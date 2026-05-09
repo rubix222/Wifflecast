@@ -620,6 +620,7 @@
   }
   .at-bat-row .player-name { font-weight: 600; color: #111827; }
   .at-bat-row .player-num { color: #6b7280; font-size: 12px; margin-right: 4px; }
+  .at-bat-row .game-stats { font-size: 11px; color: #6b7280; margin-top: 2px; }
 
   .count-row {
     display: flex;
@@ -2008,6 +2009,35 @@ function liveGameHTML(g, home, away) {
   `;
 }
 
+function batterGameStats(g, batterId) {
+  let ab = 0, h = 0, bb = 0, k = 0, rbi = 0;
+  (g.events || []).forEach(e => {
+    if (e.type !== 'pa_end' || e.batterId !== batterId) return;
+    if (e.outcome === 'BB') { bb++; return; }
+    ab++;
+    if (['1B','2B','3B','HR'].includes(e.outcome)) h++;
+    if (e.outcome === 'K') k++;
+    rbi += e.rbi || 0;
+  });
+  const parts = [`${h}-${ab}`];
+  if (bb)  parts.push(`${bb} BB`);
+  if (k)   parts.push(`${k} K`);
+  if (rbi) parts.push(`${rbi} RBI`);
+  return parts.join(', ');
+}
+
+function pitcherGameStats(g, pitcherId) {
+  let k = 0, bb = 0, h = 0, er = 0;
+  (g.events || []).forEach(e => {
+    if (e.type !== 'pa_end' || e.pitcherId !== pitcherId) return;
+    if (e.outcome === 'K')  k++;
+    if (e.outcome === 'BB') bb++;
+    if (['1B','2B','3B','HR'].includes(e.outcome)) h++;
+    er += e.earnedRuns || 0;
+  });
+  return `${k} K · ${bb} BB · ${h} H · ${er} ER`;
+}
+
 function renderBatterRow(g) {
   const batterId = currentBatterId(g);
   const onDeckId = nextBatterId(g);
@@ -2023,6 +2053,7 @@ function renderBatterRow(g) {
       <div>
         <span class="player-num">#${escapeHtml(batter?.jerseyNumber || '-')}</span>
         <span class="player-name">${escapeHtml(batter?.name || '?')}</span>
+        <div class="game-stats">${batterId ? batterGameStats(g, batterId) : ''}</div>
       </div>
     </div>
     <div class="at-bat-row">
@@ -2030,6 +2061,7 @@ function renderBatterRow(g) {
       <div>
         <span class="player-num">#${escapeHtml(pitcher?.jerseyNumber || '-')}</span>
         <span>${escapeHtml(pitcher?.name || '?')}</span>
+        <div class="game-stats">${pitcherId ? pitcherGameStats(g, pitcherId) : ''}</div>
       </div>
     </div>
     <div class="at-bat-row">
@@ -2247,7 +2279,7 @@ function drawBases(overrideBases = null) {
 
   const tag = (runner, cx, cy, above) => {
     if (!runner) return '';
-    const label = `${runner.name} ${runner.number}`;
+    const label = runner.name;
     const w = Math.max(46, label.length * 6);
     const ty = above ? cy - 28 : cy + 14;
     return `<g class="runner-tag" transform="translate(${cx - w/2}, ${ty})">
