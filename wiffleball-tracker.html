@@ -2199,10 +2199,10 @@ function drawField(overrideBases = null) {
 
   const svg = `
     <svg viewBox="0 0 400 400" class="field-svg" id="field-svg">
-      <path class="grass" d="M 200 390 L 0 190 A 283 283 0 0 1 400 190 Z"/>
+      <path class="grass" d="M 200 390 L 59 145 A 283 283 0 0 1 341 145 Z"/>
       <polygon class="dirt" points="200,230 280,310 200,390 120,310" />
       <circle class="mound" cx="${FIELD.MOUND.x}" cy="${FIELD.MOUND.y}" r="12"/>
-      <path class="double-line" d="M 66 256 A 190 190 0 0 1 334 256" />
+      <path class="double-line" d="M 105 226 A 190 190 0 0 1 295 226" />
       ${baseSquare(FIELD.HOME.x,   FIELD.HOME.y,   false)}
       ${baseSquare(FIELD.FIRST.x,  FIELD.FIRST.y,  !!bases[1])}
       ${baseSquare(FIELD.SECOND.x, FIELD.SECOND.y, !!bases[2])}
