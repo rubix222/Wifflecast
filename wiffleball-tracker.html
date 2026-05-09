@@ -1,0 +1,2786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Wiffleball Tracker</title>
+<style>
+  /* ---------- Reset & base ---------- */
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+                 Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    background: #f4f6f8;
+    color: #1f2937;
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+  button { font-family: inherit; cursor: pointer; }
+  input, select, button, textarea { font-size: 14px; }
+
+  /* ---------- Layout ---------- */
+  header {
+    background: linear-gradient(135deg, #14532d 0%, #166534 100%);
+    color: #fff;
+    padding: 16px 24px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  header h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  header h1 .logo {
+    background: #facc15;
+    color: #14532d;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 15px;
+  }
+  .storage-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+  }
+  .storage-status {
+    padding: 4px 10px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 12px;
+    font-size: 12px;
+  }
+  .storage-status.connected { background: rgba(250, 204, 21, 0.25); color: #fef9c3; }
+
+  nav.tabs {
+    background: #fff;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    padding: 0 16px;
+    overflow-x: auto;
+  }
+  nav.tabs button {
+    background: none;
+    border: none;
+    padding: 14px 20px;
+    font-size: 15px;
+    font-weight: 500;
+    color: #6b7280;
+    border-bottom: 3px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+  }
+  nav.tabs button:hover { color: #166534; }
+  nav.tabs button.active {
+    color: #166534;
+    border-bottom-color: #166534;
+  }
+
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* ---------- Toolbar ---------- */
+  .toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .toolbar h2 { margin: 0; font-size: 20px; font-weight: 600; }
+
+  /* ---------- Buttons ---------- */
+  .btn {
+    padding: 8px 16px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    font-weight: 500;
+    transition: background 0.15s, border-color 0.15s, transform 0.05s;
+    background: #fff;
+    color: #374151;
+    border-color: #d1d5db;
+  }
+  .btn:hover { background: #f9fafb; }
+  .btn:active { transform: translateY(1px); }
+  .btn-primary { background: #166534; color: #fff; border-color: #166534; }
+  .btn-primary:hover { background: #14532d; }
+  .btn-danger { color: #b91c1c; border-color: #fecaca; background: #fff; }
+  .btn-danger:hover { background: #fef2f2; }
+  .btn-warning { background: #f59e0b; color: #fff; border-color: #f59e0b; }
+  .btn-warning:hover { background: #d97706; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn-icon {
+    background: transparent;
+    border: none;
+    padding: 4px 8px;
+    color: #6b7280;
+    border-radius: 4px;
+  }
+  .btn-icon:hover { background: #f3f4f6; color: #1f2937; }
+
+  /* ---------- Cards & Lists ---------- */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+  }
+  .card {
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    padding: 16px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    transition: box-shadow 0.15s, transform 0.05s;
+  }
+  .card:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.06); }
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+    gap: 8px;
+  }
+  .card-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #111827;
+    margin: 0;
+  }
+  .card-subtitle { font-size: 13px; color: #6b7280; margin-top: 2px; }
+  .card-actions { display: flex; gap: 4px; }
+  .jersey-badge {
+    background: #166534;
+    color: #fff;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  /* ---------- Stat blocks ---------- */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .stat {
+    background: #f9fafb;
+    border-radius: 6px;
+    padding: 6px 8px;
+    text-align: center;
+  }
+  .stat-label {
+    font-size: 10px;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+  }
+  .stat-value { font-size: 14px; font-weight: 600; color: #111827; }
+  .stat-section-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #6b7280;
+    font-weight: 600;
+    margin: 12px 0 6px;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 50px 20px;
+    background: #fff;
+    border-radius: 10px;
+    border: 1px dashed #d1d5db;
+    color: #6b7280;
+  }
+  .empty-state h3 { color: #374151; margin: 0 0 6px; }
+  .empty-state p { margin: 0 0 14px; font-size: 14px; }
+
+  /* ---------- Modal ---------- */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(17, 24, 39, 0.55);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 16px;
+  }
+  .modal-backdrop.show { display: flex; }
+  .modal {
+    background: #fff;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 540px;
+    max-height: 95vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+  }
+  .modal-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .modal-header h3 { margin: 0; font-size: 18px; }
+  .modal-body { padding: 20px; }
+  .modal-footer {
+    padding: 14px 20px;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .modal.lg { max-width: 760px; }
+  .modal.xl { max-width: 1100px; }
+  .modal.full { max-width: none; height: 95vh; }
+
+  /* ---------- Forms ---------- */
+  .form-group { margin-bottom: 14px; }
+  .form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #374151;
+    font-size: 13px;
+  }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  .form-group input:focus, .form-group select:focus {
+    outline: none;
+    border-color: #166534;
+    box-shadow: 0 0 0 3px rgba(22, 101, 52, 0.12);
+  }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .help-text { font-size: 12px; color: #6b7280; margin-top: 4px; }
+
+  /* ---------- Player picker (for teams) ---------- */
+  .player-picker {
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    max-height: 280px;
+    overflow-y: auto;
+    background: #fff;
+  }
+  .player-picker-item {
+    padding: 8px 12px;
+    border-bottom: 1px solid #f3f4f6;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+  }
+  .player-picker-item:last-child { border-bottom: none; }
+  .player-picker-item:hover { background: #f9fafb; }
+  .player-picker-item input { width: auto; }
+
+  /* ---------- Game lineup (setup) ---------- */
+  .game-setup-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  @media (max-width: 720px) {
+    .game-setup-grid { grid-template-columns: 1fr; }
+    .form-row { grid-template-columns: 1fr; }
+  }
+  .lineup-team-block h4 {
+    margin: 0 0 10px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #166534;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .lineup-team-block .team-tag {
+    background: #166534;
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .team-tag.away { background: #b45309; }
+  .lineup-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: #fff;
+    overflow: hidden;
+  }
+  .lineup-row {
+    display: grid;
+    grid-template-columns: 28px 1fr auto auto auto;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-bottom: 1px solid #f3f4f6;
+    background: #fff;
+  }
+  .lineup-row:last-child { border-bottom: none; }
+  .lineup-row.dragging { opacity: 0.5; }
+  .lineup-row.drop-target { background: #ecfdf5; }
+  .lineup-order {
+    background: #166534;
+    color: #fff;
+    border-radius: 50%;
+    width: 24px; height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .lineup-name {
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .lineup-name .num {
+    color: #6b7280;
+    font-weight: 400;
+    font-size: 12px;
+    margin-right: 4px;
+  }
+  .lineup-row select {
+    padding: 4px 6px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  .lineup-handle {
+    cursor: grab;
+    color: #9ca3af;
+    user-select: none;
+    padding: 0 6px;
+  }
+  .lineup-handle:active { cursor: grabbing; }
+
+  /* ---------- Game card ---------- */
+  .game-card-status {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+  }
+  .status-setup { background: #fef3c7; color: #92400e; }
+  .status-in_progress { background: #dbeafe; color: #1e40af; }
+  .status-completed { background: #d1fae5; color: #065f46; }
+  .game-vs {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 14px 0;
+  }
+  .game-team { flex: 1; text-align: center; }
+  .game-team .label {
+    font-size: 11px; color: #6b7280;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .game-team .name { font-weight: 600; font-size: 15px; color: #111827; }
+  .game-team .score-big { font-size: 28px; font-weight: 700; color: #166534; line-height: 1.1; }
+  .game-vs .vs-divider { font-weight: 700; color: #9ca3af; font-size: 13px; }
+
+  /* ============================================================
+     LIVE GAME SCREEN
+     ============================================================ */
+  .live-game {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 18px;
+    padding: 18px;
+    background: #f4f6f8;
+    height: 95vh;
+    overflow: hidden;
+  }
+  @media (max-width: 920px) {
+    .live-game { grid-template-columns: 1fr; height: auto; max-height: none; overflow-y: auto; }
+  }
+  .live-game-left { display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow-y: auto; }
+  .live-game-right { display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow-y: auto; }
+
+  .scoreboard {
+    background: #14532d;
+    color: #fff;
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 12px;
+    align-items: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+  .scoreboard .team-side { text-align: center; }
+  .scoreboard .team-side .name {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    opacity: 0.85;
+  }
+  .scoreboard .team-side .score { font-size: 38px; font-weight: 700; line-height: 1; }
+  .scoreboard .team-side.batting .score { color: #facc15; }
+  .scoreboard .middle {
+    text-align: center;
+    border-left: 1px solid rgba(255,255,255,0.2);
+    border-right: 1px solid rgba(255,255,255,0.2);
+    padding: 0 12px;
+  }
+  .scoreboard .middle .inning { font-size: 15px; font-weight: 600; }
+  .scoreboard .middle .outs {
+    margin-top: 4px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    opacity: 0.85;
+  }
+  .scoreboard .middle .out-dots {
+    display: inline-flex;
+    gap: 3px;
+    margin-left: 4px;
+  }
+  .scoreboard .middle .out-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    border: 1.5px solid #facc15;
+    display: inline-block;
+  }
+  .scoreboard .middle .out-dot.on { background: #facc15; }
+
+  .field-wrap {
+    background: #fff;
+    border-radius: 10px;
+    padding: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .field-wrap h3 {
+    margin: 0 0 10px;
+    font-size: 14px;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+  }
+  .field-svg {
+    width: 100%;
+    height: auto;
+    max-height: 460px;
+    display: block;
+    user-select: none;
+  }
+  .field-svg .grass { fill: #5e8c3a; }
+  .field-svg .dirt  { fill: #c89968; }
+  .field-svg .double-line { stroke: rgba(255,255,255,0.65); stroke-width: 2; fill: none; }
+  .field-svg .base { fill: #f9fafb; stroke: #1f2937; stroke-width: 1; }
+  .field-svg .base.occupied { fill: #facc15; stroke: #92400e; }
+  .field-svg .mound { fill: #b07a44; }
+  .field-svg .fielder { cursor: pointer; }
+  .field-svg .fielder.dragging { opacity: 0.5; }
+  .field-svg .fielder circle {
+    fill: #1e3a8a;
+    stroke: #fff;
+    stroke-width: 2.5;
+    transition: r 0.1s, stroke-width 0.1s;
+  }
+  .field-svg .fielder:hover circle {
+    stroke: #facc15;
+    stroke-width: 3;
+  }
+  .field-svg .fielder text.pos {
+    fill: #fff;
+    font-size: 13px;
+    font-weight: 800;
+    pointer-events: none;
+    text-anchor: middle;
+  }
+  .field-svg .fielder text.name {
+    fill: #1f2937;
+    font-size: 11px;
+    font-weight: 600;
+    pointer-events: none;
+    text-anchor: middle;
+  }
+  .field-svg .fielder text.name.bg {
+    fill: none;
+    stroke: #fff;
+    stroke-width: 3;
+    paint-order: stroke;
+  }
+  .field-svg .runner-tag {
+    pointer-events: none;
+  }
+  .field-svg .runner-tag rect {
+    fill: #fff;
+    stroke: #166534;
+    stroke-width: 1.5;
+  }
+  .field-svg .runner-tag text {
+    fill: #166534;
+    font-size: 10px;
+    font-weight: 700;
+    text-anchor: middle;
+  }
+  .field-svg .ball-marker {
+    fill: #fff;
+    stroke: #b91c1c;
+    stroke-width: 2;
+    pointer-events: none;
+  }
+  .field-svg.location-mode { cursor: crosshair; }
+
+  .at-bat-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  .at-bat-card h3 {
+    margin: 0 0 6px;
+    font-size: 12px;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+  }
+  .at-bat-row {
+    display: grid;
+    grid-template-columns: 36px 1fr;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+  }
+  .at-bat-row .role {
+    font-size: 10px;
+    text-transform: uppercase;
+    color: #6b7280;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+  }
+  .at-bat-row .player-name { font-weight: 600; color: #111827; }
+  .at-bat-row .player-num { color: #6b7280; font-size: 12px; margin-right: 4px; }
+
+  .count-row {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #f3f4f6;
+  }
+  .count-block { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+  .count-block .label {
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #6b7280;
+    font-weight: 600;
+  }
+  .count-block .val {
+    background: #166534;
+    color: #fff;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-weight: 700;
+    min-width: 18px;
+    text-align: center;
+  }
+
+  .pitch-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .pitch-buttons button {
+    padding: 14px 10px;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    background: #fff;
+    font-weight: 600;
+    font-size: 14px;
+    text-align: center;
+  }
+  .pitch-buttons button:hover { background: #f9fafb; border-color: #9ca3af; }
+  .pitch-buttons .btn-bip {
+    grid-column: 1 / -1;
+    background: #166534;
+    color: #fff;
+    border-color: #166534;
+    font-size: 16px;
+    padding: 16px;
+  }
+  .pitch-buttons .btn-bip:hover { background: #14532d; }
+
+  .play-log {
+    background: #fff;
+    border-radius: 10px;
+    padding: 12px 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    font-size: 13px;
+    flex: 1;
+    overflow-y: auto;
+    max-height: 240px;
+  }
+  .play-log h3 {
+    margin: 0 0 8px;
+    font-size: 12px;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+  }
+  .play-log ul { list-style: none; padding: 0; margin: 0; }
+  .play-log li {
+    padding: 5px 0;
+    border-bottom: 1px solid #f3f4f6;
+    color: #374151;
+  }
+  .play-log li:last-child { border-bottom: none; }
+  .play-log .play-meta {
+    font-size: 11px;
+    color: #6b7280;
+    margin-right: 6px;
+  }
+  .play-inning-break {
+    text-align: center;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #6b7280;
+    background: #f3f4f6;
+    border-top: 1px solid #e5e7eb;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 3px 0;
+    pointer-events: none;
+    margin: 1px 0;
+  }
+  .play-entry.clickable { cursor: pointer; }
+  .play-entry.clickable:hover { background: #f0fdf4; }
+  .play-entry.selected { background: #dcfce7 !important; border-left: 3px solid #166534 !important; padding-left: 8px; }
+  .replay-banner {
+    background: #fef3c7;
+    border: 1px solid #fde68a;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+    color: #92400e;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+
+  .game-controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .game-controls .btn { flex: 1; }
+
+  /* Outcome chooser */
+  .outcome-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .outcome-grid button {
+    padding: 16px 12px;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    background: #fff;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .outcome-grid button:hover { background: #f9fafb; border-color: #166534; }
+  .outcome-grid button .sub {
+    display: block;
+    font-size: 11px;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 2px;
+    font-weight: 500;
+  }
+
+  /* line score */
+  .line-score {
+    background: #fff;
+    border-radius: 10px;
+    padding: 14px;
+    overflow-x: auto;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  .line-score table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 360px;
+  }
+  .line-score th, .line-score td {
+    padding: 6px 8px;
+    text-align: center;
+    border-bottom: 1px solid #f3f4f6;
+    font-size: 13px;
+  }
+  .line-score th { color: #6b7280; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .line-score td.team { text-align: left; font-weight: 600; }
+  .line-score td.total { font-weight: 700; }
+
+  .game-finish-banner {
+    background: linear-gradient(135deg, #facc15 0%, #f59e0b 100%);
+    color: #14532d;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 14px;
+  }
+
+  /* ---------- Toast ---------- */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #111827;
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+    z-index: 200;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.error { background: #b91c1c; }
+  .toast.success { background: #166534; }
+
+  /* ---------- Utility ---------- */
+  .muted { color: #6b7280; }
+  .small { font-size: 12px; }
+  .row-flex { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .pill {
+    background: #e5e7eb;
+    color: #374151;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .center { text-align: center; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span class="logo">W</span> Wiffleball Tracker</h1>
+  <div class="storage-controls">
+    <span id="storage-status" class="storage-status">Local browser storage</span>
+    <button id="btn-connect-folder" class="btn btn-sm">Connect Folder</button>
+    <button id="btn-export" class="btn btn-sm">Export</button>
+    <button id="btn-import" class="btn btn-sm">Import</button>
+    <input type="file" id="import-file" accept="application/json" hidden />
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="tab-btn active" data-view="players">Players</button>
+  <button class="tab-btn" data-view="teams">Teams</button>
+  <button class="tab-btn" data-view="games">Games</button>
+</nav>
+
+<main>
+  <section id="view-players" class="view active">
+    <div class="toolbar">
+      <h2>Players</h2>
+      <button id="btn-add-player" class="btn btn-primary">+ Add Player</button>
+    </div>
+    <div id="players-container"></div>
+  </section>
+
+  <section id="view-teams" class="view">
+    <div class="toolbar">
+      <h2>Teams</h2>
+      <button id="btn-add-team" class="btn btn-primary">+ Add Team</button>
+    </div>
+    <div id="teams-container"></div>
+  </section>
+
+  <section id="view-games" class="view">
+    <div class="toolbar">
+      <h2>Games</h2>
+      <button id="btn-add-game" class="btn btn-primary">+ New Game</button>
+    </div>
+    <div id="games-container"></div>
+  </section>
+</main>
+
+<div id="modal-backdrop" class="modal-backdrop">
+  <div id="modal" class="modal">
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+/* =====================================================
+   WIFFLEBALL TRACKER
+   ===================================================== */
+
+/* ----------- Helpers ----------- */
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+const uid = () => 'id_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+const escapeHtml = (s) => String(s ?? '')
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+function toast(msg, type = '') {
+  const el = $('#toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { el.className = 'toast'; }, 2400);
+}
+
+/* ============================================================
+   STORAGE LAYER
+   ============================================================ */
+const LS_KEY = 'wiffleball_tracker_v1';
+const IDB_NAME = 'wiffleball-tracker';
+const IDB_STORE = 'handles';
+
+function idbOpen() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbGet(key) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readonly');
+    const req = tx.objectStore(IDB_STORE).get(key);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbPut(key, val) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).put(val, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+async function idbDel(key) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).delete(key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+const Storage = {
+  dirHandle: null,
+
+  async init() {
+    if ('showDirectoryPicker' in window) {
+      try {
+        const handle = await idbGet('dir');
+        if (handle) {
+          const perm = await handle.queryPermission({ mode: 'readwrite' });
+          if (perm === 'granted') this.dirHandle = handle;
+        }
+      } catch (err) { console.warn('Could not restore dir handle', err); }
+    }
+    this.updateStatus();
+  },
+
+  isFileBased() { return !!this.dirHandle; },
+
+  updateStatus() {
+    const el = $('#storage-status');
+    if (this.dirHandle) {
+      el.textContent = '📁 ' + this.dirHandle.name;
+      el.classList.add('connected');
+      $('#btn-connect-folder').textContent = 'Change Folder';
+    } else {
+      el.textContent = 'Local browser storage';
+      el.classList.remove('connected');
+      $('#btn-connect-folder').textContent = 'Connect Folder';
+    }
+  },
+
+  async connectFolder() {
+    if (!('showDirectoryPicker' in window)) {
+      toast('Your browser does not support folder picking. Use Chrome/Edge, or Export/Import.', 'error');
+      return false;
+    }
+    try {
+      const handle = await window.showDirectoryPicker({ id: 'wiffleball', mode: 'readwrite' });
+      const perm = await handle.requestPermission({ mode: 'readwrite' });
+      if (perm !== 'granted') { toast('Permission denied', 'error'); return false; }
+      this.dirHandle = handle;
+      await idbPut('dir', handle);
+      this.updateStatus();
+      const loaded = await this.loadAll();
+      if (!loaded) await this.saveAll(State.snapshot());
+      toast('Connected to ' + handle.name, 'success');
+      Render.all();
+      return true;
+    } catch (err) {
+      if (err.name !== 'AbortError') { console.error(err); toast('Could not connect folder', 'error'); }
+      return false;
+    }
+  },
+
+  async ensurePermission() {
+    if (!this.dirHandle) return false;
+    const opts = { mode: 'readwrite' };
+    let perm = await this.dirHandle.queryPermission(opts);
+    if (perm !== 'granted') perm = await this.dirHandle.requestPermission(opts);
+    return perm === 'granted';
+  },
+
+  async readFile(name) {
+    if (!this.dirHandle) return null;
+    try {
+      const fh = await this.dirHandle.getFileHandle(name);
+      const file = await fh.getFile();
+      const text = await file.text();
+      return text ? JSON.parse(text) : [];
+    } catch (err) {
+      if (err.name === 'NotFoundError') return null;
+      console.error('readFile error', name, err);
+      return null;
+    }
+  },
+
+  async writeFile(name, data) {
+    if (!this.dirHandle) return;
+    const fh = await this.dirHandle.getFileHandle(name, { create: true });
+    const w = await fh.createWritable();
+    await w.write(JSON.stringify(data, null, 2));
+    await w.close();
+  },
+
+  async loadAll() {
+    if (this.dirHandle) {
+      const ok = await this.ensurePermission();
+      if (!ok) return false;
+      const players = await this.readFile('players.json');
+      const teams = await this.readFile('teams.json');
+      const games = await this.readFile('games.json');
+      State.players = players || [];
+      State.teams = teams || [];
+      State.games = games || [];
+      return players !== null || teams !== null || games !== null;
+    } else {
+      const raw = localStorage.getItem(LS_KEY);
+      if (raw) {
+        try {
+          const data = JSON.parse(raw);
+          State.players = data.players || [];
+          State.teams = data.teams || [];
+          State.games = data.games || [];
+          return true;
+        } catch (e) { console.error(e); }
+      }
+      State.players = []; State.teams = []; State.games = [];
+      return false;
+    }
+  },
+
+  async saveAll(snapshot = State.snapshot()) {
+    if (this.dirHandle) {
+      const ok = await this.ensurePermission();
+      if (!ok) {
+        toast('Lost folder permission, falling back to local storage', 'error');
+        this.dirHandle = null;
+        await idbDel('dir');
+        this.updateStatus();
+        localStorage.setItem(LS_KEY, JSON.stringify(snapshot));
+        return;
+      }
+      try {
+        await this.writeFile('players.json', snapshot.players);
+        await this.writeFile('teams.json',   snapshot.teams);
+        await this.writeFile('games.json',   snapshot.games);
+      } catch (err) { console.error('Save failed', err); toast('Save failed: ' + err.message, 'error'); }
+    } else {
+      localStorage.setItem(LS_KEY, JSON.stringify(snapshot));
+    }
+  },
+
+  async exportJson() {
+    const blob = new Blob([JSON.stringify(State.snapshot(), null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'wiffleball-data-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  },
+
+  async importJson(file) {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    State.players = data.players || [];
+    State.teams = data.teams || [];
+    State.games = data.games || [];
+    await this.saveAll();
+    Render.all();
+    toast('Imported successfully', 'success');
+  }
+};
+
+/* ============================================================
+   STATE
+   ============================================================ */
+const State = {
+  players: [],
+  teams: [],
+  games: [],
+
+  snapshot() { return { players: this.players, teams: this.teams, games: this.games }; },
+
+  getPlayer(id) { return this.players.find(p => p.id === id); },
+  getTeam(id)   { return this.teams.find(t => t.id === id); },
+  getGame(id)   { return this.games.find(g => g.id === id); },
+
+  // ---- Player CRUD ----
+  async addPlayer(data) {
+    const p = { id: uid(), name: data.name.trim(), jerseyNumber: (data.jerseyNumber || '').trim(), createdAt: Date.now() };
+    this.players.push(p);
+    await Storage.saveAll();
+    return p;
+  },
+  async updatePlayer(id, data) {
+    const p = this.getPlayer(id); if (!p) return;
+    p.name = data.name.trim();
+    p.jerseyNumber = (data.jerseyNumber || '').trim();
+    await Storage.saveAll();
+  },
+  async deletePlayer(id) {
+    this.players = this.players.filter(p => p.id !== id);
+    this.teams.forEach(t => { t.playerIds = t.playerIds.filter(pid => pid !== id); });
+    await Storage.saveAll();
+  },
+
+  // ---- Team CRUD ----
+  async addTeam(data) {
+    const t = { id: uid(), name: data.name.trim(), playerIds: [...(data.playerIds || [])], createdAt: Date.now() };
+    this.teams.push(t);
+    await Storage.saveAll();
+    return t;
+  },
+  async updateTeam(id, data) {
+    const t = this.getTeam(id); if (!t) return;
+    t.name = data.name.trim();
+    t.playerIds = [...(data.playerIds || [])];
+    await Storage.saveAll();
+  },
+  async deleteTeam(id) {
+    this.teams = this.teams.filter(t => t.id !== id);
+    await Storage.saveAll();
+  },
+
+  // ---- Game CRUD ----
+  async addGame(data) {
+    const home = this.getTeam(data.homeTeamId);
+    const away = this.getTeam(data.awayTeamId);
+    if (!home || !away) throw new Error('Both teams required');
+
+    const defaultPositions = (team) => {
+      const positions = {};
+      const ids = team.playerIds;
+      if (ids.length === 2) {
+        positions[ids[0]] = 'P';
+        positions[ids[1]] = 'CF';
+      } else if (ids.length >= 3) {
+        positions[ids[0]] = 'P';
+        positions[ids[1]] = 'CF';
+        for (let i = 2; i < ids.length; i++) positions[ids[i]] = 'EH';
+      }
+      return positions;
+    };
+
+    const g = {
+      id: uid(),
+      createdAt: Date.now(),
+      status: 'setup',
+      homeTeamId: home.id,
+      awayTeamId: away.id,
+      homeBattingOrder: [...home.playerIds],
+      awayBattingOrder: [...away.playerIds],
+      homePositions: defaultPositions(home),
+      awayPositions: defaultPositions(away),
+
+      // Live tracking state
+      numInnings: data.numInnings || 7,
+      currentInning: 1,
+      currentHalf: 'top',  // 'top' = away batting, 'bottom' = home batting
+      score: { home: 0, away: 0 },
+      lineScore: [],       // [{ inning, top: runs, bottom: runs }]
+      outs: 0,
+      balls: 0,
+      strikes: 0,
+      bases: { 1: null, 2: null, 3: null }, // runner objects
+      runnerCounter: 0,
+      homeBatterIdx: 0,
+      awayBatterIdx: 0,
+      events: [],
+
+      isOver: false,
+    };
+    this.games.push(g);
+    await Storage.saveAll();
+    return g;
+  },
+  async updateGame(id, patch) {
+    const g = this.getGame(id);
+    if (!g) return;
+    Object.assign(g, patch);
+    await Storage.saveAll();
+  },
+  async deleteGame(id) {
+    this.games = this.games.filter(g => g.id !== id);
+    await Storage.saveAll();
+  },
+
+  // ---- Stat aggregation from event log ----
+  computePlayerStats(playerId) {
+    let AB=0, H=0, R=0, RBI=0, BB=0, HBP=0, SF=0, TB=0, K_bat=0;
+    let pK=0, pBB=0, pIP_outs=0, pER=0;
+    let E=0; // errors
+    let singles=0, doubles=0, triples=0, hrs=0;
+
+    this.games.forEach(g => {
+      (g.events || []).forEach(e => {
+        if (e.type !== 'pa_end') return; // only summarize at end of plate appearance
+        const isBat = e.batterId === playerId;
+        const isPit = e.pitcherId === playerId;
+
+        if (isBat) {
+          if (e.outcome === 'BB') BB++;
+          else if (e.outcome === '1B') { AB++; H++; singles++; TB += 1; }
+          else if (e.outcome === '2B') { AB++; H++; doubles++; TB += 2; }
+          else if (e.outcome === '3B') { AB++; H++; triples++; TB += 3; }
+          else if (e.outcome === 'HR') { AB++; H++; hrs++; TB += 4; }
+          else if (e.outcome === 'K')  { AB++; K_bat++; }
+          else if (e.outcome === 'OUT') { AB++; }
+          else if (e.outcome === 'ERR_REACH') { AB++; } // reached on error: AB but no hit
+          RBI += e.rbi || 0;
+        }
+        if (isPit) {
+          if (e.outcome === 'BB') pBB++;
+          if (e.outcome === 'K')  pK++;
+          // Innings pitched: count outs recorded by this pitcher (K, OUT)
+          if (e.outcome === 'K' || e.outcome === 'OUT') pIP_outs++;
+          pER += e.earnedRuns || 0;
+        }
+        if (e.errorById === playerId) E++;
+        if (e.runsScoredBy && e.runsScoredBy.includes(playerId)) R++;
+      });
+    });
+
+    const PA = AB + BB + HBP + SF;
+    const AVG = AB ? H / AB : 0;
+    const OBP = PA ? (H + BB + HBP) / PA : 0;
+    const SLG = AB ? TB / AB : 0;
+    const IP = pIP_outs / 3;
+
+    return {
+      AB, H, R, RBI, BB, K_bat, AVG, OBP, SLG,
+      singles, doubles, triples, hrs,
+      pK, pBB, pER, IP, E,
+    };
+  },
+
+  computeTeamStats(teamId) {
+    const games = this.games.filter(g => g.homeTeamId === teamId || g.awayTeamId === teamId);
+    const completed = games.filter(g => g.status === 'completed');
+    let wins = 0, losses = 0, ties = 0, runsFor = 0, runsAgainst = 0;
+    completed.forEach(g => {
+      const isHome = g.homeTeamId === teamId;
+      const my = isHome ? g.score.home : g.score.away;
+      const opp = isHome ? g.score.away : g.score.home;
+      runsFor += my; runsAgainst += opp;
+      if (my > opp) wins++;
+      else if (my < opp) losses++;
+      else ties++;
+    });
+    return {
+      gamesPlayed: completed.length,
+      gamesScheduled: games.length - completed.length,
+      wins, losses, ties, runsFor, runsAgainst,
+    };
+  },
+
+  // Hit locations across all games for a player
+  getPlayerHitLocations(playerId) {
+    const locs = [];
+    this.games.forEach(g => {
+      (g.events || []).forEach(e => {
+        if (e.type === 'pa_end' && e.batterId === playerId && e.location) {
+          locs.push({ ...e.location, outcome: e.outcome });
+        }
+      });
+    });
+    return locs;
+  }
+};
+
+/* ============================================================
+   GAME LOGIC: base running, pitch handling
+   ============================================================ */
+
+// targetBase: 1, 2, 3, or 4 (home / scored)
+// Returns { newBases, runnerIdsScored }
+function advanceRunners(bases, targetBase, batterRunner) {
+  const newBases = { 1: bases[1], 2: bases[2], 3: bases[3] };
+  const runnerIdsScored = [];
+
+  // Home run: everyone scores, batter scores
+  if (targetBase === 4) {
+    for (let b = 3; b >= 1; b--) {
+      if (newBases[b]) { runnerIdsScored.push(newBases[b].id); newBases[b] = null; }
+    }
+    runnerIdsScored.push(batterRunner.id);
+    return { newBases, runnerIdsScored };
+  }
+
+  // Place batter on target base, cascade if occupied
+  let toForce = newBases[targetBase];
+  newBases[targetBase] = batterRunner;
+  let nextBase = targetBase + 1;
+  while (toForce) {
+    if (nextBase > 3) {
+      runnerIdsScored.push(toForce.id);
+      toForce = null;
+    } else {
+      const next = newBases[nextBase];
+      newBases[nextBase] = toForce;
+      toForce = next;
+      nextBase++;
+    }
+  }
+  return { newBases, runnerIdsScored };
+}
+
+// Walk: batter to 1B with force-only chain
+function walkAdvance(bases, batterRunner) {
+  return advanceRunners(bases, 1, batterRunner);
+}
+
+const battingTeamId = (g) => g.currentHalf === 'top' ? g.awayTeamId : g.homeTeamId;
+const fieldingTeamId = (g) => g.currentHalf === 'top' ? g.homeTeamId : g.awayTeamId;
+const battingOrderArr = (g) => g.currentHalf === 'top' ? g.awayBattingOrder : g.homeBattingOrder;
+const fieldingPositions = (g) => g.currentHalf === 'top' ? g.homePositions : g.awayPositions;
+const battingPositions = (g) => g.currentHalf === 'top' ? g.awayPositions : g.homePositions;
+const battingIdxKey = (g) => g.currentHalf === 'top' ? 'awayBatterIdx' : 'homeBatterIdx';
+
+function currentBatterId(g) {
+  const order = battingOrderArr(g);
+  const idx = g[battingIdxKey(g)] % order.length;
+  return order[idx];
+}
+function nextBatterId(g) {
+  const order = battingOrderArr(g);
+  const idx = (g[battingIdxKey(g)] + 1) % order.length;
+  return order[idx];
+}
+function currentPitcherId(g) {
+  const positions = fieldingPositions(g);
+  return Object.keys(positions).find(pid => positions[pid] === 'P');
+}
+function currentCFId(g) {
+  const positions = fieldingPositions(g);
+  return Object.keys(positions).find(pid => positions[pid] === 'CF');
+}
+
+function makeRunner(g, playerId) {
+  g.runnerCounter = (g.runnerCounter || 0) + 1;
+  const player = State.getPlayer(playerId);
+  return {
+    id: uid(),
+    playerId,
+    name: player ? player.name.split(' ')[0] : '?',
+    number: g.runnerCounter,
+  };
+}
+
+/* ============================================================
+   RENDER LAYER
+   ============================================================ */
+const fmt = {
+  avg(n) { return n ? n.toFixed(3).replace(/^0/, '') : '.000'; },
+  ip(n) {
+    const whole = Math.floor(n);
+    const frac = Math.round((n - whole) * 3);
+    return whole + (frac ? '.' + frac : '.0');
+  },
+};
+
+const Render = {
+  all() { this.players(); this.teams(); this.games(); },
+
+  players() {
+    const c = $('#players-container');
+    if (!State.players.length) {
+      c.innerHTML = `<div class="empty-state">
+        <h3>No players yet</h3>
+        <p>Add players to start tracking stats and building teams.</p>
+        <button class="btn btn-primary" onclick="showPlayerModal()">+ Add Player</button>
+      </div>`;
+      return;
+    }
+    const sorted = [...State.players].sort((a, b) => a.name.localeCompare(b.name));
+    c.innerHTML = '<div class="card-grid">' + sorted.map(p => {
+      const s = State.computePlayerStats(p.id);
+      return `<div class="card">
+        <div class="card-header">
+          <div style="display:flex; gap:10px; align-items:flex-start;">
+            <div class="jersey-badge">${escapeHtml(p.jerseyNumber || '#')}</div>
+            <div>
+              <h3 class="card-title">${escapeHtml(p.name)}</h3>
+              <div class="card-subtitle small">${s.AB + s.BB} PA</div>
+            </div>
+          </div>
+          <div class="card-actions">
+            <button class="btn-icon" title="Edit" onclick="showPlayerModal('${p.id}')">✎</button>
+            <button class="btn-icon" title="Delete" onclick="deletePlayer('${p.id}')">🗑</button>
+          </div>
+        </div>
+        <div class="stat-section-title">Batting</div>
+        <div class="stats-grid">
+          <div class="stat"><div class="stat-label">AB</div><div class="stat-value">${s.AB}</div></div>
+          <div class="stat"><div class="stat-label">H</div><div class="stat-value">${s.H}</div></div>
+          <div class="stat"><div class="stat-label">R</div><div class="stat-value">${s.R}</div></div>
+          <div class="stat"><div class="stat-label">RBI</div><div class="stat-value">${s.RBI}</div></div>
+          <div class="stat"><div class="stat-label">BB</div><div class="stat-value">${s.BB}</div></div>
+          <div class="stat"><div class="stat-label">AVG</div><div class="stat-value">${fmt.avg(s.AVG)}</div></div>
+          <div class="stat"><div class="stat-label">OBP</div><div class="stat-value">${fmt.avg(s.OBP)}</div></div>
+          <div class="stat"><div class="stat-label">SLG</div><div class="stat-value">${fmt.avg(s.SLG)}</div></div>
+        </div>
+        <div class="stat-section-title">Hits & Pitching</div>
+        <div class="stats-grid">
+          <div class="stat"><div class="stat-label">2B</div><div class="stat-value">${s.doubles}</div></div>
+          <div class="stat"><div class="stat-label">3B</div><div class="stat-value">${s.triples}</div></div>
+          <div class="stat"><div class="stat-label">HR</div><div class="stat-value">${s.hrs}</div></div>
+          <div class="stat"><div class="stat-label">E</div><div class="stat-value">${s.E}</div></div>
+          <div class="stat"><div class="stat-label">IP</div><div class="stat-value">${fmt.ip(s.IP)}</div></div>
+          <div class="stat"><div class="stat-label">K</div><div class="stat-value">${s.pK}</div></div>
+          <div class="stat"><div class="stat-label">BB</div><div class="stat-value">${s.pBB}</div></div>
+          <div class="stat"><div class="stat-label">ER</div><div class="stat-value">${s.pER}</div></div>
+        </div>
+      </div>`;
+    }).join('') + '</div>';
+  },
+
+  teams() {
+    const c = $('#teams-container');
+    if (!State.teams.length) {
+      const hasPlayers = State.players.length >= 2;
+      c.innerHTML = `<div class="empty-state">
+        <h3>No teams yet</h3>
+        <p>${hasPlayers ? 'Group your players into teams. A team needs at least 2 players.' : 'Add at least 2 players first, then come back to create a team.'}</p>
+        ${hasPlayers ? '<button class="btn btn-primary" onclick="showTeamModal()">+ Add Team</button>' : ''}
+      </div>`;
+      return;
+    }
+    const sorted = [...State.teams].sort((a, b) => a.name.localeCompare(b.name));
+    c.innerHTML = '<div class="card-grid">' + sorted.map(t => {
+      const s = State.computeTeamStats(t.id);
+      const players = t.playerIds.map(id => State.getPlayer(id)).filter(Boolean);
+      return `<div class="card">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">${escapeHtml(t.name)}</h3>
+            <div class="card-subtitle small">${players.length} player${players.length !== 1 ? 's' : ''} · ${s.wins}-${s.losses}${s.ties ? '-' + s.ties : ''}</div>
+          </div>
+          <div class="card-actions">
+            <button class="btn-icon" title="Edit" onclick="showTeamModal('${t.id}')">✎</button>
+            <button class="btn-icon" title="Delete" onclick="deleteTeam('${t.id}')">🗑</button>
+          </div>
+        </div>
+        <div class="stat-section-title">Roster</div>
+        <div class="row-flex">
+          ${players.map(p => `<span class="pill">${escapeHtml(p.jerseyNumber ? '#' + p.jerseyNumber + ' ' : '')}${escapeHtml(p.name)}</span>`).join('')}
+        </div>
+        <div class="stat-section-title">Record</div>
+        <div class="stats-grid">
+          <div class="stat"><div class="stat-label">GP</div><div class="stat-value">${s.gamesPlayed}</div></div>
+          <div class="stat"><div class="stat-label">W</div><div class="stat-value">${s.wins}</div></div>
+          <div class="stat"><div class="stat-label">L</div><div class="stat-value">${s.losses}</div></div>
+          <div class="stat"><div class="stat-label">RF</div><div class="stat-value">${s.runsFor}</div></div>
+        </div>
+      </div>`;
+    }).join('') + '</div>';
+  },
+
+  games() {
+    const c = $('#games-container');
+    if (!State.games.length) {
+      const hasTwoTeams = State.teams.length >= 2;
+      c.innerHTML = `<div class="empty-state">
+        <h3>No games yet</h3>
+        <p>${hasTwoTeams ? 'Pick two teams and start tracking a game.' : 'Create at least 2 teams to start a game.'}</p>
+        ${hasTwoTeams ? '<button class="btn btn-primary" onclick="showNewGameModal()">+ New Game</button>' : ''}
+      </div>`;
+      return;
+    }
+    const sorted = [...State.games].sort((a, b) => b.createdAt - a.createdAt);
+    c.innerHTML = '<div class="card-grid">' + sorted.map(g => {
+      const home = State.getTeam(g.homeTeamId);
+      const away = State.getTeam(g.awayTeamId);
+      const date = new Date(g.createdAt).toLocaleDateString();
+      const showScore = g.status !== 'setup';
+      const inningStr = g.status === 'in_progress'
+        ? `${g.currentHalf === 'top' ? 'Top' : 'Bot'} ${g.currentInning}`
+        : (g.status === 'completed' ? 'Final' : '');
+      return `<div class="card" style="cursor:pointer" onclick="openGame('${g.id}')">
+        <div class="card-header">
+          <div>
+            <span class="game-card-status status-${g.status}">${g.status.replace('_', ' ')}${inningStr ? ' · ' + inningStr : ''}</span>
+            <div class="card-subtitle small" style="margin-top:6px">${date} · ${g.numInnings} innings</div>
+          </div>
+          <div class="card-actions" onclick="event.stopPropagation()">
+            <button class="btn-icon" title="Delete" onclick="deleteGame('${g.id}')">🗑</button>
+          </div>
+        </div>
+        <div class="game-vs">
+          <div class="game-team">
+            <div class="label">Away</div>
+            <div class="name">${escapeHtml(away?.name || '—')}</div>
+            ${showScore ? `<div class="score-big">${g.score.away}</div>` : ''}
+          </div>
+          <div class="vs-divider">${showScore ? '—' : '@'}</div>
+          <div class="game-team">
+            <div class="label">Home</div>
+            <div class="name">${escapeHtml(home?.name || '—')}</div>
+            ${showScore ? `<div class="score-big">${g.score.home}</div>` : ''}
+          </div>
+        </div>
+        <button class="btn btn-sm" style="width:100%">${g.status === 'setup' ? 'Open setup' : (g.status === 'in_progress' ? 'Continue game' : 'View game')}</button>
+      </div>`;
+    }).join('') + '</div>';
+  }
+};
+
+/* ============================================================
+   MODAL INFRASTRUCTURE
+   ============================================================ */
+const Modal = {
+  show(html, { wide = false, xl = false, full = false } = {}) {
+    const m = $('#modal');
+    m.classList.remove('lg', 'xl', 'full');
+    if (wide) m.classList.add('lg');
+    if (xl) m.classList.add('xl');
+    if (full) m.classList.add('full');
+    $('#modal-content').innerHTML = html;
+    $('#modal-backdrop').classList.add('show');
+  },
+  hide() {
+    $('#modal-backdrop').classList.remove('show');
+    $('#modal-content').innerHTML = '';
+  }
+};
+$('#modal-backdrop').addEventListener('click', (e) => {
+  if (e.target.id === 'modal-backdrop') Modal.hide();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') Modal.hide();
+});
+
+/* ============================================================
+   PLAYER MODAL
+   ============================================================ */
+function showPlayerModal(id = null) {
+  const editing = id ? State.getPlayer(id) : null;
+  Modal.show(`
+    <div class="modal-header">
+      <h3>${editing ? 'Edit player' : 'Add player'}</h3>
+      <button class="btn-icon" onclick="Modal.hide()">✕</button>
+    </div>
+    <form onsubmit="submitPlayer(event, ${editing ? `'${id}'` : 'null'})">
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="player-name">Name</label>
+          <input id="player-name" required autofocus value="${escapeHtml(editing?.name || '')}" />
+        </div>
+        <div class="form-group">
+          <label for="player-jersey">Jersey number <span class="muted small">(optional)</span></label>
+          <input id="player-jersey" maxlength="4" value="${escapeHtml(editing?.jerseyNumber || '')}" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" onclick="Modal.hide()">Cancel</button>
+        <button type="submit" class="btn btn-primary">${editing ? 'Save' : 'Add'}</button>
+      </div>
+    </form>`);
+}
+async function submitPlayer(e, id) {
+  e.preventDefault();
+  const data = { name: $('#player-name').value, jerseyNumber: $('#player-jersey').value };
+  if (!data.name.trim()) return;
+  if (id) await State.updatePlayer(id, data);
+  else    await State.addPlayer(data);
+  Modal.hide();
+  Render.all();
+  toast(id ? 'Player updated' : 'Player added', 'success');
+}
+async function deletePlayer(id) {
+  const p = State.getPlayer(id);
+  if (!p) return;
+  if (!confirm(`Delete player "${p.name}"? They will be removed from all teams.`)) return;
+  await State.deletePlayer(id);
+  Render.all();
+  toast('Player deleted');
+}
+
+/* ============================================================
+   TEAM MODAL
+   ============================================================ */
+function showTeamModal(id = null) {
+  const editing = id ? State.getTeam(id) : null;
+  if (State.players.length < 2) { toast('Add at least 2 players first', 'error'); return; }
+  const selected = new Set(editing?.playerIds || []);
+  const playerOptions = [...State.players]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(p => `
+      <label class="player-picker-item">
+        <input type="checkbox" value="${p.id}" ${selected.has(p.id) ? 'checked' : ''} />
+        <span class="jersey-badge" style="width:24px; height:24px; font-size:11px;">${escapeHtml(p.jerseyNumber || '#')}</span>
+        <span>${escapeHtml(p.name)}</span>
+      </label>`).join('');
+  Modal.show(`
+    <div class="modal-header">
+      <h3>${editing ? 'Edit team' : 'Add team'}</h3>
+      <button class="btn-icon" onclick="Modal.hide()">✕</button>
+    </div>
+    <form onsubmit="submitTeam(event, ${editing ? `'${id}'` : 'null'})">
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="team-name">Team name</label>
+          <input id="team-name" required autofocus value="${escapeHtml(editing?.name || '')}" />
+        </div>
+        <div class="form-group">
+          <label>Roster <span class="muted small">(select 2 or more players)</span></label>
+          <div class="player-picker" id="team-player-picker">${playerOptions}</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" onclick="Modal.hide()">Cancel</button>
+        <button type="submit" class="btn btn-primary">${editing ? 'Save' : 'Add'}</button>
+      </div>
+    </form>`);
+}
+async function submitTeam(e, id) {
+  e.preventDefault();
+  const checked = $$('#team-player-picker input[type=checkbox]:checked').map(cb => cb.value);
+  if (checked.length < 2) { toast('Pick at least 2 players', 'error'); return; }
+  const data = { name: $('#team-name').value, playerIds: checked };
+  if (!data.name.trim()) return;
+  if (id) await State.updateTeam(id, data);
+  else    await State.addTeam(data);
+  Modal.hide();
+  Render.all();
+  toast(id ? 'Team updated' : 'Team added', 'success');
+}
+async function deleteTeam(id) {
+  const t = State.getTeam(id);
+  if (!t) return;
+  if (!confirm(`Delete team "${t.name}"?`)) return;
+  await State.deleteTeam(id);
+  Render.all();
+  toast('Team deleted');
+}
+
+/* ============================================================
+   NEW GAME MODAL
+   ============================================================ */
+function showNewGameModal() {
+  if (State.teams.length < 2) { toast('Need at least 2 teams', 'error'); return; }
+  const teamOptions = State.teams.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
+  Modal.show(`
+    <div class="modal-header">
+      <h3>New game</h3>
+      <button class="btn-icon" onclick="Modal.hide()">✕</button>
+    </div>
+    <form onsubmit="submitNewGame(event)">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="game-away">Away team <span class="muted small">(bats first)</span></label>
+            <select id="game-away" required>
+              <option value="">— pick —</option>${teamOptions}
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="game-home">Home team</label>
+            <select id="game-home" required>
+              <option value="">— pick —</option>${teamOptions}
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="game-innings">Number of innings</label>
+          <input id="game-innings" type="number" min="1" max="20" value="7" required />
+          <div class="help-text">If tied at the end of these innings, extra innings are played.</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" onclick="Modal.hide()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create game</button>
+      </div>
+    </form>`);
+}
+async function submitNewGame(e) {
+  e.preventDefault();
+  const homeTeamId = $('#game-home').value;
+  const awayTeamId = $('#game-away').value;
+  const numInnings = parseInt($('#game-innings').value, 10) || 7;
+  if (!homeTeamId || !awayTeamId) return;
+  if (homeTeamId === awayTeamId) { toast('Pick two different teams', 'error'); return; }
+  const game = await State.addGame({ homeTeamId, awayTeamId, numInnings });
+  Modal.hide();
+  Render.all();
+  openGame(game.id);
+}
+async function deleteGame(id) {
+  if (!confirm('Delete this game?')) return;
+  await State.deleteGame(id);
+  Render.all();
+  toast('Game deleted');
+}
+
+function openGame(id) {
+  const g = State.getGame(id);
+  if (!g) return;
+  if (g.status === 'setup') renderGameSetup(g);
+  else                      renderLiveGame(g.id);
+}
+
+/* ============================================================
+   GAME SETUP SCREEN (lineup + positions, then Start)
+   ============================================================ */
+function renderGameSetup(g) {
+  const home = State.getTeam(g.homeTeamId);
+  const away = State.getTeam(g.awayTeamId);
+  if (!home || !away) { toast('Game has missing teams', 'error'); return; }
+  Modal.show(`
+    <div class="modal-header">
+      <h3>Game setup
+        <span class="game-card-status status-setup" style="margin-left:8px">setup</span>
+      </h3>
+      <button class="btn-icon" onclick="Modal.hide()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="help-text" style="margin-bottom:18px">
+        Set the batting order (drag the ⋮⋮ handle or use ↑/↓) and assign starting field positions.
+        Batting order stays fixed once the game starts; positions can be changed any time during the game.
+      </p>
+      <div class="game-setup-grid">
+        <div class="lineup-team-block">
+          <h4>${escapeHtml(away.name)} <span class="team-tag away">Away</span></h4>
+          <ul class="lineup-list" id="lineup-away" data-team="away" data-game="${g.id}"></ul>
+        </div>
+        <div class="lineup-team-block">
+          <h4>${escapeHtml(home.name)} <span class="team-tag">Home</span></h4>
+          <ul class="lineup-list" id="lineup-home" data-team="home" data-game="${g.id}"></ul>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="Modal.hide()">Save & close</button>
+      <button class="btn btn-primary" onclick="startGame('${g.id}')">Start game →</button>
+    </div>`, { wide: true });
+  renderLineup(g, 'away');
+  renderLineup(g, 'home');
+}
+
+function renderLineup(g, side) {
+  const team = side === 'home' ? State.getTeam(g.homeTeamId) : State.getTeam(g.awayTeamId);
+  const order = side === 'home' ? g.homeBattingOrder : g.awayBattingOrder;
+  const positions = side === 'home' ? g.homePositions : g.awayPositions;
+  const list = $('#lineup-' + side);
+  if (!list) return;
+
+  const positionOptions = (currentPos) => {
+    const opts = [
+      { v: 'P', label: 'Pitcher (P)' },
+      { v: 'CF', label: 'Center Field (CF)' },
+    ];
+    if (team.playerIds.length >= 3) opts.push({ v: 'EH', label: 'Extra Hitter (EH)' });
+    opts.push({ v: 'BENCH', label: 'Bench' });
+    return opts.map(o => `<option value="${o.v}" ${o.v === currentPos ? 'selected' : ''}>${o.label}</option>`).join('');
+  };
+
+  list.innerHTML = order.map((pid, idx) => {
+    const p = State.getPlayer(pid); if (!p) return '';
+    const pos = positions[pid] || 'BENCH';
+    return `<li class="lineup-row" draggable="true" data-pid="${pid}">
+      <span class="lineup-handle" title="Drag to reorder">⋮⋮</span>
+      <span class="lineup-order">${idx + 1}</span>
+      <span class="lineup-name">
+        <span class="num">#${escapeHtml(p.jerseyNumber || '-')}</span>
+        ${escapeHtml(p.name)}
+      </span>
+      <select onchange="setPosition('${g.id}', '${side}', '${pid}', this.value)">${positionOptions(pos)}</select>
+      <button class="btn-icon btn-sm" title="Move up" onclick="moveBatter('${g.id}', '${side}', ${idx}, -1)">↑</button>
+      <button class="btn-icon btn-sm" title="Move down" onclick="moveBatter('${g.id}', '${side}', ${idx}, 1)">↓</button>
+    </li>`;
+  }).join('');
+
+  // Drag & drop reordering
+  let draggedIdx = null;
+  list.querySelectorAll('.lineup-row').forEach((row, idx) => {
+    row.addEventListener('dragstart', (e) => {
+      draggedIdx = idx;
+      row.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    row.addEventListener('dragend', () => {
+      row.classList.remove('dragging');
+      list.querySelectorAll('.drop-target').forEach(r => r.classList.remove('drop-target'));
+    });
+    row.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      list.querySelectorAll('.drop-target').forEach(r => r.classList.remove('drop-target'));
+      row.classList.add('drop-target');
+    });
+    row.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      if (draggedIdx === null || draggedIdx === idx) return;
+      const arr = [...order];
+      const [moved] = arr.splice(draggedIdx, 1);
+      arr.splice(idx, 0, moved);
+      const patch = side === 'home' ? { homeBattingOrder: arr } : { awayBattingOrder: arr };
+      await State.updateGame(g.id, patch);
+      const fresh = State.getGame(g.id);
+      renderLineup(fresh, side);
+    });
+  });
+}
+
+async function setPosition(gameId, side, playerId, position) {
+  const g = State.getGame(gameId); if (!g) return;
+  const positions = side === 'home' ? { ...g.homePositions } : { ...g.awayPositions };
+  positions[playerId] = position;
+  if (position === 'P' || position === 'CF') {
+    Object.keys(positions).forEach(pid => {
+      if (pid !== playerId && positions[pid] === position) positions[pid] = 'BENCH';
+    });
+  }
+  const patch = side === 'home' ? { homePositions: positions } : { awayPositions: positions };
+  await State.updateGame(gameId, patch);
+  const fresh = State.getGame(gameId);
+  renderLineup(fresh, side);
+}
+
+async function moveBatter(gameId, side, idx, delta) {
+  const g = State.getGame(gameId); if (!g) return;
+  const order = [...(side === 'home' ? g.homeBattingOrder : g.awayBattingOrder)];
+  const newIdx = idx + delta;
+  if (newIdx < 0 || newIdx >= order.length) return;
+  [order[idx], order[newIdx]] = [order[newIdx], order[idx]];
+  const patch = side === 'home' ? { homeBattingOrder: order } : { awayBattingOrder: order };
+  await State.updateGame(gameId, patch);
+  const fresh = State.getGame(gameId);
+  renderLineup(fresh, side);
+}
+
+async function startGame(gameId) {
+  const g = State.getGame(gameId); if (!g) return;
+  const checkPositions = (team, positions, teamName) => {
+    const hasP = team.playerIds.some(pid => positions[pid] === 'P');
+    const hasCF = team.playerIds.some(pid => positions[pid] === 'CF');
+    if (!hasP) { toast(`${teamName} needs a Pitcher assigned`, 'error'); return false; }
+    if (!hasCF) { toast(`${teamName} needs a Center Fielder assigned`, 'error'); return false; }
+    return true;
+  };
+  const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
+  if (!checkPositions(home, g.homePositions, home.name)) return;
+  if (!checkPositions(away, g.awayPositions, away.name)) return;
+  await State.updateGame(gameId, { status: 'in_progress' });
+  Render.games();
+  renderLiveGame(gameId);
+}
+
+/* ============================================================
+   LIVE GAME SCREEN
+   ============================================================ */
+let LiveGameId = null;
+let _selectedPlayTs = null;
+
+function renderLiveGame(gameId) {
+  LiveGameId = gameId;
+  _selectedPlayTs = null;
+  const g = State.getGame(gameId);
+  if (!g) return;
+  const home = State.getTeam(g.homeTeamId);
+  const away = State.getTeam(g.awayTeamId);
+  Modal.show(`
+    <div id="live-game-root">${liveGameHTML(g, home, away)}</div>
+  `, { full: true });
+  drawField();
+  attachPitchHandlers();
+}
+
+function liveGameHTML(g, home, away) {
+  const battingSide = g.currentHalf === 'top' ? 'away' : 'home';
+  const fieldingTeam = battingSide === 'away' ? home : away;
+  const inningStr = (g.currentHalf === 'top' ? '▲ Top ' : '▼ Bot ') + g.currentInning;
+  const isCompleted = g.status === 'completed';
+
+  const finishBanner = isCompleted ? `
+    <div class="game-finish-banner">
+      🏆 Final: ${escapeHtml(away.name)} ${g.score.away} — ${g.score.home} ${escapeHtml(home.name)}
+      ${g.score.away === g.score.home ? '(tie)' : ''}
+    </div>` : '';
+
+  return `
+    <div class="modal-header">
+      <h3>
+        <button class="btn btn-sm" onclick="Modal.hide(); Render.games();">← Back</button>
+        ${escapeHtml(away.name)} @ ${escapeHtml(home.name)}
+        <span class="game-card-status status-${g.status}" style="margin-left:8px">${g.status.replace('_',' ')}</span>
+      </h3>
+      <button class="btn-icon" onclick="Modal.hide(); Render.games();">✕</button>
+    </div>
+    <div class="live-game">
+      <div class="live-game-left">
+        ${finishBanner}
+        <div class="scoreboard">
+          <div class="team-side ${battingSide === 'away' && !isCompleted ? 'batting' : ''}">
+            <div class="name">${escapeHtml(away.name)}</div>
+            <div class="score" id="sb-score-away">${g.score.away}</div>
+          </div>
+          <div class="middle">
+            <div class="inning" id="sb-inning">${isCompleted ? 'FINAL' : inningStr}</div>
+            <div class="outs" id="sb-outs">
+              Outs
+              <span class="out-dots">
+                <span class="out-dot${g.outs >= 1 ? ' on' : ''}"></span>
+                <span class="out-dot${g.outs >= 2 ? ' on' : ''}"></span>
+                <span class="out-dot${g.outs >= 3 ? ' on' : ''}"></span>
+              </span>
+            </div>
+          </div>
+          <div class="team-side ${battingSide === 'home' && !isCompleted ? 'batting' : ''}">
+            <div class="name">${escapeHtml(home.name)}</div>
+            <div class="score" id="sb-score-home">${g.score.home}</div>
+          </div>
+        </div>
+
+        <div class="field-wrap">
+          <h3>${isCompleted ? 'Base state' : escapeHtml(fieldingTeam.name) + ' in the field'}</h3>
+          ${isCompleted ? '<div class="help-text" style="margin-bottom:8px">Click a play to see who was on base.</div>' : ''}
+          <div id="field-container"></div>
+        </div>
+
+        <div class="line-score">
+          ${renderLineScore(g, away, home)}
+        </div>
+      </div>
+
+      <div class="live-game-right">
+        ${isCompleted ? '' : `
+        <div class="at-bat-card">
+          <h3>At bat</h3>
+          ${renderBatterRow(g)}
+          <div class="count-row">
+            <div class="count-block"><span class="label">B</span><span class="val" id="count-b">${g.balls}</span></div>
+            <div class="count-block"><span class="label">S</span><span class="val" id="count-s">${g.strikes}</span></div>
+            <div class="count-block"><span class="label">Outs</span><span class="val" id="count-o">${g.outs}</span></div>
+          </div>
+        </div>
+
+        <div class="at-bat-card">
+          <h3>Pitch outcome</h3>
+          <div class="pitch-buttons">
+            <button data-pitch="ball">Ball</button>
+            <button data-pitch="foul">Foul</button>
+            <button data-pitch="strike_swinging">Strike (swinging)</button>
+            <button data-pitch="strike_looking">Strike (looking)</button>
+            <button data-pitch="bip" class="btn-bip">⚾ Ball in play</button>
+          </div>
+        </div>
+        `}
+
+        ${isCompleted ? '<div id="replay-banner" class="replay-banner" style="display:none"></div>' : ''}
+        <div class="play-log">
+          <h3>Play-by-play</h3>
+          <ul id="play-log-list">${renderPlayLog(g)}</ul>
+        </div>
+
+        ${isCompleted ? '' : `
+        <div class="game-controls">
+          <button class="btn btn-warning" onclick="endHalfInning('${g.id}')">End half early</button>
+          <button class="btn btn-danger" onclick="endGameEarly('${g.id}')">End game</button>
+        </div>`}
+      </div>
+    </div>
+  `;
+}
+
+function renderBatterRow(g) {
+  const batterId = currentBatterId(g);
+  const onDeckId = nextBatterId(g);
+  const pitcherId = currentPitcherId(g);
+  const batter = State.getPlayer(batterId);
+  const onDeck = State.getPlayer(onDeckId);
+  const pitcher = State.getPlayer(pitcherId);
+  const order = battingOrderArr(g);
+  const idx = (g[battingIdxKey(g)] % order.length) + 1;
+  return `
+    <div class="at-bat-row">
+      <div class="role">${idx}</div>
+      <div>
+        <span class="player-num">#${escapeHtml(batter?.jerseyNumber || '-')}</span>
+        <span class="player-name">${escapeHtml(batter?.name || '?')}</span>
+      </div>
+    </div>
+    <div class="at-bat-row">
+      <div class="role">P</div>
+      <div>
+        <span class="player-num">#${escapeHtml(pitcher?.jerseyNumber || '-')}</span>
+        <span>${escapeHtml(pitcher?.name || '?')}</span>
+      </div>
+    </div>
+    <div class="at-bat-row">
+      <div class="role">Next</div>
+      <div class="muted">
+        <span class="player-num">#${escapeHtml(onDeck?.jerseyNumber || '-')}</span>
+        ${escapeHtml(onDeck?.name || '?')}
+      </div>
+    </div>
+  `;
+}
+
+function renderPlayLog(g) {
+  const events = (g.events || []).filter(e => e.type === 'pa_end').slice().reverse();
+  if (!events.length) return '<li class="muted small">No plays yet.</li>';
+  const isCompleted = g.status === 'completed';
+  const parts = [];
+  let lastKey = null;
+  events.slice(0, 60).forEach(e => {
+    const key = e.inning + '-' + e.half;
+    if (key !== lastKey) {
+      parts.push(`<li class="play-inning-break">${e.half === 'top' ? 'Top' : 'Bottom'} ${ordinal(e.inning)}</li>`);
+      lastKey = key;
+    }
+    const batter = State.getPlayer(e.batterId);
+    const desc = describeOutcome(e);
+    const handler = isCompleted ? `data-ts="${e.ts}" onclick="selectPlay(${e.ts})"` : '';
+    parts.push(`<li class="play-entry${isCompleted ? ' clickable' : ''}" ${handler}><span class="play-meta">${e.half === 'top' ? 'T' : 'B'}${e.inning}</span> ${escapeHtml(batter?.name || '?')} — ${desc}</li>`);
+  });
+  return parts.join('');
+}
+
+function describeOutcome(e) {
+  const map = {
+    'BB': 'Walk',
+    'K': 'Strikeout',
+    '1B': 'Single',
+    '2B': 'Double',
+    '3B': 'Triple',
+    'HR': 'Home Run',
+    'OUT': `Out${e.hitType ? ' (' + hitTypeLabel(e.hitType) + ')' : ''}`,
+    'ERR_REACH': `Reached on error${e.errBase ? ' (' + e.errBase + ')' : ''}`,
+  };
+  let s = map[e.outcome] || e.outcome;
+  if (e.rbi) s += ` · ${e.rbi} RBI`;
+  return s;
+}
+function hitTypeLabel(t) {
+  return ({ GB: 'ground ball', LD: 'line drive', PU: 'pop fly', FB: 'fly ball' })[t] || t;
+}
+
+function ordinal(n) {
+  const s = ['th','st','nd','rd'], v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+function replayToEvent(g, targetPaIdx) {
+  const paEvents = (g.events || []).filter(e => e.type === 'pa_end');
+  let bases = { 1: null, 2: null, 3: null };
+  let score = { home: 0, away: 0 };
+  let outs = 0, runnerCounter = 0, prevKey = null;
+  for (let i = 0; i <= targetPaIdx; i++) {
+    const e = paEvents[i];
+    const key = e.inning + '-' + e.half;
+    if (prevKey !== null && key !== prevKey) { bases = { 1: null, 2: null, 3: null }; outs = 0; }
+    prevKey = key;
+    runnerCounter++;
+    const player = State.getPlayer(e.batterId);
+    const br = { id: 'rp_' + i, playerId: e.batterId, name: player ? player.name.split(' ')[0] : '?', number: runnerCounter };
+    let runsCount = 0;
+    if (e.outcome === 'BB') {
+      const res = walkAdvance(bases, br); bases = res.newBases; runsCount = res.runnerIdsScored.length;
+    } else if (e.outcome === 'K' || e.outcome === 'OUT') {
+      outs++;
+    } else if (['1B','2B','3B','HR'].includes(e.outcome)) {
+      const res = advanceRunners(bases, ({ '1B':1,'2B':2,'3B':3,'HR':4 })[e.outcome], br);
+      bases = res.newBases; runsCount = res.runnerIdsScored.length;
+    } else if (e.outcome === 'ERR_REACH') {
+      const res = advanceRunners(bases, ({ '1B':1,'2B':2,'3B':3,'HR':4 })[e.errBase] || 1, br);
+      bases = res.newBases; runsCount = res.runnerIdsScored.length;
+    }
+    if (e.half === 'top') score.away += runsCount; else score.home += runsCount;
+  }
+  return { bases, score, outs };
+}
+
+function selectPlay(ts) {
+  const g = State.getGame(LiveGameId);
+  if (!g || g.status !== 'completed') return;
+  const paEvents = (g.events || []).filter(e => e.type === 'pa_end');
+  const targetIdx = paEvents.findIndex(e => e.ts === ts);
+  if (targetIdx < 0) return;
+  const event = paEvents[targetIdx];
+  if (_selectedPlayTs === ts) { clearPlaySelection(g); return; }
+  _selectedPlayTs = ts;
+
+  let bases, score, outs;
+  if (event.basesAfter) {
+    bases = event.basesAfter; score = event.scoreAfter || g.score; outs = event.outsAfter ?? 0;
+  } else {
+    const r = replayToEvent(g, targetIdx); bases = r.bases; score = r.score; outs = r.outs;
+  }
+
+  $$('.play-entry').forEach(li => li.classList.toggle('selected', li.dataset.ts === String(ts)));
+  drawField(bases);
+
+  const sbAway = $('#sb-score-away'), sbHome = $('#sb-score-home');
+  if (sbAway) sbAway.textContent = score.away;
+  if (sbHome) sbHome.textContent = score.home;
+  const sbInning = $('#sb-inning');
+  if (sbInning) sbInning.textContent = (event.half === 'top' ? '▲ Top ' : '▼ Bot ') + event.inning;
+  const sbOuts = $('#sb-outs');
+  if (sbOuts) sbOuts.innerHTML = `Outs <span class="out-dots"><span class="out-dot${outs >= 1 ? ' on' : ''}"></span><span class="out-dot${outs >= 2 ? ' on' : ''}"></span><span class="out-dot${outs >= 3 ? ' on' : ''}"></span></span>`;
+
+  const banner = $('#replay-banner');
+  if (banner) {
+    const batter = State.getPlayer(event.batterId);
+    banner.style.display = 'flex';
+    banner.innerHTML = `<span>▶ ${event.half === 'top' ? 'T' : 'B'}${event.inning} — ${escapeHtml(batter?.name || '?')} — ${describeOutcome(event)}</span><button class="btn btn-sm" onclick="clearPlaySelection(State.getGame(LiveGameId))">Reset view</button>`;
+  }
+}
+
+function clearPlaySelection(g) {
+  _selectedPlayTs = null;
+  $$('.play-entry').forEach(li => li.classList.remove('selected'));
+  drawField(null);
+  const sbAway = $('#sb-score-away'), sbHome = $('#sb-score-home');
+  if (sbAway && g) sbAway.textContent = g.score.away;
+  if (sbHome && g) sbHome.textContent = g.score.home;
+  const sbInning = $('#sb-inning');
+  if (sbInning) sbInning.textContent = 'FINAL';
+  const sbOuts = $('#sb-outs');
+  if (sbOuts) sbOuts.innerHTML = `Outs <span class="out-dots"><span class="out-dot"></span><span class="out-dot"></span><span class="out-dot"></span></span>`;
+  const banner = $('#replay-banner');
+  if (banner) banner.style.display = 'none';
+}
+
+/* ============================================================
+   FIELD DIAMOND (SVG)
+   ============================================================ */
+const FIELD = {
+  HOME:    { x: 200, y: 380 },
+  FIRST:   { x: 360, y: 220 },
+  SECOND:  { x: 200, y: 60  },
+  THIRD:   { x: 40,  y: 220 },
+  MOUND:   { x: 200, y: 232 },
+  CF_HOME: { x: 200, y: 50  },
+};
+
+let __fieldClickMode = null;
+
+function drawField(overrideBases = null) {
+  const g = State.getGame(LiveGameId);
+  if (!g) return;
+  const container = $('#field-container');
+  if (!container) return;
+
+  const isCompleted = g.status === 'completed';
+  const bases = overrideBases !== null ? overrideBases
+              : isCompleted            ? { 1: null, 2: null, 3: null }
+              : g.bases;
+
+  const fieldingPos = fieldingPositions(g);
+  const pitcherId = Object.keys(fieldingPos).find(pid => fieldingPos[pid] === 'P');
+  const cfId = Object.keys(fieldingPos).find(pid => fieldingPos[pid] === 'CF');
+  const pitcher = pitcherId ? State.getPlayer(pitcherId) : null;
+  const cf = cfId ? State.getPlayer(cfId) : null;
+
+  const baseSquare = (cx, cy, occupied) => {
+    const s = 8;
+    const cls = 'base' + (occupied ? ' occupied' : '');
+    return `<polygon class="${cls}" points="${cx},${cy-s} ${cx+s},${cy} ${cx},${cy+s} ${cx-s},${cy}" />`;
+  };
+
+  const runnerTag = (runner, cx, cy) => {
+    if (!runner) return '';
+    const label = `${runner.name} ${runner.number}`;
+    const w = Math.max(46, label.length * 6);
+    return `<g class="runner-tag" transform="translate(${cx - w/2}, ${cy + 14})">
+      <rect x="0" y="0" width="${w}" height="18" rx="4" />
+      <text x="${w/2}" y="13">${escapeHtml(label)}</text>
+    </g>`;
+  };
+
+  const fielderMarker = (pid, player, pos, cx, cy) => {
+    if (!pid || !player) return '';
+    return `<g class="fielder" data-pid="${pid}" data-pos="${pos}" transform="translate(${cx},${cy})" onclick="onFielderClick('${pid}', '${pos}')">
+      <circle r="18" />
+      <text class="pos">${pos}</text>
+      <text class="name bg" y="36">${escapeHtml(player.name)}</text>
+      <text class="name" y="36">${escapeHtml(player.name)}</text>
+    </g>`;
+  };
+
+  const svg = `
+    <svg viewBox="0 0 400 400" class="field-svg" id="field-svg">
+      <path class="grass" d="M 200 380 L 0 180 L 0 0 L 400 0 L 400 180 Z"/>
+      <polygon class="dirt" points="200,60 360,220 200,380 40,220" />
+      <circle class="mound" cx="${FIELD.MOUND.x}" cy="${FIELD.MOUND.y}" r="12"/>
+      <path class="double-line" d="M 15 165 Q 200 90 385 165" />
+      ${baseSquare(FIELD.HOME.x,   FIELD.HOME.y,   false)}
+      ${baseSquare(FIELD.FIRST.x,  FIELD.FIRST.y,  !!bases[1])}
+      ${baseSquare(FIELD.SECOND.x, FIELD.SECOND.y, !!bases[2])}
+      ${baseSquare(FIELD.THIRD.x,  FIELD.THIRD.y,  !!bases[3])}
+      ${runnerTag(bases[1], FIELD.FIRST.x,  FIELD.FIRST.y)}
+      ${runnerTag(bases[2], FIELD.SECOND.x, FIELD.SECOND.y + 10)}
+      ${runnerTag(bases[3], FIELD.THIRD.x,  FIELD.THIRD.y)}
+      ${isCompleted ? '' : fielderMarker(pitcherId, pitcher, 'P',  FIELD.MOUND.x,   FIELD.MOUND.y)}
+      ${isCompleted ? '' : fielderMarker(cfId,      cf,      'CF', FIELD.CF_HOME.x, FIELD.CF_HOME.y)}
+    </svg>
+  `;
+  container.innerHTML = svg;
+
+  const svgEl = $('#field-svg');
+  svgEl.addEventListener('click', (e) => {
+    if (!__fieldClickMode) return;
+    if (e.target.closest('.fielder')) return;
+    const pt = svgPoint(svgEl, e);
+    __fieldClickMode.onClick({ x: pt.x, y: pt.y });
+  });
+}
+
+function svgPoint(svg, evt) {
+  const pt = svg.createSVGPoint();
+  pt.x = evt.clientX;
+  pt.y = evt.clientY;
+  return pt.matrixTransform(svg.getScreenCTM().inverse());
+}
+
+function onFielderClick(pid, pos) {
+  if (__fieldClickMode && __fieldClickMode.onPickFielder) {
+    __fieldClickMode.onPickFielder(pid);
+    return;
+  }
+  showSwapFielderModal(pid, pos);
+}
+
+/* ----- Swap fielder positions ----- */
+function showSwapFielderModal(currentPid, currentPos) {
+  const g = State.getGame(LiveGameId); if (!g) return;
+  const positions = fieldingPositions(g);
+  const team = State.getTeam(fieldingTeamId(g));
+  const others = team.playerIds.filter(pid => pid !== currentPid);
+  const cur = State.getPlayer(currentPid);
+  const list = others.map(pid => {
+    const p = State.getPlayer(pid);
+    const otherPos = positions[pid] || 'BENCH';
+    return `<button class="btn" style="display:flex; justify-content:space-between; width:100%; margin-bottom:6px;" onclick="swapFielder('${currentPid}', '${pid}')">
+      <span>${escapeHtml(p?.name || '?')}</span>
+      <span class="pill">${otherPos}</span>
+    </button>`;
+  }).join('');
+  Modal.show(`
+    <div class="modal-header">
+      <h3>Swap ${currentPos}: ${escapeHtml(cur?.name || '')}</h3>
+      <button class="btn-icon" onclick="Modal.hide(); renderLiveGame('${g.id}')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="help-text" style="margin-bottom:10px">Pick a player to move into the ${currentPos} role. The current ${currentPos} will take their position.</p>
+      ${list || '<div class="muted">No other players available.</div>'}
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="Modal.hide(); renderLiveGame('${g.id}')">Cancel</button>
+    </div>
+  `);
+}
+
+async function swapFielder(currentPid, newPid) {
+  const g = State.getGame(LiveGameId); if (!g) return;
+  const positions = { ...(g.currentHalf === 'top' ? g.homePositions : g.awayPositions) };
+  const oldPos = positions[currentPid];
+  const newOldPos = positions[newPid];
+  positions[currentPid] = newOldPos;
+  positions[newPid] = oldPos;
+  const patch = g.currentHalf === 'top' ? { homePositions: positions } : { awayPositions: positions };
+  await State.updateGame(g.id, patch);
+  renderLiveGame(g.id);
+  toast(`${oldPos}: ${State.getPlayer(newPid).name}`, 'success');
+}
+
+/* ============================================================
+   PITCH HANDLERS
+   ============================================================ */
+function attachPitchHandlers() {
+  document.querySelectorAll('.pitch-buttons button').forEach(btn => {
+    btn.addEventListener('click', () => handlePitch(btn.dataset.pitch));
+  });
+}
+
+async function handlePitch(kind) {
+  const g = State.getGame(LiveGameId); if (!g) return;
+  if (g.status === 'completed') return;
+
+  if (kind === 'ball') {
+    g.balls++;
+    if (g.balls >= 4) {
+      await applyPaEnd(g, { outcome: 'BB' });
+    } else {
+      await State.updateGame(g.id, { balls: g.balls });
+      renderLiveGame(g.id);
+    }
+    return;
+  }
+  if (kind === 'strike_swinging' || kind === 'strike_looking') {
+    g.strikes++;
+    if (g.strikes >= 3) {
+      await applyPaEnd(g, { outcome: 'K', strikeType: kind });
+    } else {
+      await State.updateGame(g.id, { strikes: g.strikes });
+      renderLiveGame(g.id);
+    }
+    return;
+  }
+  if (kind === 'foul') {
+    if (g.strikes < 2) g.strikes++;
+    await State.updateGame(g.id, { strikes: g.strikes });
+    renderLiveGame(g.id);
+    return;
+  }
+  if (kind === 'bip') {
+    showBipChoiceModal();
+    return;
+  }
+}
+
+/* ----- Ball in play: choose Out / Hit / Error ----- */
+function showBipChoiceModal() {
+  Modal.show(`
+    <div class="modal-header">
+      <h3>Ball in play</h3>
+      <button class="btn-icon" onclick="Modal.hide(); renderLiveGame(LiveGameId);">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="help-text" style="margin-bottom:14px">What was the result?</p>
+      <div class="outcome-grid">
+        <button onclick="showBipOutTypeModal()">Out<span class="sub">batter is out</span></button>
+        <button onclick="showBipHitModal()">Hit<span class="sub">single / double / triple / HR</span></button>
+        <button onclick="showBipErrorModal()">Error<span class="sub">batter reaches on error</span></button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="Modal.hide(); renderLiveGame(LiveGameId);">Cancel</button>
+    </div>
+  `);
+}
+
+/* ----- Out type ----- */
+function showBipOutTypeModal() {
+  Modal.show(`
+    <div class="modal-header">
+      <h3>Type of out</h3>
+      <button class="btn-icon" onclick="Modal.hide(); renderLiveGame(LiveGameId);">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="outcome-grid">
+        <button onclick="askLocation('out','GB')">Ground ball<span class="sub">GB</span></button>
+        <button onclick="askLocation('out','LD')">Line drive<span class="sub">LD</span></button>
+        <button onclick="askLocation('out','PU')">Pop fly<span class="sub">PU</span></button>
+        <button onclick="askLocation('out','FB')">Fly ball<span class="sub">FB</span></button>
+      </div>
+    </div>
+  `);
+}
+
+/* ----- Hit type ----- */
+function showBipHitModal() {
+  Modal.show(`
+    <div class="modal-header">
+      <h3>Hit</h3>
+      <button class="btn-icon" onclick="Modal.hide(); renderLiveGame(LiveGameId);">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="outcome-grid">
+        <button onclick="askLocation('hit','1B')">Single<span class="sub">1B</span></button>
+        <button onclick="askLocation('hit','2B')">Double<span class="sub">2B</span></button>
+        <button onclick="askLocation('hit','3B')">Triple<span class="sub">3B</span></button>
+        <button onclick="finishHit('HR', null, null)">Home Run<span class="sub">HR</span></button>
+      </div>
+    </div>
+  `);
+}
+
+/* ----- Error type ----- */
+function showBipErrorModal() {
+  Modal.show(`
+    <div class="modal-header">
+      <h3>Error — batter reaches</h3>
+      <button class="btn-icon" onclick="Modal.hide(); renderLiveGame(LiveGameId);">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="help-text" style="margin-bottom:14px">How far did the batter reach?</p>
+      <div class="outcome-grid">
+        <button onclick="askLocation('error','1B')">Reached 1B</button>
+        <button onclick="askLocation('error','2B')">Reached 2B</button>
+        <button onclick="askLocation('error','3B')">Reached 3B</button>
+        <button onclick="askLocation('error','HR')">Inside-the-park HR</button>
+      </div>
+    </div>
+  `);
+}
+
+/* ============================================================
+   LOCATION + FIELDER PICKER
+   ============================================================ */
+let __pendingPlay = null;
+
+function askLocation(kind, detail) {
+  if (kind === 'hit' && detail === 'HR') { finishHit('HR', null, null); return; }
+
+  __pendingPlay = { kind, detail, fielderId: null, location: null };
+  const g = State.getGame(LiveGameId);
+  const fieldingPos = fieldingPositions(g);
+  const team = State.getTeam(fieldingTeamId(g));
+  const fielderButtons = team.playerIds.map(pid => {
+    const p = State.getPlayer(pid);
+    const pos = fieldingPos[pid] || 'BENCH';
+    return `<button class="btn" data-fielder="${pid}" style="margin:3px">${escapeHtml(p.name)} <span class="pill" style="margin-left:4px">${pos}</span></button>`;
+  }).join('');
+
+  const titleByKind = {
+    out:   `Out — ${hitTypeLabel(detail)}`,
+    hit:   ({ '1B': 'Single', '2B': 'Double', '3B': 'Triple' })[detail] || 'Hit',
+    error: `Error — batter reached ${detail}`
+  };
+  const purpose = kind === 'error'
+    ? '1) Pick the fielder who committed the error.<br>2) Click the spot on the field where the ball ended up.'
+    : '1) Pick the fielder who made the play.<br>2) Click the spot on the field where the ball ended up.';
+
+  Modal.show(`
+    <div class="modal-header">
+      <h3>${titleByKind[kind] || ''}</h3>
+      <button class="btn-icon" onclick="cancelLocation()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="help-text" style="margin-bottom:10px">${purpose}</p>
+      <div id="loc-fielders" class="row-flex" style="margin-bottom:10px">${fielderButtons}</div>
+      <div id="loc-field-wrap"></div>
+      <div class="help-text center" id="loc-status" style="margin-top:8px">Pick a fielder, then click the field.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="cancelLocation()">Cancel</button>
+      <button id="loc-confirm" class="btn btn-primary" disabled onclick="confirmLocation()">Confirm</button>
+    </div>
+  `, { wide: true });
+
+  const container = $('#loc-field-wrap');
+  container.innerHTML = `<div id="field-container"></div>`;
+  drawField();
+  const svgEl = $('#field-svg');
+  if (svgEl) svgEl.classList.add('location-mode');
+
+  __fieldClickMode = {
+    onClick(loc) {
+      __pendingPlay.location = loc;
+      drawBallMarker(loc);
+      updateLocConfirm();
+    },
+    onPickFielder(pid) {
+      __pendingPlay.fielderId = pid;
+      $$('#loc-fielders button').forEach(b => {
+        b.classList.toggle('btn-primary', b.dataset.fielder === pid);
+      });
+      updateLocConfirm();
+    }
+  };
+
+  $$('#loc-fielders button[data-fielder]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      __fieldClickMode.onPickFielder(btn.dataset.fielder);
+    });
+  });
+}
+
+function drawBallMarker(loc) {
+  const svg = $('#field-svg'); if (!svg) return;
+  let m = svg.querySelector('.ball-marker');
+  if (!m) {
+    m = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    m.setAttribute('class', 'ball-marker');
+    m.setAttribute('r', 6);
+    svg.appendChild(m);
+  }
+  m.setAttribute('cx', loc.x);
+  m.setAttribute('cy', loc.y);
+}
+
+function updateLocConfirm() {
+  const ok = __pendingPlay && __pendingPlay.fielderId && __pendingPlay.location;
+  $('#loc-confirm').disabled = !ok;
+  if (ok) {
+    const f = State.getPlayer(__pendingPlay.fielderId);
+    $('#loc-status').textContent = `Fielder: ${f?.name || '?'} · Location set. Tap Confirm.`;
+  } else if (__pendingPlay && __pendingPlay.fielderId) {
+    $('#loc-status').textContent = 'Now click the field where the ball ended up.';
+  } else if (__pendingPlay && __pendingPlay.location) {
+    $('#loc-status').textContent = 'Now pick the fielder.';
+  }
+}
+
+function cancelLocation() {
+  __pendingPlay = null;
+  __fieldClickMode = null;
+  Modal.hide();
+  renderLiveGame(LiveGameId);
+}
+
+async function confirmLocation() {
+  if (!__pendingPlay || !__pendingPlay.fielderId || !__pendingPlay.location) return;
+  const { kind, detail, fielderId, location } = __pendingPlay;
+  __pendingPlay = null;
+  __fieldClickMode = null;
+  if (kind === 'out')   await finishOut(detail, fielderId, location);
+  if (kind === 'hit')   await finishHit(detail, fielderId, location);
+  if (kind === 'error') await finishError(detail, fielderId, location);
+}
+
+/* ============================================================
+   PA RESOLUTION
+   ============================================================ */
+async function finishOut(hitType, fielderId, location) {
+  const g = State.getGame(LiveGameId);
+  await applyPaEnd(g, { outcome: 'OUT', hitType, fielderId, location });
+}
+
+async function finishHit(hitDetail, fielderId, location) {
+  const g = State.getGame(LiveGameId);
+  await applyPaEnd(g, { outcome: hitDetail, fielderId, location });
+}
+
+async function finishError(errBase, errorById, location) {
+  const g = State.getGame(LiveGameId);
+  await applyPaEnd(g, { outcome: 'ERR_REACH', errBase, errorById, location });
+}
+
+async function applyPaEnd(g, ev) {
+  const batterId = currentBatterId(g);
+  const pitcherId = currentPitcherId(g);
+  const inning = g.currentInning;
+  const half = g.currentHalf;
+
+  const event = {
+    type: 'pa_end',
+    ts: Date.now(),
+    inning, half,
+    batterId,
+    pitcherId,
+    outcome: ev.outcome,
+    hitType: ev.hitType || null,
+    errBase: ev.errBase || null,
+    errorById: ev.errorById || null,
+    fielderId: ev.fielderId || null,
+    location: ev.location || null,
+    rbi: 0,
+    earnedRuns: 0,
+    runsScoredBy: [],
+  };
+
+  const newBases = { 1: g.bases[1], 2: g.bases[2], 3: g.bases[3] };
+  let runs = [];
+  let outsToAdd = 0;
+
+  if (ev.outcome === 'BB') {
+    const r = makeRunner(g, batterId);
+    const res = walkAdvance(newBases, r);
+    Object.assign(newBases, res.newBases);
+    runs = res.runnerIdsScored;
+  } else if (ev.outcome === 'K' || ev.outcome === 'OUT') {
+    outsToAdd = 1;
+  } else if (['1B','2B','3B','HR'].includes(ev.outcome)) {
+    const target = ({ '1B': 1, '2B': 2, '3B': 3, 'HR': 4 })[ev.outcome];
+    const r = makeRunner(g, batterId);
+    const res = advanceRunners(newBases, target, r);
+    Object.assign(newBases, res.newBases);
+    runs = res.runnerIdsScored;
+  } else if (ev.outcome === 'ERR_REACH') {
+    const target = ({ '1B': 1, '2B': 2, '3B': 3, 'HR': 4 })[ev.errBase] || 1;
+    const r = makeRunner(g, batterId);
+    const res = advanceRunners(newBases, target, r);
+    Object.assign(newBases, res.newBases);
+    runs = res.runnerIdsScored;
+  }
+
+  // Map runner ids back to player ids for R stat
+  const allRunners = [
+    g.bases[1], g.bases[2], g.bases[3],
+    newBases[1], newBases[2], newBases[3],
+  ].filter(Boolean);
+  const findRunner = (rid) => allRunners.find(r => r.id === rid);
+  event.runsScoredBy = runs.map(rid => {
+    const r = findRunner(rid); return r ? r.playerId : null;
+  }).filter(Boolean);
+
+  const runsCount = runs.length;
+  if (ev.outcome !== 'ERR_REACH') { event.rbi = runsCount; event.earnedRuns = runsCount; }
+
+  const newScore = { ...g.score };
+  if (half === 'top') newScore.away += runsCount;
+  else                newScore.home += runsCount;
+
+  const lineScore = ensureLineScore(g);
+  const inningEntry = lineScore.find(x => x.inning === inning);
+  if (inningEntry) {
+    if (half === 'top') inningEntry.top += runsCount;
+    else                inningEntry.bottom += runsCount;
+  }
+
+  const newOuts = g.outs + outsToAdd;
+  event.basesAfter = { 1: newBases[1], 2: newBases[2], 3: newBases[3] };
+  event.scoreAfter = { ...newScore };
+  event.outsAfter  = newOuts;
+  const newEvents = [...(g.events || []), event];
+  const idxKey = battingIdxKey(g);
+  const newBatterIdx = g[idxKey] + 1;
+
+  const patch = {
+    bases: newBases,
+    outs: newOuts,
+    balls: 0,
+    strikes: 0,
+    score: newScore,
+    lineScore,
+    events: newEvents,
+    [idxKey]: newBatterIdx,
+    runnerCounter: g.runnerCounter || 0,
+  };
+
+  await State.updateGame(g.id, patch);
+  const fresh = State.getGame(g.id);
+  await postPlayCheck(fresh);
+  Modal.hide();
+  renderLiveGame(g.id);
+}
+
+function ensureLineScore(g) {
+  const ls = [...(g.lineScore || [])];
+  while (ls.length < g.currentInning) {
+    ls.push({ inning: ls.length + 1, top: 0, bottom: 0 });
+  }
+  return ls;
+}
+
+async function postPlayCheck(g) {
+  if (g.outs >= 3) {
+    await endHalfInningInternal(g);
+    return;
+  }
+  // Walk-off: home batting in final inning or extras and they've taken the lead
+  if (g.currentHalf === 'bottom' && g.currentInning >= g.numInnings && g.score.home > g.score.away) {
+    await finishGame(g, 'walkoff');
+  }
+}
+
+async function endHalfInningInternal(g) {
+  let { currentInning, currentHalf } = g;
+  if (currentHalf === 'top') {
+    currentHalf = 'bottom';
+    // Home already leads after top of last inning — no need to bat
+    if (currentInning >= g.numInnings && g.score.home > g.score.away) {
+      await finishGame(g, 'home_leads_after_top');
+      return;
+    }
+  } else {
+    currentInning++;
+    currentHalf = 'top';
+    if (currentInning > g.numInnings && g.score.home !== g.score.away) {
+      await finishGame(g, 'regulation');
+      return;
+    }
+    // If tied, continue into extras
+  }
+  await State.updateGame(g.id, {
+    currentInning, currentHalf,
+    outs: 0, balls: 0, strikes: 0,
+    bases: { 1: null, 2: null, 3: null },
+  });
+  const fresh = State.getGame(g.id);
+  await State.updateGame(g.id, { lineScore: ensureLineScore(fresh) });
+}
+
+async function finishGame(g, _reason) {
+  await State.updateGame(g.id, { status: 'completed', isOver: true });
+  Render.games();
+}
+
+async function endHalfInning(gameId) {
+  if (!confirm('End this half-inning early? The current at-bat will be discarded.')) return;
+  const g = State.getGame(gameId); if (!g) return;
+  await endHalfInningInternal(g);
+  renderLiveGame(gameId);
+}
+
+async function endGameEarly(gameId) {
+  if (!confirm('End the game now? Final scores will be locked.')) return;
+  const g = State.getGame(gameId); if (!g) return;
+  await State.updateGame(gameId, { status: 'completed', isOver: true });
+  renderLiveGame(gameId);
+  Render.games();
+}
+
+/* ============================================================
+   LINE SCORE
+   ============================================================ */
+function renderLineScore(g, away, home) {
+  const innings = Math.max(g.numInnings, g.lineScore?.length || 0, g.currentInning);
+  const ls = g.lineScore || [];
+  const headerCells = [];
+  for (let i = 1; i <= innings; i++) headerCells.push(`<th>${i}</th>`);
+  const awayCells = [], homeCells = [];
+  for (let i = 1; i <= innings; i++) {
+    const entry = ls.find(x => x.inning === i);
+    const topVal  = entry ? entry.top    : '';
+    // Don't show bottom if not yet played
+    const botVal  = (!entry || (i === g.currentInning && g.currentHalf === 'top' && g.status !== 'completed'))
+      ? '' : entry.bottom;
+    awayCells.push(`<td>${topVal === '' ? '-' : topVal}</td>`);
+    homeCells.push(`<td>${botVal === '' ? '-' : botVal}</td>`);
+  }
+  return `<table>
+    <thead><tr><th></th>${headerCells.join('')}<th>R</th></tr></thead>
+    <tbody>
+      <tr><td class="team">${escapeHtml(away.name)}</td>${awayCells.join('')}<td class="total">${g.score.away}</td></tr>
+      <tr><td class="team">${escapeHtml(home.name)}</td>${homeCells.join('')}<td class="total">${g.score.home}</td></tr>
+    </tbody>
+  </table>`;
+}
+
+/* ============================================================
+   TAB NAVIGATION + WIRE-UP
+   ============================================================ */
+$$('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const view = btn.dataset.view;
+    $$('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+    $$('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + view));
+  });
+});
+
+$('#btn-add-player').addEventListener('click', () => showPlayerModal());
+$('#btn-add-team').addEventListener('click', () => showTeamModal());
+$('#btn-add-game').addEventListener('click', () => showNewGameModal());
+
+$('#btn-connect-folder').addEventListener('click', async () => { await Storage.connectFolder(); });
+$('#btn-export').addEventListener('click', () => Storage.exportJson());
+$('#btn-import').addEventListener('click', () => $('#import-file').click());
+$('#import-file').addEventListener('change', async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  if (!confirm('Importing will replace your current data. Continue?')) { e.target.value = ''; return; }
+  try { await Storage.importJson(f); }
+  catch (err) { toast('Import failed: ' + err.message, 'error'); }
+  e.target.value = '';
+});
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+(async function boot() {
+  await Storage.init();
+  await Storage.loadAll();
+  // Migrate games missing new fields (forward compat)
+  let needsSave = false;
+  State.games.forEach(g => {
+    if (g.numInnings   === undefined) { g.numInnings   = 7;                          needsSave = true; }
+    if (g.score        === undefined) { g.score        = { home: 0, away: 0 };       needsSave = true; }
+    if (g.lineScore    === undefined) { g.lineScore    = [];                          needsSave = true; }
+    if (g.outs         === undefined) { g.outs         = 0;                           needsSave = true; }
+    if (g.balls        === undefined) { g.balls        = 0;                           needsSave = true; }
+    if (g.strikes      === undefined) { g.strikes      = 0;                           needsSave = true; }
+    if (g.bases        === undefined) { g.bases        = { 1: null, 2: null, 3: null }; needsSave = true; }
+    if (g.runnerCounter=== undefined) { g.runnerCounter= 0;                           needsSave = true; }
+    if (g.homeBatterIdx=== undefined) { g.homeBatterIdx= 0;                           needsSave = true; }
+    if (g.awayBatterIdx=== undefined) { g.awayBatterIdx= 0;                           needsSave = true; }
+    if (g.currentInning=== undefined) { g.currentInning= 1;                           needsSave = true; }
+    if (g.currentHalf  === undefined) { g.currentHalf  = 'top';                       needsSave = true; }
+    if (g.events       === undefined) { g.events       = [];                           needsSave = true; }
+  });
+  if (needsSave) await Storage.saveAll();
+  Render.all();
+})();
+</script>
+</body>
+</html>
