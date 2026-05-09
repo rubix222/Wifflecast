@@ -572,7 +572,7 @@
   }
   .field-svg.location-mode { cursor: crosshair; }
 
-  .field-and-bases { display: flex; gap: 12px; align-items: flex-start; }
+  .field-and-bases { display: flex; gap: 4px; align-items: flex-start; }
   .field-panel { flex: 1; min-width: 0; }
   .bases-panel { flex: 0 0 140px; }
   .bases-panel h3 {
@@ -1983,6 +1983,7 @@ function liveGameHTML(g, home, away) {
 
         <div class="at-bat-card">
           <h3>Pitch outcome</h3>
+          ${renderPitcherRow(g)}
           <div class="pitch-buttons">
             <button data-pitch="ball">Ball</button>
             <button data-pitch="foul">Foul</button>
@@ -2004,6 +2005,21 @@ function liveGameHTML(g, home, away) {
           <button class="btn btn-warning" onclick="endHalfInning('${g.id}')">End half early</button>
           <button class="btn btn-danger" onclick="endGameEarly('${g.id}')">End game</button>
         </div>`}
+      </div>
+    </div>
+  `;
+}
+
+function renderPitcherRow(g) {
+  const pitcherId = currentPitcherId(g);
+  const pitcher = pitcherId ? State.getPlayer(pitcherId) : null;
+  return `
+    <div class="at-bat-row" style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #f3f4f6">
+      <div class="role">P</div>
+      <div>
+        <span class="player-num">#${escapeHtml(pitcher?.jerseyNumber || '-')}</span>
+        <span>${escapeHtml(pitcher?.name || '?')}</span>
+        <div class="game-stats">${pitcherId ? pitcherGameStats(g, pitcherId) : ''}</div>
       </div>
     </div>
   `;
@@ -2054,14 +2070,6 @@ function renderBatterRow(g) {
         <span class="player-num">#${escapeHtml(batter?.jerseyNumber || '-')}</span>
         <span class="player-name">${escapeHtml(batter?.name || '?')}</span>
         <div class="game-stats">${batterId ? batterGameStats(g, batterId) : ''}</div>
-      </div>
-    </div>
-    <div class="at-bat-row">
-      <div class="role">P</div>
-      <div>
-        <span class="player-num">#${escapeHtml(pitcher?.jerseyNumber || '-')}</span>
-        <span>${escapeHtml(pitcher?.name || '?')}</span>
-        <div class="game-stats">${pitcherId ? pitcherGameStats(g, pitcherId) : ''}</div>
       </div>
     </div>
     <div class="at-bat-row">
@@ -2209,8 +2217,8 @@ const FIELD = {
   FIRST:   { x: 280, y: 310 },
   SECOND:  { x: 200, y: 230 },
   THIRD:   { x: 120, y: 310 },
-  MOUND:   { x: 200, y: 320 },
-  CF_HOME: { x: 200, y: 50  },
+  MOUND:   { x: 200, y: 305 },
+  CF_HOME: { x: 200, y: 155 },
 };
 
 let __fieldClickMode = null;
