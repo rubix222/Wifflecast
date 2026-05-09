@@ -842,8 +842,7 @@
 <header>
   <h1><span class="logo">W</span> Wiffleball Tracker</h1>
   <div class="storage-controls">
-    <span id="storage-status" class="storage-status">Local browser storage</span>
-    <button id="btn-connect-folder" class="btn btn-sm">Connect Folder</button>
+    <span id="storage-status" class="storage-status connected">☁️ Firestore</span>
     <button id="btn-export" class="btn btn-sm">Export</button>
     <button id="btn-import" class="btn btn-sm">Import</button>
     <input type="file" id="import-file" accept="application/json" hidden />
@@ -890,6 +889,25 @@
 
 <div id="toast" class="toast"></div>
 
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
+  import { getFirestore, collection, doc, getDocs, setDoc, deleteDoc, onSnapshot }
+    from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+
+  const app = initializeApp({
+    apiKey: "AIzaSyDp_4n3yu7pYBHGhsphp579u5qXPXFCwNE",
+    authDomain: "wiffle-cast.firebaseapp.com",
+    projectId: "wiffle-cast",
+    storageBucket: "wiffle-cast.firebasestorage.app",
+    messagingSenderId: "396782720853",
+    appId: "1:396782720853:web:b84e66fa4dd13b852b81dc"
+  });
+
+  const db = getFirestore(app);
+  window._fs = { db, collection, doc, getDocs, setDoc, deleteDoc, onSnapshot };
+  document.dispatchEvent(new Event('firebase-ready'));
+</script>
+
 <script>
 /* =====================================================
    WIFFLEBALL TRACKER
@@ -912,186 +930,80 @@ function toast(msg, type = '') {
 }
 
 /* ============================================================
-   STORAGE LAYER
+   STORAGE LAYER (Firestore)
    ============================================================ */
-const LS_KEY = 'wiffleball_tracker_v1';
-const IDB_NAME = 'wiffleball-tracker';
-const IDB_STORE = 'handles';
-
-function idbOpen() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(IDB_NAME, 1);
-    req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-async function idbGet(key) {
-  const db = await idbOpen();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(IDB_STORE, 'readonly');
-    const req = tx.objectStore(IDB_STORE).get(key);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-async function idbPut(key, val) {
-  const db = await idbOpen();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(IDB_STORE, 'readwrite');
-    tx.objectStore(IDB_STORE).put(val, key);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-async function idbDel(key) {
-  const db = await idbOpen();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(IDB_STORE, 'readwrite');
-    tx.objectStore(IDB_STORE).delete(key);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
 const Storage = {
-  dirHandle: null,
-
-  async init() {
-    if ('showDirectoryPicker' in window) {
-      try {
-        const handle = await idbGet('dir');
-        if (handle) {
-          const perm = await handle.queryPermission({ mode: 'readwrite' });
-          if (perm === 'granted') this.dirHandle = handle;
-        }
-      } catch (err) { console.warn('Could not restore dir handle', err); }
-    }
-    this.updateStatus();
-  },
-
-  isFileBased() { return !!this.dirHandle; },
-
-  updateStatus() {
-    const el = $('#storage-status');
-    if (this.dirHandle) {
-      el.textContent = '📁 ' + this.dirHandle.name;
-      el.classList.add('connected');
-      $('#btn-connect-folder').textContent = 'Change Folder';
-    } else {
-      el.textContent = 'Local browser storage';
-      el.classList.remove('connected');
-      $('#btn-connect-folder').textContent = 'Connect Folder';
-    }
-  },
-
-  async connectFolder() {
-    if (!('showDirectoryPicker' in window)) {
-      toast('Your browser does not support folder picking. Use Chrome/Edge, or Export/Import.', 'error');
-      return false;
-    }
-    try {
-      const handle = await window.showDirectoryPicker({ id: 'wiffleball', mode: 'readwrite' });
-      const perm = await handle.requestPermission({ mode: 'readwrite' });
-      if (perm !== 'granted') { toast('Permission denied', 'error'); return false; }
-      this.dirHandle = handle;
-      await idbPut('dir', handle);
-      this.updateStatus();
-      const loaded = await this.loadAll();
-      if (!loaded) await this.saveAll(State.snapshot());
-      toast('Connected to ' + handle.name, 'success');
-      Render.all();
-      return true;
-    } catch (err) {
-      if (err.name !== 'AbortError') { console.error(err); toast('Could not connect folder', 'error'); }
-      return false;
-    }
-  },
-
-  async ensurePermission() {
-    if (!this.dirHandle) return false;
-    const opts = { mode: 'readwrite' };
-    let perm = await this.dirHandle.queryPermission(opts);
-    if (perm !== 'granted') perm = await this.dirHandle.requestPermission(opts);
-    return perm === 'granted';
-  },
-
-  async readFile(name) {
-    if (!this.dirHandle) return null;
-    try {
-      const fh = await this.dirHandle.getFileHandle(name);
-      const file = await fh.getFile();
-      const text = await file.text();
-      return text ? JSON.parse(text) : [];
-    } catch (err) {
-      if (err.name === 'NotFoundError') return null;
-      console.error('readFile error', name, err);
-      return null;
-    }
-  },
-
-  async writeFile(name, data) {
-    if (!this.dirHandle) return;
-    const fh = await this.dirHandle.getFileHandle(name, { create: true });
-    const w = await fh.createWritable();
-    await w.write(JSON.stringify(data, null, 2));
-    await w.close();
-  },
+  async init() {}, // Firebase already initialised by module script
 
   async loadAll() {
-    if (this.dirHandle) {
-      const ok = await this.ensurePermission();
-      if (!ok) return false;
-      const players = await this.readFile('players.json');
-      const teams = await this.readFile('teams.json');
-      const games = await this.readFile('games.json');
-      State.players = players || [];
-      State.teams = teams || [];
-      State.games = games || [];
-      return players !== null || teams !== null || games !== null;
-    } else {
-      const raw = localStorage.getItem(LS_KEY);
-      if (raw) {
-        try {
-          const data = JSON.parse(raw);
-          State.players = data.players || [];
-          State.teams = data.teams || [];
-          State.games = data.games || [];
-          return true;
-        } catch (e) { console.error(e); }
-      }
-      State.players = []; State.teams = []; State.games = [];
-      return false;
-    }
+    const fs = window._fs;
+    const [ps, ts, gs] = await Promise.all([
+      fs.getDocs(fs.collection(fs.db, 'players')),
+      fs.getDocs(fs.collection(fs.db, 'teams')),
+      fs.getDocs(fs.collection(fs.db, 'games')),
+    ]);
+    State.players = ps.docs.map(d => d.data());
+    State.teams   = ts.docs.map(d => d.data());
+    State.games   = gs.docs.map(d => d.data());
   },
 
-  async saveAll(snapshot = State.snapshot()) {
-    if (this.dirHandle) {
-      const ok = await this.ensurePermission();
-      if (!ok) {
-        toast('Lost folder permission, falling back to local storage', 'error');
-        this.dirHandle = null;
-        await idbDel('dir');
-        this.updateStatus();
-        localStorage.setItem(LS_KEY, JSON.stringify(snapshot));
-        return;
-      }
-      try {
-        await this.writeFile('players.json', snapshot.players);
-        await this.writeFile('teams.json',   snapshot.teams);
-        await this.writeFile('games.json',   snapshot.games);
-      } catch (err) { console.error('Save failed', err); toast('Save failed: ' + err.message, 'error'); }
-    } else {
-      localStorage.setItem(LS_KEY, JSON.stringify(snapshot));
-    }
+  listenAll() {
+    const fs = window._fs;
+    fs.onSnapshot(fs.collection(fs.db, 'players'), snap => {
+      State.players = snap.docs.map(d => d.data());
+      Render.players();
+    });
+    fs.onSnapshot(fs.collection(fs.db, 'teams'), snap => {
+      State.teams = snap.docs.map(d => d.data());
+      Render.teams();
+    });
+    fs.onSnapshot(fs.collection(fs.db, 'games'), snap => {
+      snap.docChanges().forEach(change => {
+        const g = change.doc.data();
+        if (change.type === 'removed') {
+          State.games = State.games.filter(x => x.id !== g.id);
+        } else {
+          const idx = State.games.findIndex(x => x.id === g.id);
+          if (idx >= 0) State.games[idx] = g; else State.games.push(g);
+        }
+      });
+      Render.games();
+      if (LiveGameId && $('#live-game-root')) rerenderLive();
+    });
+  },
+
+  async saveAll() { /* no-op — individual saves handle this */ },
+
+  async savePlayer(p) {
+    const fs = window._fs;
+    await fs.setDoc(fs.doc(fs.db, 'players', p.id), p);
+  },
+  async removePlayer(id) {
+    const fs = window._fs;
+    await fs.deleteDoc(fs.doc(fs.db, 'players', id));
+  },
+  async saveTeam(t) {
+    const fs = window._fs;
+    await fs.setDoc(fs.doc(fs.db, 'teams', t.id), t);
+  },
+  async removeTeam(id) {
+    const fs = window._fs;
+    await fs.deleteDoc(fs.doc(fs.db, 'teams', id));
+  },
+  async saveGame(g) {
+    const fs = window._fs;
+    await fs.setDoc(fs.doc(fs.db, 'games', g.id), g);
+  },
+  async removeGame(id) {
+    const fs = window._fs;
+    await fs.deleteDoc(fs.doc(fs.db, 'games', id));
   },
 
   async exportJson() {
     const blob = new Blob([JSON.stringify(State.snapshot(), null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = 'wiffleball-data-' + new Date().toISOString().slice(0, 10) + '.json';
+    a.href = url; a.download = 'wiffleball-data-' + new Date().toISOString().slice(0,10) + '.json';
     document.body.appendChild(a); a.click(); a.remove();
     URL.revokeObjectURL(url);
   },
@@ -1099,13 +1011,13 @@ const Storage = {
   async importJson(file) {
     const text = await file.text();
     const data = JSON.parse(text);
-    State.players = data.players || [];
-    State.teams = data.teams || [];
-    State.games = data.games || [];
-    await this.saveAll();
-    Render.all();
+    await Promise.all([
+      ...(data.players || []).map(p => Storage.savePlayer(p)),
+      ...(data.teams   || []).map(t => Storage.saveTeam(t)),
+      ...(data.games   || []).map(g => Storage.saveGame(g)),
+    ]);
     toast('Imported successfully', 'success');
-  }
+  },
 };
 
 /* ============================================================
@@ -1126,37 +1038,39 @@ const State = {
   async addPlayer(data) {
     const p = { id: uid(), name: data.name.trim(), jerseyNumber: (data.jerseyNumber || '').trim(), createdAt: Date.now() };
     this.players.push(p);
-    await Storage.saveAll();
+    await Storage.savePlayer(p);
     return p;
   },
   async updatePlayer(id, data) {
     const p = this.getPlayer(id); if (!p) return;
     p.name = data.name.trim();
     p.jerseyNumber = (data.jerseyNumber || '').trim();
-    await Storage.saveAll();
+    await Storage.savePlayer(p);
   },
   async deletePlayer(id) {
+    const teamsToUpdate = this.teams.filter(t => t.playerIds.includes(id));
     this.players = this.players.filter(p => p.id !== id);
     this.teams.forEach(t => { t.playerIds = t.playerIds.filter(pid => pid !== id); });
-    await Storage.saveAll();
+    await Storage.removePlayer(id);
+    await Promise.all(teamsToUpdate.map(t => Storage.saveTeam(t)));
   },
 
   // ---- Team CRUD ----
   async addTeam(data) {
     const t = { id: uid(), name: data.name.trim(), playerIds: [...(data.playerIds || [])], createdAt: Date.now() };
     this.teams.push(t);
-    await Storage.saveAll();
+    await Storage.saveTeam(t);
     return t;
   },
   async updateTeam(id, data) {
     const t = this.getTeam(id); if (!t) return;
     t.name = data.name.trim();
     t.playerIds = [...(data.playerIds || [])];
-    await Storage.saveAll();
+    await Storage.saveTeam(t);
   },
   async deleteTeam(id) {
     this.teams = this.teams.filter(t => t.id !== id);
-    await Storage.saveAll();
+    await Storage.removeTeam(id);
   },
 
   // ---- Game CRUD ----
@@ -1208,18 +1122,18 @@ const State = {
       isOver: false,
     };
     this.games.push(g);
-    await Storage.saveAll();
+    await Storage.saveGame(g);
     return g;
   },
   async updateGame(id, patch) {
     const g = this.getGame(id);
     if (!g) return;
     Object.assign(g, patch);
-    await Storage.saveAll();
+    await Storage.saveGame(g);
   },
   async deleteGame(id) {
     this.games = this.games.filter(g => g.id !== id);
-    await Storage.saveAll();
+    await Storage.removeGame(id);
   },
 
   // ---- Stat aggregation from event log ----
@@ -2054,6 +1968,10 @@ function pitcherGameStats(g, pitcherId) {
   return `${k} K · ${bb} BB · ${h} H · ${er} ER`;
 }
 
+function rerenderLive() {
+  if (LiveGameId) renderLiveGame(LiveGameId);
+}
+
 function renderBatterRow(g) {
   const batterId = currentBatterId(g);
   const onDeckId = nextBatterId(g);
@@ -2189,11 +2107,12 @@ function selectPlay(ts) {
   if (banner) {
     const batter = State.getPlayer(event.batterId);
     banner.style.display = 'flex';
-    banner.innerHTML = `<span>▶ ${event.half === 'top' ? 'T' : 'B'}${event.inning} — ${escapeHtml(batter?.name || '?')} — ${describeOutcome(event)}</span><button class="btn btn-sm" onclick="clearPlaySelection(State.getGame(LiveGameId))">Reset view</button>`;
+    banner.innerHTML = `<span>▶ ${event.half === 'top' ? 'T' : 'B'}${event.inning} — ${escapeHtml(batter?.name || '?')} — ${describeOutcome(event)}</span><button class="btn btn-sm" onclick="clearPlaySelection()">Reset view</button>`;
   }
 }
 
 function clearPlaySelection(g) {
+  if (!g) g = State.getGame(LiveGameId);
   _selectedPlayTs = null;
   $$('.play-entry').forEach(li => li.classList.remove('selected'));
   drawField(null);
@@ -2418,7 +2337,7 @@ function showBipChoiceModal() {
   Modal.show(`
     <div class="modal-header">
       <h3>Ball in play</h3>
-      <button class="btn-icon" onclick="Modal.hide(); renderLiveGame(LiveGameId);">✕</button>
+      <button class="btn-icon" onclick="Modal.hide(); rerenderLive();">✕</button>
     </div>
     <div class="modal-body">
       <p class="help-text" style="margin-bottom:14px">What was the result?</p>
@@ -2429,7 +2348,7 @@ function showBipChoiceModal() {
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn" onclick="Modal.hide(); renderLiveGame(LiveGameId);">Cancel</button>
+      <button class="btn" onclick="Modal.hide(); rerenderLive();">Cancel</button>
     </div>
   `);
 }
@@ -2439,7 +2358,7 @@ function showBipOutTypeModal() {
   Modal.show(`
     <div class="modal-header">
       <h3>Type of out</h3>
-      <button class="btn-icon" onclick="Modal.hide(); renderLiveGame(LiveGameId);">✕</button>
+      <button class="btn-icon" onclick="Modal.hide(); rerenderLive();">✕</button>
     </div>
     <div class="modal-body">
       <div class="outcome-grid">
@@ -2457,7 +2376,7 @@ function showBipHitModal() {
   Modal.show(`
     <div class="modal-header">
       <h3>Hit</h3>
-      <button class="btn-icon" onclick="Modal.hide(); renderLiveGame(LiveGameId);">✕</button>
+      <button class="btn-icon" onclick="Modal.hide(); rerenderLive();">✕</button>
     </div>
     <div class="modal-body">
       <div class="outcome-grid">
@@ -2475,7 +2394,7 @@ function showBipErrorModal() {
   Modal.show(`
     <div class="modal-header">
       <h3>Error — batter reaches</h3>
-      <button class="btn-icon" onclick="Modal.hide(); renderLiveGame(LiveGameId);">✕</button>
+      <button class="btn-icon" onclick="Modal.hide(); rerenderLive();">✕</button>
     </div>
     <div class="modal-body">
       <p class="help-text" style="margin-bottom:14px">How far did the batter reach?</p>
@@ -2829,7 +2748,6 @@ $('#btn-add-player').addEventListener('click', () => showPlayerModal());
 $('#btn-add-team').addEventListener('click', () => showTeamModal());
 $('#btn-add-game').addEventListener('click', () => showNewGameModal());
 
-$('#btn-connect-folder').addEventListener('click', async () => { await Storage.connectFolder(); });
 $('#btn-export').addEventListener('click', () => Storage.exportJson());
 $('#btn-import').addEventListener('click', () => $('#import-file').click());
 $('#import-file').addEventListener('change', async (e) => {
@@ -2843,29 +2761,49 @@ $('#import-file').addEventListener('change', async (e) => {
 /* ============================================================
    BOOT
    ============================================================ */
-(async function boot() {
+async function boot() {
   await Storage.init();
   await Storage.loadAll();
   // Migrate games missing new fields (forward compat)
-  let needsSave = false;
+  const migrationSaves = [];
   State.games.forEach(g => {
-    if (g.numInnings   === undefined) { g.numInnings   = 7;                          needsSave = true; }
-    if (g.score        === undefined) { g.score        = { home: 0, away: 0 };       needsSave = true; }
-    if (g.lineScore    === undefined) { g.lineScore    = [];                          needsSave = true; }
-    if (g.outs         === undefined) { g.outs         = 0;                           needsSave = true; }
-    if (g.balls        === undefined) { g.balls        = 0;                           needsSave = true; }
-    if (g.strikes      === undefined) { g.strikes      = 0;                           needsSave = true; }
-    if (g.bases        === undefined) { g.bases        = { 1: null, 2: null, 3: null }; needsSave = true; }
-    if (g.runnerCounter=== undefined) { g.runnerCounter= 0;                           needsSave = true; }
-    if (g.homeBatterIdx=== undefined) { g.homeBatterIdx= 0;                           needsSave = true; }
-    if (g.awayBatterIdx=== undefined) { g.awayBatterIdx= 0;                           needsSave = true; }
-    if (g.currentInning=== undefined) { g.currentInning= 1;                           needsSave = true; }
-    if (g.currentHalf  === undefined) { g.currentHalf  = 'top';                       needsSave = true; }
-    if (g.events       === undefined) { g.events       = [];                           needsSave = true; }
+    let changed = false;
+    if (g.numInnings   === undefined) { g.numInnings   = 7;                            changed = true; }
+    if (g.score        === undefined) { g.score        = { home: 0, away: 0 };         changed = true; }
+    if (g.lineScore    === undefined) { g.lineScore    = [];                            changed = true; }
+    if (g.outs         === undefined) { g.outs         = 0;                             changed = true; }
+    if (g.balls        === undefined) { g.balls        = 0;                             changed = true; }
+    if (g.strikes      === undefined) { g.strikes      = 0;                             changed = true; }
+    if (g.bases        === undefined) { g.bases        = { 1: null, 2: null, 3: null }; changed = true; }
+    if (g.runnerCounter=== undefined) { g.runnerCounter= 0;                             changed = true; }
+    if (g.homeBatterIdx=== undefined) { g.homeBatterIdx= 0;                             changed = true; }
+    if (g.awayBatterIdx=== undefined) { g.awayBatterIdx= 0;                             changed = true; }
+    if (g.currentInning=== undefined) { g.currentInning= 1;                             changed = true; }
+    if (g.currentHalf  === undefined) { g.currentHalf  = 'top';                         changed = true; }
+    if (g.events       === undefined) { g.events       = [];                             changed = true; }
+    if (changed) migrationSaves.push(Storage.saveGame(g));
   });
-  if (needsSave) await Storage.saveAll();
+  if (migrationSaves.length) await Promise.all(migrationSaves);
+  Storage.listenAll();
   Render.all();
-})();
+}
+
+document.addEventListener('firebase-ready', boot, { once: true });
+
+// Expose functions needed by inline HTML event handlers
+Object.assign(window, {
+  Modal, Render, State,
+  showPlayerModal, deletePlayer, showTeamModal, deleteTeam,
+  showNewGameModal, openGame, deleteGame,
+  submitPlayer, submitTeam, submitNewGame,
+  startGame, setPosition, moveBatter,
+  endHalfInning, endGameEarly,
+  selectPlay, clearPlaySelection,
+  onFielderClick, swapFielder,
+  renderLiveGame, rerenderLive,
+  showBipOutTypeModal, showBipHitModal, showBipErrorModal,
+  askLocation, cancelLocation, confirmLocation, finishHit,
+});
 </script>
 </body>
 </html>
