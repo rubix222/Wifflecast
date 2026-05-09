@@ -572,6 +572,24 @@
   }
   .field-svg.location-mode { cursor: crosshair; }
 
+  .field-and-bases { display: flex; gap: 12px; align-items: flex-start; }
+  .field-panel { flex: 1; min-width: 0; }
+  .bases-panel { flex: 0 0 140px; }
+  .bases-panel h3 {
+    margin: 0 0 8px;
+    font-size: 14px;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+  }
+  .bases-svg { width: 100%; height: auto; display: block; user-select: none; }
+  .bases-svg .diamond-outline { fill: none; stroke: #c89968; stroke-width: 2; }
+  .bases-svg .base { fill: #f9fafb; stroke: #1f2937; stroke-width: 1; }
+  .bases-svg .base.occupied { fill: #facc15; stroke: #92400e; }
+  .bases-svg .runner-tag rect { fill: #fff; stroke: #166534; stroke-width: 1.5; }
+  .bases-svg .runner-tag text { fill: #166534; font-size: 10px; font-weight: 700; text-anchor: middle; }
+
   .at-bat-card {
     background: #fff;
     border-radius: 10px;
@@ -1881,6 +1899,7 @@ function renderLiveGame(gameId) {
     <div id="live-game-root">${liveGameHTML(g, home, away)}</div>
   `, { full: true });
   drawField();
+  drawBases();
   attachPitchHandlers();
 }
 
@@ -1931,9 +1950,17 @@ function liveGameHTML(g, home, away) {
         </div>
 
         <div class="field-wrap">
-          <h3>${isCompleted ? 'Base state' : escapeHtml(fieldingTeam.name) + ' in the field'}</h3>
-          ${isCompleted ? '<div class="help-text" style="margin-bottom:8px">Click a play to see who was on base.</div>' : ''}
-          <div id="field-container"></div>
+          <div class="field-and-bases">
+            <div class="field-panel">
+              <h3>${isCompleted ? 'Field' : escapeHtml(fieldingTeam.name) + ' in the field'}</h3>
+              <div id="field-container"></div>
+            </div>
+            <div class="bases-panel">
+              <h3>On base</h3>
+              ${isCompleted ? '<div class="help-text" style="margin-bottom:6px;font-size:11px">Click a play.</div>' : ''}
+              <div id="bases-container"></div>
+            </div>
+          </div>
         </div>
 
         <div class="line-score">
@@ -2108,6 +2135,7 @@ function selectPlay(ts) {
 
   $$('.play-entry').forEach(li => li.classList.toggle('selected', li.dataset.ts === String(ts)));
   drawField(bases);
+  drawBases(bases);
 
   const sbAway = $('#sb-score-away'), sbHome = $('#sb-score-home');
   if (sbAway) sbAway.textContent = score.away;
@@ -2129,6 +2157,7 @@ function clearPlaySelection(g) {
   _selectedPlayTs = null;
   $$('.play-entry').forEach(li => li.classList.remove('selected'));
   drawField(null);
+  drawBases(null);
   const sbAway = $('#sb-score-away'), sbHome = $('#sb-score-home');
   if (sbAway && g) sbAway.textContent = g.score.away;
   if (sbHome && g) sbHome.textContent = g.score.home;
@@ -2161,31 +2190,12 @@ function drawField(overrideBases = null) {
   if (!container) return;
 
   const isCompleted = g.status === 'completed';
-  const bases = overrideBases !== null ? overrideBases
-              : isCompleted            ? { 1: null, 2: null, 3: null }
-              : g.bases;
 
   const fieldingPos = fieldingPositions(g);
   const pitcherId = Object.keys(fieldingPos).find(pid => fieldingPos[pid] === 'P');
   const cfId = Object.keys(fieldingPos).find(pid => fieldingPos[pid] === 'CF');
   const pitcher = pitcherId ? State.getPlayer(pitcherId) : null;
   const cf = cfId ? State.getPlayer(cfId) : null;
-
-  const baseSquare = (cx, cy, occupied) => {
-    const s = 8;
-    const cls = 'base' + (occupied ? ' occupied' : '');
-    return `<polygon class="${cls}" points="${cx},${cy-s} ${cx+s},${cy} ${cx},${cy+s} ${cx-s},${cy}" />`;
-  };
-
-  const runnerTag = (runner, cx, cy) => {
-    if (!runner) return '';
-    const label = `${runner.name} ${runner.number}`;
-    const w = Math.max(46, label.length * 6);
-    return `<g class="runner-tag" transform="translate(${cx - w/2}, ${cy + 14})">
-      <rect x="0" y="0" width="${w}" height="18" rx="4" />
-      <text x="${w/2}" y="13">${escapeHtml(label)}</text>
-    </g>`;
-  };
 
   const fielderMarker = (pid, player, pos, cx, cy) => {
     if (!pid || !player) return '';
@@ -2200,16 +2210,7 @@ function drawField(overrideBases = null) {
   const svg = `
     <svg viewBox="0 0 400 400" class="field-svg" id="field-svg">
       <path class="grass" d="M 200 390 L 59 145 A 283 283 0 0 1 341 145 Z"/>
-      <polygon class="dirt" points="200,230 280,310 200,390 120,310" />
-      <circle class="mound" cx="${FIELD.MOUND.x}" cy="${FIELD.MOUND.y}" r="12"/>
       <path class="double-line" d="M 105 226 A 190 190 0 0 1 295 226" />
-      ${baseSquare(FIELD.HOME.x,   FIELD.HOME.y,   false)}
-      ${baseSquare(FIELD.FIRST.x,  FIELD.FIRST.y,  !!bases[1])}
-      ${baseSquare(FIELD.SECOND.x, FIELD.SECOND.y, !!bases[2])}
-      ${baseSquare(FIELD.THIRD.x,  FIELD.THIRD.y,  !!bases[3])}
-      ${runnerTag(bases[1], FIELD.FIRST.x,  FIELD.FIRST.y)}
-      ${runnerTag(bases[2], FIELD.SECOND.x, FIELD.SECOND.y + 10)}
-      ${runnerTag(bases[3], FIELD.THIRD.x,  FIELD.THIRD.y)}
       ${isCompleted ? '' : fielderMarker(pitcherId, pitcher, 'P',  FIELD.MOUND.x,   FIELD.MOUND.y)}
       ${isCompleted ? '' : fielderMarker(cfId,      cf,      'CF', FIELD.CF_HOME.x, FIELD.CF_HOME.y)}
     </svg>
@@ -2223,6 +2224,50 @@ function drawField(overrideBases = null) {
     const pt = svgPoint(svgEl, e);
     __fieldClickMode.onClick({ x: pt.x, y: pt.y });
   });
+}
+
+function drawBases(overrideBases = null) {
+  const g = State.getGame(LiveGameId);
+  if (!g) return;
+  const container = $('#bases-container');
+  if (!container) return;
+
+  const isCompleted = g.status === 'completed';
+  const bases = overrideBases !== null ? overrideBases
+              : isCompleted            ? { 1: null, 2: null, 3: null }
+              : g.bases;
+
+  const B = { HOME: {x:100,y:190}, FIRST: {x:162,y:110}, SECOND: {x:100,y:30}, THIRD: {x:38,y:110} };
+  const s = 7;
+
+  const sq = (cx, cy, occ) => {
+    const cls = 'base' + (occ ? ' occupied' : '');
+    return `<polygon class="${cls}" points="${cx},${cy-s} ${cx+s},${cy} ${cx},${cy+s} ${cx-s},${cy}" />`;
+  };
+
+  const tag = (runner, cx, cy, above) => {
+    if (!runner) return '';
+    const label = `${runner.name} ${runner.number}`;
+    const w = Math.max(46, label.length * 6);
+    const ty = above ? cy - 28 : cy + 14;
+    return `<g class="runner-tag" transform="translate(${cx - w/2}, ${ty})">
+      <rect x="0" y="0" width="${w}" height="18" rx="4" />
+      <text x="${w/2}" y="13">${escapeHtml(label)}</text>
+    </g>`;
+  };
+
+  container.innerHTML = `
+    <svg viewBox="0 0 200 215" class="bases-svg">
+      <polygon class="diamond-outline" points="${B.HOME.x},${B.HOME.y} ${B.FIRST.x},${B.FIRST.y} ${B.SECOND.x},${B.SECOND.y} ${B.THIRD.x},${B.THIRD.y}" />
+      ${sq(B.HOME.x,   B.HOME.y,   false)}
+      ${sq(B.FIRST.x,  B.FIRST.y,  !!bases[1])}
+      ${sq(B.SECOND.x, B.SECOND.y, !!bases[2])}
+      ${sq(B.THIRD.x,  B.THIRD.y,  !!bases[3])}
+      ${tag(bases[1], B.FIRST.x,  B.FIRST.y,  false)}
+      ${tag(bases[2], B.SECOND.x, B.SECOND.y, true)}
+      ${tag(bases[3], B.THIRD.x,  B.THIRD.y,  false)}
+    </svg>
+  `;
 }
 
 function svgPoint(svg, evt) {
