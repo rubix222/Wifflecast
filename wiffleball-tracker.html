@@ -570,6 +570,10 @@
     stroke-width: 2;
     pointer-events: none;
   }
+  .badge { display:inline-block; font-size:10px; font-weight:700; padding:2px 7px; border-radius:10px; text-transform:uppercase; letter-spacing:0.4px; margin-left:6px; }
+  .badge-guest { background:#f3f4f6; color:#6b7280; }
+  .badge-invited { background:#fef3c7; color:#92400e; }
+  .badge-linked { background:#d1fae5; color:#065f46; }
   .field-svg.location-mode { cursor: crosshair; }
 
   .field-and-bases { display: flex; gap: 4px; align-items: flex-start; }
@@ -846,6 +850,9 @@
     <button id="btn-export" class="btn btn-sm">Export</button>
     <button id="btn-import" class="btn btn-sm">Import</button>
     <input type="file" id="import-file" accept="application/json" hidden />
+    <span id="auth-user-name" style="display:none;font-size:13px;color:#fef9c3;font-weight:600"></span>
+    <button id="btn-sign-in" class="btn btn-sm">Sign In</button>
+    <button id="btn-sign-out" class="btn btn-sm" style="display:none">Sign Out</button>
   </div>
 </header>
 
@@ -859,7 +866,7 @@
   <section id="view-players" class="view active">
     <div class="toolbar">
       <h2>Players</h2>
-      <button id="btn-add-player" class="btn btn-primary">+ Add Player</button>
+      <button id="btn-add-player" class="btn btn-primary" style="display:none">+ Add Player</button>
     </div>
     <div id="players-container"></div>
   </section>
@@ -867,7 +874,7 @@
   <section id="view-teams" class="view">
     <div class="toolbar">
       <h2>Teams</h2>
-      <button id="btn-add-team" class="btn btn-primary">+ Add Team</button>
+      <button id="btn-add-team" class="btn btn-primary" style="display:none">+ Add Team</button>
     </div>
     <div id="teams-container"></div>
   </section>
@@ -875,7 +882,7 @@
   <section id="view-games" class="view">
     <div class="toolbar">
       <h2>Games</h2>
-      <button id="btn-add-game" class="btn btn-primary">+ New Game</button>
+      <button id="btn-add-game" class="btn btn-primary" style="display:none">+ New Game</button>
     </div>
     <div id="games-container"></div>
   </section>
@@ -893,6 +900,10 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
   import { getFirestore, collection, doc, getDocs, setDoc, deleteDoc, onSnapshot }
     from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+  import { getAuth, onAuthStateChanged, signInWithEmailAndPassword,
+           createUserWithEmailAndPassword, signOut,
+           sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink }
+    from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
 
   const app = initializeApp({
     apiKey: "AIzaSyDp_4n3yu7pYBHGhsphp579u5qXPXFCwNE",
@@ -904,7 +915,11 @@
   });
 
   const db = getFirestore(app);
-  window._fs = { db, collection, doc, getDocs, setDoc, deleteDoc, onSnapshot };
+  const auth = getAuth(app);
+  window._fs = { db, collection, doc, getDocs, setDoc, deleteDoc, onSnapshot,
+                 auth, onAuthStateChanged, signInWithEmailAndPassword,
+                 createUserWithEmailAndPassword, signOut,
+                 sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink };
   document.dispatchEvent(new Event('firebase-ready'));
 </script>
 
@@ -972,6 +987,16 @@ const Storage = {
     });
   },
 
+  async saveUser(profile) {
+    const fs = window._fs;
+    await fs.setDoc(fs.doc(fs.db, 'users', profile.uid), profile);
+  },
+  async getUser(uid) {
+    const fs = window._fs;
+    const snap = await fs.getDocs(fs.collection(fs.db, 'users'));
+    const d = snap.docs.find(x => x.id === uid);
+    return d ? d.data() : null;
+  },
   async saveAll() { /* no-op — individual saves handle this */ },
 
   async savePlayer(p) {
@@ -1310,6 +1335,172 @@ const fmt = {
   },
 };
 
+/* ============================================================
+   AUTH
+   ============================================================ */
+const ADMIN_EMAIL = 'rubix222@gmail.com';
+let currentUser = null;
+let currentUserProfile = null;
+function isAdmin() { return currentUser?.email === ADMIN_EMAIL; }
+
+function updateAuthUI() {
+  const btnIn  = $('#btn-sign-in');
+  const btnOut = $('#btn-sign-out');
+  const nameEl = $('#auth-user-name');
+  const addPlayer = $('#btn-add-player');
+  const addTeam   = $('#btn-add-team');
+  const addGame   = $('#btn-add-game');
+  if (!btnIn) return;
+  if (currentUser) {
+    btnIn.style.display  = 'none';
+    btnOut.style.display = '';
+    nameEl.style.display = '';
+    const name = currentUserProfile?.name || currentUser.email.split('@')[0];
+    nameEl.textContent = (isAdmin() ? '⭐ ' : '') + name;
+  } else {
+    btnIn.style.display  = '';
+    btnOut.style.display = 'none';
+    nameEl.style.display = 'none';
+  }
+  if (addPlayer) addPlayer.style.display = isAdmin() ? '' : 'none';
+  if (addTeam)   addTeam.style.display   = isAdmin() ? '' : 'none';
+  if (addGame)   addGame.style.display   = isAdmin() ? '' : 'none';
+}
+
+async function createOrLinkUserProfile(user, playerId, name) {
+  const existing = await Storage.getUser(user.uid);
+  if (existing) { currentUserProfile = existing; return; }
+  const profile = {
+    uid: user.uid,
+    email: user.email,
+    name: name || user.displayName || user.email.split('@')[0],
+    playerId: playerId || null,
+    createdAt: Date.now(),
+  };
+  await Storage.saveUser(profile);
+  currentUserProfile = profile;
+  if (playerId) {
+    const player = State.getPlayer(playerId);
+    if (player) {
+      player.userId = user.uid;
+      player.invitePending = false;
+      await Storage.savePlayer(player);
+    }
+  }
+}
+
+function authErrorMessage(code) {
+  return ({
+    'auth/user-not-found':      'No account found with that email.',
+    'auth/wrong-password':      'Incorrect password.',
+    'auth/invalid-credential':  'Incorrect email or password.',
+    'auth/email-already-in-use':'An account with that email already exists.',
+    'auth/weak-password':       'Password must be at least 6 characters.',
+    'auth/invalid-email':       'Invalid email address.',
+    'auth/too-many-requests':   'Too many attempts. Please try again later.',
+  })[code] || 'Authentication failed. Please try again.';
+}
+
+function showAuthModal(mode = 'signin') {
+  Modal.show(`
+    <div class="modal-header">
+      <h3>${mode === 'signin' ? 'Sign In' : 'Create Account'}</h3>
+      <button class="btn-icon" onclick="Modal.hide()">✕</button>
+    </div>
+    <form onsubmit="submitAuth(event,'${mode}')">
+      <div class="modal-body">
+        ${mode === 'signup' ? `<div class="form-group"><label>Name</label><input name="uname" type="text" required autofocus placeholder="Your name" /></div>` : ''}
+        <div class="form-group"><label>Email</label><input name="email" type="email" required ${mode === 'signin' ? 'autofocus' : ''} /></div>
+        <div class="form-group"><label>Password</label><input name="password" type="password" required minlength="6" /></div>
+      </div>
+      <div class="modal-footer">
+        <p style="margin:0 auto 0 0;font-size:13px">
+          ${mode === 'signin'
+            ? `No account? <a href="#" onclick="Modal.hide();showAuthModal('signup');return false">Create one</a>`
+            : `Have an account? <a href="#" onclick="Modal.hide();showAuthModal('signin');return false">Sign in</a>`}
+        </p>
+        <button type="button" class="btn" onclick="Modal.hide()">Cancel</button>
+        <button type="submit" class="btn btn-primary">${mode === 'signin' ? 'Sign In' : 'Create Account'}</button>
+      </div>
+    </form>`);
+}
+
+async function submitAuth(event, mode) {
+  event.preventDefault();
+  const form = event.target;
+  const email = form.email.value.trim();
+  const password = form.password.value;
+  const fs = window._fs;
+  try {
+    if (mode === 'signup') {
+      const name = form.uname.value.trim();
+      const cred = await fs.createUserWithEmailAndPassword(fs.auth, email, password);
+      const invitedPlayer = State.players.find(p => p.inviteEmail === email);
+      await createOrLinkUserProfile(cred.user, invitedPlayer?.id || null, name);
+      Modal.hide();
+      toast('Welcome to WiffleCast!', 'success');
+    } else {
+      await fs.signInWithEmailAndPassword(fs.auth, email, password);
+      Modal.hide();
+      toast('Signed in!', 'success');
+    }
+  } catch (err) {
+    toast(authErrorMessage(err.code), 'error');
+  }
+}
+
+async function signOutUser() {
+  await window._fs.signOut(window._fs.auth);
+  currentUser = null;
+  currentUserProfile = null;
+  updateAuthUI();
+  Render.all();
+  toast('Signed out');
+}
+
+async function invitePlayer(playerId) {
+  const player = State.getPlayer(playerId);
+  if (!player) return;
+  const email = window.prompt(`Enter email address to invite for ${player.name}:`);
+  if (!email || !email.includes('@')) { if (email !== null) toast('Invalid email', 'error'); return; }
+  const actionCodeSettings = {
+    url: window.location.origin + window.location.pathname + '?invitePlayerId=' + playerId,
+    handleCodeInApp: true,
+  };
+  try {
+    await window._fs.sendSignInLinkToEmail(window._fs.auth, email, actionCodeSettings);
+    localStorage.setItem('wc_invite_email', email);
+    localStorage.setItem('wc_invite_pid', playerId);
+    player.inviteEmail = email;
+    player.invitePending = true;
+    await Storage.savePlayer(player);
+    Render.players();
+    toast('Invite sent to ' + email, 'success');
+  } catch (err) {
+    toast('Could not send invite: ' + err.message, 'error');
+  }
+}
+
+async function handleEmailLinkSignIn() {
+  const fs = window._fs;
+  const params = new URLSearchParams(window.location.search);
+  const playerId = params.get('invitePlayerId') || localStorage.getItem('wc_invite_pid');
+  let email = localStorage.getItem('wc_invite_email');
+  if (!email) email = window.prompt('Please confirm your email address to complete sign-in:');
+  if (!email) return;
+  try {
+    const result = await fs.signInWithEmailLink(fs.auth, email, window.location.href);
+    localStorage.removeItem('wc_invite_email');
+    localStorage.removeItem('wc_invite_pid');
+    history.replaceState({}, '', window.location.pathname);
+    const name = window.prompt('Welcome! Enter your display name:') || email.split('@')[0];
+    await createOrLinkUserProfile(result.user, playerId, name);
+    toast('Welcome to WiffleCast, ' + (currentUserProfile?.name || '') + '!', 'success');
+  } catch (err) {
+    toast('Sign-in link issue: ' + err.message, 'error');
+  }
+}
+
 const Render = {
   all() { this.players(); this.teams(); this.games(); },
 
@@ -1319,7 +1510,7 @@ const Render = {
       c.innerHTML = `<div class="empty-state">
         <h3>No players yet</h3>
         <p>Add players to start tracking stats and building teams.</p>
-        <button class="btn btn-primary" onclick="showPlayerModal()">+ Add Player</button>
+        ${isAdmin() ? '<button class="btn btn-primary" onclick="showPlayerModal()">+ Add Player</button>' : ''}
       </div>`;
       return;
     }
@@ -1331,13 +1522,14 @@ const Render = {
           <div style="display:flex; gap:10px; align-items:flex-start;">
             <div class="jersey-badge">${escapeHtml(p.jerseyNumber || '#')}</div>
             <div>
-              <h3 class="card-title">${escapeHtml(p.name)}</h3>
+              <h3 class="card-title">${escapeHtml(p.name)}${p.userId ? '<span class="badge badge-linked">Linked</span>' : p.invitePending ? '<span class="badge badge-invited">Invited</span>' : '<span class="badge badge-guest">Guest</span>'}</h3>
               <div class="card-subtitle small">${s.AB + s.BB} PA</div>
             </div>
           </div>
           <div class="card-actions">
-            <button class="btn-icon" title="Edit" onclick="showPlayerModal('${p.id}')">✎</button>
-            <button class="btn-icon" title="Delete" onclick="deletePlayer('${p.id}')">🗑</button>
+            ${isAdmin() ? `<button class="btn-icon" title="Edit" onclick="showPlayerModal('${p.id}')">✎</button>` : ''}
+            ${isAdmin() && !p.userId ? `<button class="btn-icon" title="Send invite" onclick="invitePlayer('${p.id}')">✉</button>` : ''}
+            ${isAdmin() ? `<button class="btn-icon" title="Delete" onclick="deletePlayer('${p.id}')">🗑</button>` : ''}
           </div>
         </div>
         <div class="stat-section-title">Batting</div>
@@ -1373,7 +1565,7 @@ const Render = {
       c.innerHTML = `<div class="empty-state">
         <h3>No teams yet</h3>
         <p>${hasPlayers ? 'Group your players into teams. A team needs at least 2 players.' : 'Add at least 2 players first, then come back to create a team.'}</p>
-        ${hasPlayers ? '<button class="btn btn-primary" onclick="showTeamModal()">+ Add Team</button>' : ''}
+        ${hasPlayers && isAdmin() ? '<button class="btn btn-primary" onclick="showTeamModal()">+ Add Team</button>' : ''}
       </div>`;
       return;
     }
@@ -1388,8 +1580,8 @@ const Render = {
             <div class="card-subtitle small">${players.length} player${players.length !== 1 ? 's' : ''} · ${s.wins}-${s.losses}${s.ties ? '-' + s.ties : ''}</div>
           </div>
           <div class="card-actions">
-            <button class="btn-icon" title="Edit" onclick="showTeamModal('${t.id}')">✎</button>
-            <button class="btn-icon" title="Delete" onclick="deleteTeam('${t.id}')">🗑</button>
+            ${isAdmin() ? `<button class="btn-icon" title="Edit" onclick="showTeamModal('${t.id}')">✎</button>` : ''}
+            ${isAdmin() ? `<button class="btn-icon" title="Delete" onclick="deleteTeam('${t.id}')">🗑</button>` : ''}
           </div>
         </div>
         <div class="stat-section-title">Roster</div>
@@ -1414,7 +1606,7 @@ const Render = {
       c.innerHTML = `<div class="empty-state">
         <h3>No games yet</h3>
         <p>${hasTwoTeams ? 'Pick two teams and start tracking a game.' : 'Create at least 2 teams to start a game.'}</p>
-        ${hasTwoTeams ? '<button class="btn btn-primary" onclick="showNewGameModal()">+ New Game</button>' : ''}
+        ${hasTwoTeams && isAdmin() ? '<button class="btn btn-primary" onclick="showNewGameModal()">+ New Game</button>' : ''}
       </div>`;
       return;
     }
@@ -1434,7 +1626,7 @@ const Render = {
             <div class="card-subtitle small" style="margin-top:6px">${date} · ${g.numInnings} innings</div>
           </div>
           <div class="card-actions" onclick="event.stopPropagation()">
-            <button class="btn-icon" title="Delete" onclick="deleteGame('${g.id}')">🗑</button>
+            ${isAdmin() ? `<button class="btn-icon" title="Delete" onclick="deleteGame('${g.id}')">🗑</button>` : ''}
           </div>
         </div>
         <div class="game-vs">
@@ -2748,6 +2940,8 @@ $('#btn-add-player').addEventListener('click', () => showPlayerModal());
 $('#btn-add-team').addEventListener('click', () => showTeamModal());
 $('#btn-add-game').addEventListener('click', () => showNewGameModal());
 
+$('#btn-sign-in').addEventListener('click', () => showAuthModal('signin'));
+$('#btn-sign-out').addEventListener('click', () => signOutUser());
 $('#btn-export').addEventListener('click', () => Storage.exportJson());
 $('#btn-import').addEventListener('click', () => $('#import-file').click());
 $('#import-file').addEventListener('change', async (e) => {
@@ -2764,6 +2958,24 @@ $('#import-file').addEventListener('change', async (e) => {
 async function boot() {
   await Storage.init();
   await Storage.loadAll();
+
+  // Handle email link sign-in (invite flow)
+  const fs = window._fs;
+  if (fs.isSignInWithEmailLink(fs.auth, window.location.href)) {
+    await handleEmailLinkSignIn();
+  }
+
+  // Auth state listener — fires immediately with current user or null
+  fs.onAuthStateChanged(fs.auth, async (user) => {
+    currentUser = user;
+    currentUserProfile = null;
+    if (user) {
+      currentUserProfile = await Storage.getUser(user.uid);
+    }
+    updateAuthUI();
+    Render.all();
+  });
+
   // Migrate games missing new fields (forward compat)
   const migrationSaves = [];
   State.games.forEach(g => {
@@ -2793,6 +3005,7 @@ document.addEventListener('firebase-ready', boot, { once: true });
 // Expose functions needed by inline HTML event handlers
 Object.assign(window, {
   Modal, Render, State,
+  showAuthModal, submitAuth, signOutUser, invitePlayer,
   showPlayerModal, deletePlayer, showTeamModal, deleteTeam,
   showNewGameModal, openGame, deleteGame,
   submitPlayer, submitTeam, submitNewGame,
