@@ -2144,11 +2144,11 @@ function clearPlaySelection(g) {
    FIELD DIAMOND (SVG)
    ============================================================ */
 const FIELD = {
-  HOME:    { x: 200, y: 380 },
-  FIRST:   { x: 360, y: 220 },
-  SECOND:  { x: 200, y: 60  },
-  THIRD:   { x: 40,  y: 220 },
-  MOUND:   { x: 200, y: 232 },
+  HOME:    { x: 200, y: 390 },
+  FIRST:   { x: 280, y: 310 },
+  SECOND:  { x: 200, y: 230 },
+  THIRD:   { x: 120, y: 310 },
+  MOUND:   { x: 200, y: 320 },
   CF_HOME: { x: 200, y: 50  },
 };
 
@@ -2199,10 +2199,10 @@ function drawField(overrideBases = null) {
 
   const svg = `
     <svg viewBox="0 0 400 400" class="field-svg" id="field-svg">
-      <path class="grass" d="M 200 380 L 0 180 L 0 0 L 400 0 L 400 180 Z"/>
-      <polygon class="dirt" points="200,60 360,220 200,380 40,220" />
+      <path class="grass" d="M 200 390 L 0 190 A 283 283 0 0 1 400 190 Z"/>
+      <polygon class="dirt" points="200,230 280,310 200,390 120,310" />
       <circle class="mound" cx="${FIELD.MOUND.x}" cy="${FIELD.MOUND.y}" r="12"/>
-      <path class="double-line" d="M 15 165 Q 200 90 385 165" />
+      <path class="double-line" d="M 66 256 A 190 190 0 0 1 334 256" />
       ${baseSquare(FIELD.HOME.x,   FIELD.HOME.y,   false)}
       ${baseSquare(FIELD.FIRST.x,  FIELD.FIRST.y,  !!bases[1])}
       ${baseSquare(FIELD.SECOND.x, FIELD.SECOND.y, !!bases[2])}
