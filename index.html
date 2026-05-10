@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>WiffleCast</title>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
   /* ---------- Reset & base ---------- */
   *, *::before, *::after { box-sizing: border-box; }
@@ -1180,6 +1181,18 @@
   .champ-score { font-size: 20px; font-weight: 800; color: #1f2937; padding: 0 4px; }
 
   /* ---------- Admin edit bar ---------- */
+  .last-scorer-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(34,197,94,0.12);
+    border: 1px solid rgba(34,197,94,0.3);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 12px;
+    color: #166534;
+    margin-bottom: 8px;
+  }
   .admin-edit-bar {
     display: flex;
     align-items: center;
@@ -3514,6 +3527,13 @@ function renderLiveGame(gameId) {
   attachPitchHandlers();
 }
 
+function renderLastScorerPill(g) {
+  const lastPa = [...(g.events || [])].reverse().find(e => e.type === 'pa_end');
+  const name = lastPa?.scoredByName;
+  const notMe = lastPa?.scoredBy && lastPa.scoredBy !== currentUser?.uid;
+  return (name && notMe) ? '<div class="last-scorer-pill">🟢 ' + escapeHtml(name) + ' is scoring</div>' : '';
+}
+
 function liveGameHTML(g, home, away) {
   const battingSide = g.currentHalf === 'top' ? 'away' : 'home';
   const fieldingTeam = battingSide === 'away' ? home : away;
@@ -3587,6 +3607,7 @@ function liveGameHTML(g, home, away) {
       </div>
 
       <div class="live-game-right">
+        ${renderLastScorerPill(g)}
         ${isCompleted ? '' : !canUserScore() ? `<div class="help-text" style="padding:12px;text-align:center">Sign in with scoring privilege to record plays.</div>` : `
         <div class="at-bat-card">
           <h3>At bat</h3>
@@ -3944,13 +3965,30 @@ function svgPoint(svg, evt) {
 function attachSvgLocationHandlers(svgEl) {
   const handle = (e) => {
     if (!__fieldClickMode) return;
-    if (e.target.closest('.fielder')) return;
+    const fielderEl = e.target.closest('.fielder');
+    if (fielderEl) {
+      const pid = fielderEl.dataset.pid;
+      if (pid && __fieldClickMode.onPickFielder) {
+        __fieldClickMode.onPickFielder(pid);
+        e.preventDefault();
+      }
+      const pt = svgPoint(svgEl, e);
+      __fieldClickMode.onClick({ x: Math.round(pt.x), y: Math.round(pt.y) });
+      return;
+    }
     e.preventDefault();
     const pt = svgPoint(svgEl, e);
     __fieldClickMode.onClick({ x: Math.round(pt.x), y: Math.round(pt.y) });
   };
+  const handleMove = (e) => {
+    if (!__fieldClickMode || !e.changedTouches) return;
+    e.preventDefault();
+    const pt = svgPoint(svgEl, e);
+    drawBallMarker({ x: Math.round(pt.x), y: Math.round(pt.y) });
+  };
   svgEl.addEventListener('click', handle);
   svgEl.addEventListener('touchend', handle, { passive: false });
+  svgEl.addEventListener('touchmove', handleMove, { passive: false });
 }
 
 function onFielderClick(pid, pos) {
@@ -4667,6 +4705,91 @@ function buildRecapText(g) {
   return lines.join('\n');
 }
 
+/* ============================================================
+   EMAILJS — recap delivery
+   ============================================================ */
+function getEmailConfig() {
+  try { return JSON.parse(localStorage.getItem('wc_ejs') || 'null'); } catch (e) { return null; }
+}
+function saveEmailConfig(cfg) {
+  localStorage.setItem('wc_ejs', JSON.stringify(cfg));
+}
+
+function _toggleEmailSetup() {
+  const wrap = document.getElementById('ejs-setup-wrap');
+  if (wrap) wrap.style.display = wrap.style.display === 'none' ? 'block' : 'none';
+}
+
+function showEmailSetupModal() {
+  const cfg = getEmailConfig() || {};
+  Modal.show(`
+    <div class="modal-header">
+      <h3>Email Setup (EmailJS)</h3>
+      <button class="btn-icon" onclick="Modal.hide()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="help-text" style="margin-bottom:12px">Enter your <a href="https://www.emailjs.com/" target="_blank">EmailJS</a> credentials. These are saved locally and never sent to any server.</p>
+      <label class="form-label">Service ID</label>
+      <input class="form-input" id="ejs-service" placeholder="service_xxxxxxx" value="${escapeHtml(cfg.serviceId || '')}" />
+      <label class="form-label">Template ID</label>
+      <input class="form-input" id="ejs-template" placeholder="template_xxxxxxx" value="${escapeHtml(cfg.templateId || '')}" />
+      <label class="form-label">Public Key</label>
+      <input class="form-input" id="ejs-key" placeholder="your_public_key" value="${escapeHtml(cfg.publicKey || '')}" />
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="Modal.hide()">Cancel</button>
+      <button class="btn btn-primary" onclick="_saveEmailSetup()">Save</button>
+    </div>`);
+}
+
+function _saveEmailSetup() {
+  const serviceId  = document.getElementById('ejs-service')?.value.trim();
+  const templateId = document.getElementById('ejs-template')?.value.trim();
+  const publicKey  = document.getElementById('ejs-key')?.value.trim();
+  if (!serviceId || !templateId || !publicKey) { toast('All three fields are required', 'error'); return; }
+  saveEmailConfig({ serviceId, templateId, publicKey });
+  toast('Email settings saved', 'success');
+  Modal.hide();
+}
+
+async function sendRecapEmails(gameId) {
+  const cfg = getEmailConfig();
+  if (!cfg) { showEmailSetupModal(); return; }
+  const g = State.getGame(gameId); if (!g) return;
+  const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
+  const allPids = [...new Set([...(home?.playerIds || []), ...(away?.playerIds || [])])];
+  const players = allPids.map(pid => State.getPlayer(pid)).filter(p => p?.email);
+  if (!players.length) { toast('No players have email addresses on file', 'error'); return; }
+
+  try {
+    emailjs.init(cfg.publicKey);
+  } catch (e) { toast('EmailJS init failed: ' + e.message, 'error'); return; }
+
+  const recap = buildRecapText(g);
+  const subject = away.name + ' @ ' + home.name + ' — WiffleCast Recap';
+  let sent = 0, failed = 0;
+  const btn = document.getElementById('btn-send-recap');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+
+  for (const p of players) {
+    try {
+      await emailjs.send(cfg.serviceId, cfg.templateId, {
+        to_email: p.email,
+        to_name: p.name || p.email,
+        subject,
+        message: recap,
+      });
+      sent++;
+    } catch (e) {
+      console.warn('EmailJS send failed for', p.email, e);
+      failed++;
+    }
+  }
+
+  if (btn) { btn.disabled = false; btn.textContent = '📧 Email Recap'; }
+  toast(sent + ' recap email' + (sent !== 1 ? 's' : '') + ' sent' + (failed ? ', ' + failed + ' failed' : ''), sent ? 'success' : 'error');
+}
+
 function showRecapModal(gameId) {
   const g = State.getGame(gameId); if (!g) return;
   const text = buildRecapText(g);
@@ -4681,8 +4804,12 @@ function showRecapModal(gameId) {
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="Modal.hide()">Close</button>
+      <button class="btn" id="btn-send-recap" onclick="sendRecapEmails('${gameId}')">📧 Email Recap</button>
       ${canShare ? `<button class="btn btn-primary" onclick="_shareRecap('${gameId}')">Share…</button>` : ''}
       <button class="btn btn-primary" onclick="_copyRecap('${gameId}')">Copy</button>
+    </div>
+    <div style="text-align:center;margin-top:8px;font-size:12px;color:#6b7280">
+      <a href="#" onclick="showEmailSetupModal();return false">Configure email settings</a>
     </div>`);
 }
 
@@ -4743,7 +4870,6 @@ function switchTab(view) {
 }
 $$('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => switchTab(btn.dataset.view));
-  });
 });
 
 // btn-add-player is dynamically rendered inside #players-toolbar-right — no static listener needed
@@ -4854,7 +4980,7 @@ Object.assign(window, {
   startGame, setPosition, moveBatter,
   endHalfInning, endGameEarly,
   showEditScoreModal, reopenGame, _esAdj, _esSave,
-  showRecapModal, _copyRecap, _shareRecap,
+  showRecapModal, _copyRecap, _shareRecap, sendRecapEmails, showEmailSetupModal, _saveEmailSetup, _toggleEmailSetup,
   showNewTournamentModal, submitNewTournament, selectTournament,
   generateTournamentGames, generateChampionshipGame, deleteTournamentUI,
   selectPlay, clearPlaySelection,
