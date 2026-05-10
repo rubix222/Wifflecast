@@ -1108,7 +1108,8 @@
     from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
   import { getAuth, onAuthStateChanged, signInWithEmailAndPassword,
            createUserWithEmailAndPassword, signOut,
-           sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink }
+           sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink,
+           browserLocalPersistence, setPersistence }
     from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
 
   const app = initializeApp({
@@ -1122,6 +1123,7 @@
 
   const db = getFirestore(app);
   const auth = getAuth(app);
+  setPersistence(auth, browserLocalPersistence);
   window._fs = { db, collection, doc, getDocs, setDoc, deleteDoc, onSnapshot,
                  auth, onAuthStateChanged, signInWithEmailAndPassword,
                  createUserWithEmailAndPassword, signOut,
@@ -1679,6 +1681,12 @@ function updateAuthUI() {
   // Teams & Games add buttons — admin mode only
   if (addTeam) addTeam.style.display = isAdminMode() ? '' : 'none';
   if (addGame) addGame.style.display = isAdminMode() ? '' : 'none';
+
+  // Import/export — admin mode only
+  const btnExport = $('#btn-export');
+  const btnImport = $('#btn-import');
+  if (btnExport) btnExport.style.display = isAdminMode() ? '' : 'none';
+  if (btnImport) btnImport.style.display = isAdminMode() ? '' : 'none';
 }
 
 async function createOrLinkUserProfile(user, playerId, name) {
@@ -2275,7 +2283,7 @@ function showNewGameModal() {
         </div>
         <div class="form-group">
           <label for="game-innings">Number of innings</label>
-          <input id="game-innings" type="number" min="1" max="20" value="7" required />
+          <input id="game-innings" type="number" min="1" max="20" value="6" required />
           <div class="help-text">If tied at the end of these innings, extra innings are played.</div>
         </div>
       </div>
@@ -2289,7 +2297,7 @@ async function submitNewGame(e) {
   e.preventDefault();
   const homeTeamId = $('#game-home').value;
   const awayTeamId = $('#game-away').value;
-  const numInnings = parseInt($('#game-innings').value, 10) || 7;
+  const numInnings = parseInt($('#game-innings').value, 10) || 6;
   if (!homeTeamId || !awayTeamId) return;
   if (homeTeamId === awayTeamId) { toast('Pick two different teams', 'error'); return; }
   const game = await State.addGame({ homeTeamId, awayTeamId, numInnings });
