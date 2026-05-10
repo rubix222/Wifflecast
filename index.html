@@ -3405,7 +3405,7 @@ $$('.tab-btn').forEach(btn => {
   });
 });
 
-$('#btn-add-player').addEventListener('click', () => showPlayerModal());
+// btn-add-player is dynamically rendered inside #players-toolbar-right — no static listener needed
 $('#btn-add-team').addEventListener('click', () => showTeamModal());
 $('#btn-add-game').addEventListener('click', () => showNewGameModal());
 
