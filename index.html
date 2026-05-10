@@ -1715,7 +1715,7 @@ function authErrorMessage(code) {
   })[code] || 'Authentication failed. Please try again.';
 }
 
-function showAuthModal(mode = 'signin') {
+function showAuthModal(mode = 'signin', errorMsg = '') {
   Modal.show(`
     <div class="modal-header">
       <h3>${mode === 'signin' ? 'Sign In' : 'Create Account'}</h3>
@@ -1723,6 +1723,7 @@ function showAuthModal(mode = 'signin') {
     </div>
     <form onsubmit="submitAuth(event,'${mode}')">
       <div class="modal-body">
+        ${errorMsg ? `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:8px 12px;color:#b91c1c;font-size:13px;margin-bottom:12px">${escapeHtml(errorMsg)}</div>` : ''}
         ${mode === 'signup' ? `<div class="form-group"><label>Name</label><input name="uname" type="text" required autofocus placeholder="Your name" /></div>` : ''}
         <div class="form-group"><label>Email</label><input name="email" type="email" required ${mode === 'signin' ? 'autofocus' : ''} /></div>
         <div class="form-group"><label>Password</label><input name="password" type="password" required minlength="6" /></div>
@@ -1759,7 +1760,10 @@ async function submitAuth(event, mode) {
       toast('Signed in!', 'success');
     }
   } catch (err) {
-    toast(authErrorMessage(err.code), 'error');
+    // Show error inside the modal so it's hard to miss; include raw code for debugging
+    const friendly = authErrorMessage(err.code);
+    const debug = err.code ? ` (${err.code})` : '';
+    showAuthModal(mode, friendly + debug);
   }
 }
 
@@ -3479,11 +3483,15 @@ async function boot() {
 
     updateAuthUI();
 
-    // First load: run migration then start listeners
-    if (!_bootDone) {
+    // Always re-subscribe listeners (unsubAll cancels the old ones first)
+    Storage.listenAll();
+
+    // Migration only needs to run once on first successful data load
+    if (!_bootDone && State.games.length) {
       _bootDone = true;
-      if (State.games.length) await migrateGames();
-      Storage.listenAll();
+      await migrateGames();
+    } else {
+      _bootDone = true;
     }
 
     Render.all();
