@@ -1156,6 +1156,8 @@ function toast(msg, type = '') {
 const Storage = {
   async init() {}, // Firebase already initialised by module script
 
+  _unsubs: [], // active onSnapshot unsubscribers
+
   async loadAll() {
     const fs = window._fs;
     const [ps, ts, gs] = await Promise.all([
@@ -1168,29 +1170,39 @@ const Storage = {
     State.games   = gs.docs.map(d => d.data());
   },
 
+  unsubAll() {
+    this._unsubs.forEach(u => u());
+    this._unsubs = [];
+  },
+
   listenAll() {
+    this.unsubAll(); // cancel any existing listeners before re-subscribing
     const fs = window._fs;
-    fs.onSnapshot(fs.collection(fs.db, 'players'), snap => {
-      State.players = snap.docs.map(d => d.data());
-      Render.players();
-    });
-    fs.onSnapshot(fs.collection(fs.db, 'teams'), snap => {
-      State.teams = snap.docs.map(d => d.data());
-      Render.teams();
-    });
-    fs.onSnapshot(fs.collection(fs.db, 'games'), snap => {
-      snap.docChanges().forEach(change => {
-        const g = change.doc.data();
-        if (change.type === 'removed') {
-          State.games = State.games.filter(x => x.id !== g.id);
-        } else {
-          const idx = State.games.findIndex(x => x.id === g.id);
-          if (idx >= 0) State.games[idx] = g; else State.games.push(g);
-        }
-      });
-      Render.games();
-      if (LiveGameId && $('#live-game-root')) rerenderLive();
-    });
+    this._unsubs.push(
+      fs.onSnapshot(fs.collection(fs.db, 'players'), snap => {
+        State.players = snap.docs.map(d => d.data());
+        Render.players();
+      }, err => console.warn('players listener:', err.message)),
+
+      fs.onSnapshot(fs.collection(fs.db, 'teams'), snap => {
+        State.teams = snap.docs.map(d => d.data());
+        Render.teams();
+      }, err => console.warn('teams listener:', err.message)),
+
+      fs.onSnapshot(fs.collection(fs.db, 'games'), snap => {
+        snap.docChanges().forEach(change => {
+          const g = change.doc.data();
+          if (change.type === 'removed') {
+            State.games = State.games.filter(x => x.id !== g.id);
+          } else {
+            const idx = State.games.findIndex(x => x.id === g.id);
+            if (idx >= 0) State.games[idx] = g; else State.games.push(g);
+          }
+        });
+        Render.games();
+        if (LiveGameId && $('#live-game-root')) rerenderLive();
+      }, err => console.warn('games listener:', err.message))
+    );
   },
 
   async saveUser(profile) {
@@ -3408,29 +3420,8 @@ $('#import-file').addEventListener('change', async (e) => {
 /* ============================================================
    BOOT
    ============================================================ */
-async function boot() {
-  await Storage.init();
-  await Storage.loadAll();
-
-  // Handle email link sign-in (invite flow)
-  const fs = window._fs;
-  if (fs.isSignInWithEmailLink(fs.auth, window.location.href)) {
-    await handleEmailLinkSignIn();
-  }
-
-  // Auth state listener — fires immediately with current user or null
-  fs.onAuthStateChanged(fs.auth, async (user) => {
-    currentUser = user;
-    currentUserProfile = null;
-    if (user) {
-      currentUserProfile = await Storage.getUser(user.uid);
-    }
-    updateAuthUI();
-    Render.all();
-  });
-
-  // Migrate games missing new fields (forward compat)
-  const migrationSaves = [];
+async function migrateGames() {
+  const saves = [];
   State.games.forEach(g => {
     let changed = false;
     if (g.numInnings   === undefined) { g.numInnings   = 7;                            changed = true; }
@@ -3446,11 +3437,57 @@ async function boot() {
     if (g.currentInning=== undefined) { g.currentInning= 1;                             changed = true; }
     if (g.currentHalf  === undefined) { g.currentHalf  = 'top';                         changed = true; }
     if (g.events       === undefined) { g.events       = [];                             changed = true; }
-    if (changed) migrationSaves.push(Storage.saveGame(g));
+    if (changed) saves.push(Storage.saveGame(g));
   });
-  if (migrationSaves.length) await Promise.all(migrationSaves);
-  Storage.listenAll();
-  Render.all();
+  if (saves.length) await Promise.all(saves);
+}
+
+let _bootDone = false;
+async function boot() {
+  await Storage.init();
+
+  // Handle email link sign-in before anything else
+  const fs = window._fs;
+  if (fs.isSignInWithEmailLink(fs.auth, window.location.href)) {
+    await handleEmailLinkSignIn();
+  }
+
+  // Auth state fires immediately (null if signed out).
+  // Load all data here so it works whether Firestore rules require auth or not.
+  fs.onAuthStateChanged(fs.auth, async (user) => {
+    currentUser = user;
+    currentUserProfile = null;
+
+    try {
+      await Storage.loadAll();
+    } catch (err) {
+      // Rules may require auth — show a sign-in prompt instead of blank screen
+      console.warn('Firestore loadAll error:', err.code, err.message);
+      if (!user) {
+        const c = $('#players-container');
+        if (c) c.innerHTML = `<div class="empty-state">
+          <h3>Sign in to view data</h3>
+          <p>Your data is stored in the cloud. Sign in to access it.</p>
+          <button class="btn btn-primary" onclick="showAuthModal('signin')">Sign In</button>
+        </div>`;
+      }
+    }
+
+    if (user) {
+      currentUserProfile = await Storage.getUser(user.uid).catch(() => null);
+    }
+
+    updateAuthUI();
+
+    // First load: run migration then start listeners
+    if (!_bootDone) {
+      _bootDone = true;
+      if (State.games.length) await migrateGames();
+      Storage.listenAll();
+    }
+
+    Render.all();
+  });
 }
 
 document.addEventListener('firebase-ready', boot, { once: true });
