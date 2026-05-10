@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>WiffleCast</title>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
   /* ---------- Reset & base ---------- */
   *, *::before, *::after { box-sizing: border-box; }
@@ -1178,6 +1179,18 @@
   }
   .champ-vs { font-size: 13px; font-weight: 700; color: #9ca3af; }
   .champ-score { font-size: 20px; font-weight: 800; color: #1f2937; padding: 0 4px; }
+
+  /* ---------- Multi-person indicator ---------- */
+  .last-scorer-pill {
+    margin-top: 8px;
+    font-size: 11px;
+    color: #166534;
+    background: #dcfce7;
+    border-radius: 10px;
+    padding: 3px 10px;
+    display: inline-block;
+    font-weight: 500;
+  }
 
   /* ---------- Admin edit bar ---------- */
   .admin-edit-bar {
@@ -3597,6 +3610,12 @@ function liveGameHTML(g, home, away) {
             <div class="count-block"><span class="label">F</span><span class="val" id="count-f">${g.fouls || 0}</span></div>
             <div class="count-block"><span class="label">Outs</span><span class="val" id="count-o">${g.outs}</span></div>
           </div>
+          ${(() => {
+            const lastPa = [...(g.events||[])].reverse().find(e => e.type === 'pa_end');
+            const name = lastPa?.scoredByName;
+            const notMe = lastPa?.scoredBy && lastPa.scoredBy !== currentUser?.uid;
+            return (name && notMe) ? `<div class="last-scorer-pill">🟢 ${escapeHtml(name)} is scoring</div>` : '';
+          })()}
         </div>
 
         <div class="at-bat-card">
@@ -3944,13 +3963,32 @@ function svgPoint(svg, evt) {
 function attachSvgLocationHandlers(svgEl) {
   const handle = (e) => {
     if (!__fieldClickMode) return;
-    if (e.target.closest('.fielder')) return;
+    const fielderEl = e.target.closest('.fielder');
+    if (fielderEl) {
+      // In the location picker, tapping a fielder selects them AND sets the location to their spot
+      const pid = fielderEl.dataset.pid;
+      if (pid && __fieldClickMode.onPickFielder) {
+        __fieldClickMode.onPickFielder(pid);
+        e.preventDefault();
+        const pt = svgPoint(svgEl, e);
+        __fieldClickMode.onClick({ x: Math.round(pt.x), y: Math.round(pt.y) });
+      }
+      return;
+    }
     e.preventDefault();
     const pt = svgPoint(svgEl, e);
     __fieldClickMode.onClick({ x: Math.round(pt.x), y: Math.round(pt.y) });
   };
+  // Live drag preview: move the ball marker as finger drags
+  const handleMove = (e) => {
+    if (!__fieldClickMode || !e.changedTouches) return;
+    e.preventDefault();
+    const pt = svgPoint(svgEl, e);
+    drawBallMarker({ x: Math.round(pt.x), y: Math.round(pt.y) });
+  };
   svgEl.addEventListener('click', handle);
   svgEl.addEventListener('touchend', handle, { passive: false });
+  svgEl.addEventListener('touchmove', handleMove, { passive: false });
 }
 
 function onFielderClick(pid, pos) {
@@ -4162,13 +4200,13 @@ function askLocation(kind, detail) {
     error: `Error — batter reached ${detail}`
   };
   const purpose = kind === 'hr'
-    ? 'Touch or click the boundary where the ball left the field.'
+    ? 'Drag or tap the boundary where the ball left the field.'
     : kind === 'hit'
-      ? 'Touch or drag to where the ball went.'
+      ? 'Drag or tap to where the ball went.'
       : kind === 'error'
-        ? '1) Pick the fielder who committed the error. 2) Tap the spot on the field.'
-        : '1) Pick the fielder who made the play. 2) Tap the spot on the field.';
-  const initStatus = needFielder ? 'Pick a fielder, then tap the field.' : 'Tap the field to mark the location.';
+        ? 'Tap the fielder who made the error on the field — or pick from the list, then tap the spot.'
+        : 'Tap the fielder who made the play on the field — or pick from the list, then tap the spot.';
+  const initStatus = needFielder ? 'Tap a fielder on the field (or list) then tap the spot.' : 'Drag or tap to mark the location.';
 
   Modal.show(`
     <div class="modal-header">
@@ -4667,23 +4705,133 @@ function buildRecapText(g) {
   return lines.join('\n');
 }
 
+function getEmailConfig() {
+  try { return JSON.parse(localStorage.getItem('wc_ejs') || 'null'); } catch { return null; }
+}
+function saveEmailConfig(cfg) {
+  localStorage.setItem('wc_ejs', JSON.stringify(cfg));
+}
+
+function showEmailSetupModal() {
+  const cfg = getEmailConfig() || {};
+  Modal.show(`
+    <div class="modal-header">
+      <h2>Email Setup</h2>
+      <button class="btn-icon" onclick="Modal.hide()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="help-text" style="margin-bottom:12px">
+        WiffleCast uses <strong>EmailJS</strong> (free, no backend needed) to send recap emails.<br>
+        <a href="https://www.emailjs.com" target="_blank" style="color:#166534">Create a free account at emailjs.com</a>, then create an email service and a template with these variables:
+        <code style="display:block;margin:8px 0;padding:8px;background:#f3f4f6;border-radius:4px;font-size:12px">{{to_name}} {{to_email}} {{subject}} {{message}}</code>
+      </p>
+      <div class="form-row">
+        <label>Service ID</label>
+        <input type="text" id="ejs-service" value="${escapeHtml(cfg.serviceId||'')}" placeholder="service_xxxxxxx">
+      </div>
+      <div class="form-row">
+        <label>Template ID</label>
+        <input type="text" id="ejs-template" value="${escapeHtml(cfg.templateId||'')}" placeholder="template_xxxxxxx">
+      </div>
+      <div class="form-row">
+        <label>Public Key</label>
+        <input type="text" id="ejs-key" value="${escapeHtml(cfg.publicKey||'')}" placeholder="Your EmailJS public key">
+      </div>
+    </div>
+    <div class="modal-footer">
+      ${cfg.serviceId ? `<button class="btn btn-danger" onclick="saveEmailConfig(null);Modal.hide();toast('Email config cleared')">Clear</button>` : ''}
+      <button class="btn" onclick="Modal.hide()">Cancel</button>
+      <button class="btn btn-primary" onclick="_saveEmailSetup()">Save</button>
+    </div>`);
+}
+
+function _saveEmailSetup() {
+  const serviceId  = $('#ejs-service')?.value.trim();
+  const templateId = $('#ejs-template')?.value.trim();
+  const publicKey  = $('#ejs-key')?.value.trim();
+  if (!serviceId || !templateId || !publicKey) { toast('Fill in all three fields', 'error'); return; }
+  saveEmailConfig({ serviceId, templateId, publicKey });
+  Modal.hide();
+  toast('Email config saved', 'success');
+}
+
+async function sendRecapEmails(gameId) {
+  const cfg = getEmailConfig();
+  if (!cfg) { showEmailSetupModal(); return; }
+  const g = State.getGame(gameId); if (!g) return;
+  const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
+  const subject = `WiffleCast Recap: ${away.name} @ ${home.name}`;
+  const message = buildRecapText(g);
+
+  // Collect players from both rosters who have an email address
+  const allPids = [...new Set([...(g.homeBattingOrder||[]), ...(g.awayBattingOrder||[])])];
+  const recipients = allPids
+    .map(pid => State.getPlayer(pid))
+    .filter(p => p?.inviteEmail);
+
+  if (!recipients.length) {
+    toast('No player emails on file — add emails via the Players tab Invite button', 'error');
+    return;
+  }
+
+  if (typeof emailjs === 'undefined') { toast('EmailJS failed to load', 'error'); return; }
+
+  const statusEl = $('#recap-send-status');
+  if (statusEl) statusEl.textContent = `Sending to ${recipients.length} player${recipients.length > 1 ? 's' : ''}…`;
+
+  let sent = 0, failed = 0;
+  for (const p of recipients) {
+    try {
+      await emailjs.send(cfg.serviceId, cfg.templateId, {
+        to_name:  p.name,
+        to_email: p.inviteEmail,
+        subject,
+        message,
+      }, cfg.publicKey);
+      sent++;
+    } catch (e) {
+      console.warn('EmailJS send failed for', p.inviteEmail, e);
+      failed++;
+    }
+  }
+
+  if (statusEl) statusEl.textContent = `Sent ${sent}${failed ? `, ${failed} failed` : ''}.`;
+  toast(failed ? `Sent ${sent}, ${failed} failed` : `Recap sent to ${sent} player${sent>1?'s':''}!`, failed ? 'error' : 'success');
+}
+
 function showRecapModal(gameId) {
   const g = State.getGame(gameId); if (!g) return;
   const text = buildRecapText(g);
   const canShare = !!navigator.share;
+  const cfg = getEmailConfig();
+  const allPids = [...new Set([...(g.homeBattingOrder||[]), ...(g.awayBattingOrder||[])])];
+  const emailCount = allPids.map(pid => State.getPlayer(pid)).filter(p => p?.inviteEmail).length;
+
   Modal.show(`
     <div class="modal-header">
       <h2>Game Recap</h2>
       <button class="btn-icon" onclick="Modal.hide()">✕</button>
     </div>
     <div class="modal-body">
-      <pre id="recap-text" style="font-size:12px;line-height:1.6;white-space:pre-wrap;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:12px;margin:0;max-height:340px;overflow-y:auto">${escapeHtml(text)}</pre>
+      <pre id="recap-text" style="font-size:12px;line-height:1.6;white-space:pre-wrap;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:12px;margin:0;max-height:300px;overflow-y:auto">${escapeHtml(text)}</pre>
+      <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="_toggleEmailSetup()">⚙ Email setup${cfg ? ' ✓' : ''}</button>
+        <span id="recap-send-status" class="help-text"></span>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="Modal.hide()">Close</button>
       ${canShare ? `<button class="btn btn-primary" onclick="_shareRecap('${gameId}')">Share…</button>` : ''}
       <button class="btn btn-primary" onclick="_copyRecap('${gameId}')">Copy</button>
+      <button class="btn btn-primary" onclick="sendRecapEmails('${gameId}')" ${emailCount ? '' : 'disabled'} title="${emailCount ? `Send to ${emailCount} players` : 'No player emails on file'}">
+        📧 Email${emailCount ? ` (${emailCount})` : ''}
+      </button>
     </div>`);
+}
+
+function _toggleEmailSetup() {
+  Modal.hide();
+  showEmailSetupModal();
 }
 
 function _copyRecap(gameId) {
@@ -4855,6 +5003,7 @@ Object.assign(window, {
   endHalfInning, endGameEarly,
   showEditScoreModal, reopenGame, _esAdj, _esSave,
   showRecapModal, _copyRecap, _shareRecap,
+  sendRecapEmails, showEmailSetupModal, _saveEmailSetup, _toggleEmailSetup,
   showNewTournamentModal, submitNewTournament, selectTournament,
   generateTournamentGames, generateChampionshipGame, deleteTournamentUI,
   selectPlay, clearPlaySelection,
