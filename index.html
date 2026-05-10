@@ -574,6 +574,203 @@
   .badge-guest { background:#f3f4f6; color:#6b7280; }
   .badge-invited { background:#fef3c7; color:#92400e; }
   .badge-linked { background:#d1fae5; color:#065f46; }
+
+  /* ---------- Admin mode toggle ---------- */
+  .admin-mode-toggle {
+    display: flex;
+    align-items: center;
+    background: rgba(255,255,255,0.12);
+    border-radius: 20px;
+    padding: 2px;
+    gap: 0;
+  }
+  .admin-mode-toggle button {
+    padding: 3px 10px;
+    border-radius: 16px;
+    border: none;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    background: transparent;
+    color: rgba(255,255,255,0.65);
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+  }
+  .admin-mode-toggle button.active { background: #facc15; color: #14532d; }
+
+  /* ---------- Players sub-nav ---------- */
+  .players-subnav {
+    display: flex;
+    border-bottom: 2px solid #e5e7eb;
+    margin-bottom: 18px;
+  }
+  .players-subnav button {
+    background: none;
+    border: none;
+    padding: 8px 18px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #6b7280;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .players-subnav button:hover { color: #166534; }
+  .players-subnav button.active { color: #166534; border-bottom-color: #166534; font-weight: 600; }
+
+  /* ---------- Player split layout ---------- */
+  .player-split {
+    display: grid;
+    grid-template-columns: 230px 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+  @media (max-width: 600px) { .player-split { grid-template-columns: 1fr; } }
+
+  .player-list-panel {
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    overflow: hidden;
+    max-height: 72vh;
+    overflow-y: auto;
+  }
+  .player-list-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #f3f4f6;
+    border-left: 3px solid transparent;
+    transition: background 0.1s;
+  }
+  .player-list-item:last-child { border-bottom: none; }
+  .player-list-item:hover { background: #f9fafb; }
+  .player-list-item.selected { background: #f0fdf4; border-left-color: #166534; }
+  .player-list-item.selected .pli-name { color: #166534; font-weight: 700; }
+  .pli-name { font-size: 14px; font-weight: 600; color: #111827; }
+  .pli-sub { font-size: 11px; color: #9ca3af; margin-top: 1px; }
+
+  /* ---------- Player detail panel ---------- */
+  .player-detail-panel {
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    padding: 20px;
+    min-height: 340px;
+  }
+  .player-detail-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 280px;
+    color: #9ca3af;
+    font-size: 14px;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .detail-player-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid #f3f4f6;
+    margin-bottom: 14px;
+  }
+  .jersey-badge-lg {
+    background: #166534;
+    color: #fff;
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 17px;
+    flex-shrink: 0;
+  }
+  .detail-player-name { font-size: 20px; font-weight: 700; color: #111827; margin: 0 0 3px; }
+  .detail-player-sub { font-size: 13px; color: #6b7280; }
+  .detail-actions { display: flex; gap: 4px; margin-left: auto; align-items: flex-start; }
+
+  .detail-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+  .detail-tabs button {
+    padding: 5px 16px;
+    border-radius: 20px;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    color: #6b7280;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .detail-tabs button.active { background: #166534; color: #fff; border-color: #166534; }
+
+  .stat-row-lg {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .stat-lg {
+    background: #f9fafb;
+    border-radius: 8px;
+    padding: 10px 6px;
+    text-align: center;
+  }
+  .stat-lg .stat-label { font-size: 10px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+  .stat-lg .stat-value { font-size: 17px; font-weight: 700; color: #111827; margin-top: 2px; }
+  .stat-lg.hi .stat-value { color: #166534; }
+
+  /* ---------- Sortable stats table ---------- */
+  .stats-table-wrap {
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    overflow-x: auto;
+  }
+  .stats-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .stats-table th {
+    background: #f9fafb;
+    padding: 9px 12px;
+    text-align: right;
+    font-size: 11px;
+    font-weight: 700;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    border-bottom: 1px solid #e5e7eb;
+    cursor: pointer;
+    user-select: none;
+  }
+  .stats-table th:first-child { text-align: left; min-width: 150px; }
+  .stats-table th:hover { background: #f0fdf4; color: #166534; }
+  .stats-table th.sorted { color: #166534; background: #f0fdf4; }
+  .stats-table th .sort-arr { margin-left: 3px; opacity: 0.7; font-size: 9px; }
+  .stats-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #f3f4f6;
+    color: #374151;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .stats-table td:first-child { text-align: left; font-weight: 600; color: #111827; }
+  .stats-table tr:last-child td { border-bottom: none; }
+  .stats-table tr:hover td { background: #f9fafb; }
+  .stats-table .jersey-sm { color: #9ca3af; font-size: 11px; font-weight: 500; margin-right: 4px; }
+
   .field-svg.location-mode { cursor: crosshair; }
 
   .field-and-bases { display: flex; gap: 4px; align-items: flex-start; }
@@ -850,6 +1047,10 @@
     <button id="btn-export" class="btn btn-sm">Export</button>
     <button id="btn-import" class="btn btn-sm">Import</button>
     <input type="file" id="import-file" accept="application/json" hidden />
+    <div id="admin-mode-toggle" class="admin-mode-toggle" style="display:none">
+      <button id="btn-admin-mode" onclick="setAdminMode(true)">👑 Admin</button>
+      <button id="btn-user-mode" onclick="setAdminMode(false)">👤 User</button>
+    </div>
     <span id="auth-user-name" style="display:none;font-size:13px;color:#fef9c3;font-weight:600"></span>
     <button id="btn-sign-in" class="btn btn-sm">Sign In</button>
     <button id="btn-sign-out" class="btn btn-sm" style="display:none">Sign Out</button>
@@ -866,7 +1067,12 @@
   <section id="view-players" class="view active">
     <div class="toolbar">
       <h2>Players</h2>
-      <button id="btn-add-player" class="btn btn-primary" style="display:none">+ Add Player</button>
+      <div id="players-toolbar-right" style="display:flex;gap:8px;align-items:center"></div>
+    </div>
+    <div class="players-subnav">
+      <button class="active" data-pview="roster" onclick="setPlayersView('roster')">Roster</button>
+      <button data-pview="batting" onclick="setPlayersView('batting')">Batting Stats</button>
+      <button data-pview="pitching" onclick="setPlayersView('pitching')">Pitching Stats</button>
     </div>
     <div id="players-container"></div>
   </section>
@@ -1167,6 +1373,7 @@ const State = {
     let pK=0, pBB=0, pIP_outs=0, pER=0;
     let E=0; // errors
     let singles=0, doubles=0, triples=0, hrs=0;
+    const pitchedGames = new Set();
 
     this.games.forEach(g => {
       (g.events || []).forEach(e => {
@@ -1191,6 +1398,7 @@ const State = {
           // Innings pitched: count outs recorded by this pitcher (K, OUT)
           if (e.outcome === 'K' || e.outcome === 'OUT') pIP_outs++;
           pER += e.earnedRuns || 0;
+          pitchedGames.add(g.id);
         }
         if (e.errorById === playerId) E++;
         if (e.runsScoredBy && e.runsScoredBy.includes(playerId)) R++;
@@ -1201,12 +1409,15 @@ const State = {
     const AVG = AB ? H / AB : 0;
     const OBP = PA ? (H + BB + HBP) / PA : 0;
     const SLG = AB ? TB / AB : 0;
+    const OPS = OBP + SLG;
     const IP = pIP_outs / 3;
+    const ERA = IP > 0 ? (pER * 9) / IP : null;
+    const pGP = pitchedGames.size;
 
     return {
-      AB, H, R, RBI, BB, K_bat, AVG, OBP, SLG,
+      AB, H, R, RBI, BB, K_bat, AVG, OBP, SLG, OPS, PA, TB,
       singles, doubles, triples, hrs,
-      pK, pBB, pER, IP, E,
+      pK, pBB, pER, IP, ERA, E, pGP,
     };
   },
 
@@ -1343,28 +1554,119 @@ let currentUser = null;
 let currentUserProfile = null;
 function isAdmin() { return currentUser?.email === ADMIN_EMAIL; }
 
+// Admin can toggle between full Admin Mode and normal User Mode
+let adminMode = true;
+function isAdminMode() { return isAdmin() && adminMode; }
+function setAdminMode(val) {
+  adminMode = val;
+  updateAuthUI();
+  Render.players();
+}
+
+// Player view state
+let selectedPlayerId = null;
+let playerDetailTab = 'batting'; // 'batting' | 'pitching'
+let playersView = 'roster';      // 'roster' | 'batting' | 'pitching'
+let statsSort  = { col: 'AVG', dir: -1 };
+let pitchSort  = { col: 'IP',  dir: -1 };
+
+function setPlayersView(view) {
+  playersView = view;
+  $$('.players-subnav button').forEach(b => b.classList.toggle('active', b.dataset.pview === view));
+  Render.players();
+}
+function selectPlayer(id) {
+  selectedPlayerId = id;
+  Render.players();
+}
+function setPlayerDetailTab(tab) {
+  playerDetailTab = tab;
+  Render.players();
+}
+function sortStats(col, which) {
+  const s = which === 'pitching' ? pitchSort : statsSort;
+  s.dir = s.col === col ? -s.dir : -1;
+  s.col = col;
+  Render.players();
+}
+function showCreateMyPlayerModal() {
+  Modal.show(`
+    <div class="modal-header">
+      <h3>Create My Player</h3>
+      <button class="btn-icon" onclick="Modal.hide()">✕</button>
+    </div>
+    <form onsubmit="submitMyPlayer(event)">
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="my-player-name">Name</label>
+          <input id="my-player-name" required autofocus value="${escapeHtml(currentUserProfile?.name || currentUser?.email?.split('@')[0] || '')}" />
+        </div>
+        <div class="form-group">
+          <label for="my-player-jersey">Jersey number <span class="muted small">(optional)</span></label>
+          <input id="my-player-jersey" maxlength="4" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" onclick="Modal.hide()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create</button>
+      </div>
+    </form>`);
+}
+async function submitMyPlayer(e) {
+  e.preventDefault();
+  if (!currentUser) return;
+  const name = $('#my-player-name').value.trim();
+  const jersey = $('#my-player-jersey').value.trim();
+  if (!name) return;
+  const p = await State.addPlayer({ name, jerseyNumber: jersey });
+  p.userId = currentUser.uid;
+  p.invitePending = false;
+  await Storage.savePlayer(p);
+  // Link profile
+  if (currentUserProfile) {
+    currentUserProfile.playerId = p.id;
+    await Storage.saveUser(currentUserProfile);
+  } else {
+    currentUserProfile = { uid: currentUser.uid, email: currentUser.email, name, playerId: p.id, createdAt: Date.now() };
+    await Storage.saveUser(currentUserProfile);
+  }
+  Modal.hide();
+  selectedPlayerId = p.id;
+  Render.all();
+  toast('Player created!', 'success');
+}
+
 function updateAuthUI() {
-  const btnIn  = $('#btn-sign-in');
-  const btnOut = $('#btn-sign-out');
-  const nameEl = $('#auth-user-name');
-  const addPlayer = $('#btn-add-player');
-  const addTeam   = $('#btn-add-team');
-  const addGame   = $('#btn-add-game');
+  const btnIn    = $('#btn-sign-in');
+  const btnOut   = $('#btn-sign-out');
+  const nameEl   = $('#auth-user-name');
+  const modeWrap = $('#admin-mode-toggle');
+  const addTeam  = $('#btn-add-team');
+  const addGame  = $('#btn-add-game');
   if (!btnIn) return;
+
   if (currentUser) {
     btnIn.style.display  = 'none';
     btnOut.style.display = '';
     nameEl.style.display = '';
     const name = currentUserProfile?.name || currentUser.email.split('@')[0];
-    nameEl.textContent = (isAdmin() ? '⭐ ' : '') + name;
+    nameEl.textContent = name;
   } else {
     btnIn.style.display  = '';
     btnOut.style.display = 'none';
     nameEl.style.display = 'none';
   }
-  if (addPlayer) addPlayer.style.display = isAdmin() ? '' : 'none';
-  if (addTeam)   addTeam.style.display   = isAdmin() ? '' : 'none';
-  if (addGame)   addGame.style.display   = isAdmin() ? '' : 'none';
+
+  // Admin mode toggle — only visible when admin is signed in
+  if (modeWrap) {
+    modeWrap.style.display = isAdmin() ? '' : 'none';
+    $('#btn-admin-mode')?.classList.toggle('active', adminMode);
+    $('#btn-user-mode')?.classList.toggle('active', !adminMode);
+  }
+
+  // Teams & Games add buttons — admin mode only
+  if (addTeam) addTeam.style.display = isAdminMode() ? '' : 'none';
+  if (addGame) addGame.style.display = isAdminMode() ? '' : 'none';
 }
 
 async function createOrLinkUserProfile(user, playerId, name) {
@@ -1506,56 +1808,207 @@ const Render = {
 
   players() {
     const c = $('#players-container');
-    if (!State.players.length) {
+    const toolbar = $('#players-toolbar-right');
+
+    // Toolbar buttons
+    if (toolbar) {
+      let btns = '';
+      if (isAdminMode()) {
+        btns = '<button class="btn btn-primary" onclick="showPlayerModal()">+ Add Player</button>';
+      } else if (currentUser && !currentUserProfile?.playerId) {
+        btns = '<button class="btn btn-primary" onclick="showCreateMyPlayerModal()">+ Create My Player</button>';
+      }
+      toolbar.innerHTML = btns;
+    }
+
+    const sorted = [...State.players].sort((a, b) => a.name.localeCompare(b.name));
+
+    if (!sorted.length) {
       c.innerHTML = `<div class="empty-state">
         <h3>No players yet</h3>
         <p>Add players to start tracking stats and building teams.</p>
-        ${isAdmin() ? '<button class="btn btn-primary" onclick="showPlayerModal()">+ Add Player</button>' : ''}
       </div>`;
       return;
     }
-    const sorted = [...State.players].sort((a, b) => a.name.localeCompare(b.name));
-    c.innerHTML = '<div class="card-grid">' + sorted.map(p => {
-      const s = State.computePlayerStats(p.id);
-      return `<div class="card">
-        <div class="card-header">
-          <div style="display:flex; gap:10px; align-items:flex-start;">
-            <div class="jersey-badge">${escapeHtml(p.jerseyNumber || '#')}</div>
+
+    // ── ROSTER VIEW ────────────────────────────────────────────────
+    if (playersView === 'roster') {
+      // Auto-select first player if none selected or selection gone
+      if (!selectedPlayerId || !State.getPlayer(selectedPlayerId)) {
+        selectedPlayerId = sorted[0]?.id || null;
+      }
+      const sel = selectedPlayerId ? State.getPlayer(selectedPlayerId) : null;
+      const s   = sel ? State.computePlayerStats(sel.id) : null;
+
+      const listItems = sorted.map(p => {
+        const ps = State.computePlayerStats(p.id);
+        const active = p.id === selectedPlayerId ? 'selected' : '';
+        return `<div class="player-list-item ${active}" onclick="selectPlayer('${p.id}')">
+          <div class="jersey-badge" style="width:28px;height:28px;font-size:12px;">${escapeHtml(p.jerseyNumber || '#')}</div>
+          <div>
+            <div class="pli-name">${escapeHtml(p.name)}</div>
+            <div class="pli-sub">${ps.PA} PA · ${fmt.avg(ps.AVG)}</div>
+          </div>
+        </div>`;
+      }).join('');
+
+      let detailHtml = '<div class="player-detail-empty"><span>← Select a player</span></div>';
+      if (sel && s) {
+        const badge = sel.userId
+          ? '<span class="badge badge-linked">Linked</span>'
+          : sel.invitePending ? '<span class="badge badge-invited">Invited</span>'
+          : '<span class="badge badge-guest">Guest</span>';
+        const canEdit = isAdminMode() || (currentUser && sel.userId === currentUser.uid);
+        const actions = isAdminMode()
+          ? `<button class="btn-icon" title="Edit" onclick="showPlayerModal('${sel.id}')">✎</button>
+             ${!sel.userId ? `<button class="btn-icon" title="Invite" onclick="invitePlayer('${sel.id}')">✉</button>` : ''}
+             <button class="btn-icon" title="Delete" onclick="deletePlayer('${sel.id}')">🗑</button>`
+          : canEdit ? `<button class="btn-icon" title="Edit" onclick="showPlayerModal('${sel.id}')">✎</button>` : '';
+
+        const batHtml = `
+          <div class="stat-section-title" style="margin-top:0">Rate</div>
+          <div class="stat-row-lg">
+            <div class="stat-lg hi"><div class="stat-label">AVG</div><div class="stat-value">${fmt.avg(s.AVG)}</div></div>
+            <div class="stat-lg hi"><div class="stat-label">OBP</div><div class="stat-value">${fmt.avg(s.OBP)}</div></div>
+            <div class="stat-lg hi"><div class="stat-label">SLG</div><div class="stat-value">${fmt.avg(s.SLG)}</div></div>
+            <div class="stat-lg hi"><div class="stat-label">OPS</div><div class="stat-value">${fmt.avg(s.OPS)}</div></div>
+          </div>
+          <div class="stat-section-title">Counting</div>
+          <div class="stat-row-lg">
+            <div class="stat-lg"><div class="stat-label">PA</div><div class="stat-value">${s.PA}</div></div>
+            <div class="stat-lg"><div class="stat-label">AB</div><div class="stat-value">${s.AB}</div></div>
+            <div class="stat-lg"><div class="stat-label">H</div><div class="stat-value">${s.H}</div></div>
+            <div class="stat-lg"><div class="stat-label">1B</div><div class="stat-value">${s.singles}</div></div>
+            <div class="stat-lg"><div class="stat-label">2B</div><div class="stat-value">${s.doubles}</div></div>
+            <div class="stat-lg"><div class="stat-label">3B</div><div class="stat-value">${s.triples}</div></div>
+            <div class="stat-lg"><div class="stat-label">HR</div><div class="stat-value">${s.hrs}</div></div>
+            <div class="stat-lg"><div class="stat-label">R</div><div class="stat-value">${s.R}</div></div>
+            <div class="stat-lg"><div class="stat-label">RBI</div><div class="stat-value">${s.RBI}</div></div>
+            <div class="stat-lg"><div class="stat-label">BB</div><div class="stat-value">${s.BB}</div></div>
+            <div class="stat-lg"><div class="stat-label">K</div><div class="stat-value">${s.K_bat}</div></div>
+            <div class="stat-lg"><div class="stat-label">E</div><div class="stat-value">${s.E}</div></div>
+          </div>`;
+
+        const pitHtml = `
+          <div class="stat-section-title" style="margin-top:0">Rate</div>
+          <div class="stat-row-lg">
+            <div class="stat-lg hi"><div class="stat-label">ERA</div><div class="stat-value">${s.ERA !== null ? s.ERA.toFixed(2) : '—'}</div></div>
+            <div class="stat-lg hi"><div class="stat-label">IP</div><div class="stat-value">${fmt.ip(s.IP)}</div></div>
+          </div>
+          <div class="stat-section-title">Counting</div>
+          <div class="stat-row-lg">
+            <div class="stat-lg"><div class="stat-label">GP</div><div class="stat-value">${s.pGP}</div></div>
+            <div class="stat-lg"><div class="stat-label">K</div><div class="stat-value">${s.pK}</div></div>
+            <div class="stat-lg"><div class="stat-label">BB</div><div class="stat-value">${s.pBB}</div></div>
+            <div class="stat-lg"><div class="stat-label">ER</div><div class="stat-value">${s.pER}</div></div>
+          </div>
+          ${s.pGP === 0 ? '<p style="color:#9ca3af;font-size:13px;margin:0">No pitching appearances yet.</p>' : ''}`;
+
+        detailHtml = `
+          <div class="detail-player-header">
+            <div class="jersey-badge-lg">${escapeHtml(sel.jerseyNumber || '#')}</div>
             <div>
-              <h3 class="card-title">${escapeHtml(p.name)}${p.userId ? '<span class="badge badge-linked">Linked</span>' : p.invitePending ? '<span class="badge badge-invited">Invited</span>' : '<span class="badge badge-guest">Guest</span>'}</h3>
-              <div class="card-subtitle small">${s.AB + s.BB} PA</div>
+              <div class="detail-player-name">${escapeHtml(sel.name)}${badge}</div>
+              <div class="detail-player-sub">${s.PA} PA</div>
             </div>
+            <div class="detail-actions">${actions}</div>
           </div>
-          <div class="card-actions">
-            ${isAdmin() ? `<button class="btn-icon" title="Edit" onclick="showPlayerModal('${p.id}')">✎</button>` : ''}
-            ${isAdmin() && !p.userId ? `<button class="btn-icon" title="Send invite" onclick="invitePlayer('${p.id}')">✉</button>` : ''}
-            ${isAdmin() ? `<button class="btn-icon" title="Delete" onclick="deletePlayer('${p.id}')">🗑</button>` : ''}
+          <div class="detail-tabs">
+            <button class="${playerDetailTab === 'batting' ? 'active' : ''}" onclick="setPlayerDetailTab('batting')">Batting</button>
+            <button class="${playerDetailTab === 'pitching' ? 'active' : ''}" onclick="setPlayerDetailTab('pitching')">Pitching</button>
           </div>
-        </div>
-        <div class="stat-section-title">Batting</div>
-        <div class="stats-grid">
-          <div class="stat"><div class="stat-label">AB</div><div class="stat-value">${s.AB}</div></div>
-          <div class="stat"><div class="stat-label">H</div><div class="stat-value">${s.H}</div></div>
-          <div class="stat"><div class="stat-label">R</div><div class="stat-value">${s.R}</div></div>
-          <div class="stat"><div class="stat-label">RBI</div><div class="stat-value">${s.RBI}</div></div>
-          <div class="stat"><div class="stat-label">BB</div><div class="stat-value">${s.BB}</div></div>
-          <div class="stat"><div class="stat-label">AVG</div><div class="stat-value">${fmt.avg(s.AVG)}</div></div>
-          <div class="stat"><div class="stat-label">OBP</div><div class="stat-value">${fmt.avg(s.OBP)}</div></div>
-          <div class="stat"><div class="stat-label">SLG</div><div class="stat-value">${fmt.avg(s.SLG)}</div></div>
-        </div>
-        <div class="stat-section-title">Hits & Pitching</div>
-        <div class="stats-grid">
-          <div class="stat"><div class="stat-label">2B</div><div class="stat-value">${s.doubles}</div></div>
-          <div class="stat"><div class="stat-label">3B</div><div class="stat-value">${s.triples}</div></div>
-          <div class="stat"><div class="stat-label">HR</div><div class="stat-value">${s.hrs}</div></div>
-          <div class="stat"><div class="stat-label">E</div><div class="stat-value">${s.E}</div></div>
-          <div class="stat"><div class="stat-label">IP</div><div class="stat-value">${fmt.ip(s.IP)}</div></div>
-          <div class="stat"><div class="stat-label">K</div><div class="stat-value">${s.pK}</div></div>
-          <div class="stat"><div class="stat-label">BB</div><div class="stat-value">${s.pBB}</div></div>
-          <div class="stat"><div class="stat-label">ER</div><div class="stat-value">${s.pER}</div></div>
-        </div>
+          ${playerDetailTab === 'batting' ? batHtml : pitHtml}`;
+      }
+
+      c.innerHTML = `<div class="player-split">
+        <div class="player-list-panel">${listItems}</div>
+        <div class="player-detail-panel">${detailHtml}</div>
       </div>`;
-    }).join('') + '</div>';
+      return;
+    }
+
+    // ── STATS GRID VIEW (batting or pitching) ──────────────────────
+    const which = playersView; // 'batting' | 'pitching'
+    const sort  = which === 'pitching' ? pitchSort : statsSort;
+
+    const BATTING_COLS = [
+      { key: 'PA',    label: 'PA'  },
+      { key: 'AB',    label: 'AB'  },
+      { key: 'AVG',   label: 'AVG', fmt: v => fmt.avg(v) },
+      { key: 'OBP',   label: 'OBP', fmt: v => fmt.avg(v) },
+      { key: 'SLG',   label: 'SLG', fmt: v => fmt.avg(v) },
+      { key: 'OPS',   label: 'OPS', fmt: v => fmt.avg(v) },
+      { key: 'H',     label: 'H'   },
+      { key: 'singles', label: '1B' },
+      { key: 'doubles', label: '2B' },
+      { key: 'triples', label: '3B' },
+      { key: 'hrs',   label: 'HR'  },
+      { key: 'R',     label: 'R'   },
+      { key: 'RBI',   label: 'RBI' },
+      { key: 'BB',    label: 'BB'  },
+      { key: 'K_bat', label: 'K'   },
+      { key: 'E',     label: 'E'   },
+    ];
+    const PITCH_COLS = [
+      { key: 'pGP',   label: 'GP'  },
+      { key: 'IP',    label: 'IP',  fmt: v => fmt.ip(v) },
+      { key: 'ERA',   label: 'ERA', fmt: v => v !== null ? v.toFixed(2) : '—', nullLow: true },
+      { key: 'pK',    label: 'K'   },
+      { key: 'pBB',   label: 'BB'  },
+      { key: 'pER',   label: 'ER'  },
+    ];
+
+    const cols = which === 'pitching' ? PITCH_COLS : BATTING_COLS;
+
+    // Build rows with computed stats
+    let rows = sorted.map(p => ({ p, s: State.computePlayerStats(p.id) }));
+
+    // Sort
+    rows.sort((a, b) => {
+      if (sort.col === 'name') {
+        // dir -1 = desc (Z→A), dir 1 = asc (A→Z)
+        return b.p.name.localeCompare(a.p.name) * sort.dir;
+      }
+      let av = a.s[sort.col] ?? null;
+      let bv = b.s[sort.col] ?? null;
+      // ERA null means didn't pitch — push to bottom regardless of sort direction
+      const col = cols.find(c => c.key === sort.col);
+      // nullLow: null values always sort to the bottom regardless of direction
+      if (av === null) av = sort.dir > 0 ? Infinity  : -Infinity;
+      if (bv === null) bv = sort.dir > 0 ? Infinity  : -Infinity;
+      // dir -1 = desc (b-a), dir 1 = asc (a-b)
+      return (bv - av) * sort.dir;
+    });
+
+    const thArr = col => {
+      const isSorted = sort.col === col.key;
+      const arr = isSorted ? (sort.dir === -1 ? '▼' : '▲') : '<span style="opacity:0.25">▼</span>';
+      return `<th class="num-col ${isSorted ? 'sorted' : ''}" onclick="sortStats('${col.key}','${which}')">${col.label}<span class="sort-arr">${arr}</span></th>`;
+    };
+
+    const headers = `<tr>
+      <th onclick="sortStats('name','${which}')">Player${sort.col==='name' ? (sort.dir===-1?'<span class="sort-arr">▼</span>':'<span class="sort-arr">▲</span>'):'<span class="sort-arr" style="opacity:0.25">▼</span>'}</th>
+      ${cols.map(thArr).join('')}
+    </tr>`;
+
+    const tBody = rows.map(({ p, s }) => {
+      const cells = cols.map(col => {
+        let v = s[col.key];
+        const disp = col.fmt ? col.fmt(v) : (v ?? '—');
+        return `<td>${disp}</td>`;
+      }).join('');
+      return `<tr onclick="selectPlayer('${p.id}');setPlayersView('roster')" style="cursor:pointer" title="View ${escapeHtml(p.name)}'s roster card">
+        <td><span class="jersey-sm">${escapeHtml(p.jerseyNumber ? '#' + p.jerseyNumber : '')}</span>${escapeHtml(p.name)}</td>
+        ${cells}
+      </tr>`;
+    }).join('');
+
+    c.innerHTML = `<div class="stats-table-wrap">
+      <table class="stats-table">
+        <thead>${headers}</thead>
+        <tbody>${tBody}</tbody>
+      </table>
+    </div>`;
   },
 
   teams() {
@@ -1565,7 +2018,7 @@ const Render = {
       c.innerHTML = `<div class="empty-state">
         <h3>No teams yet</h3>
         <p>${hasPlayers ? 'Group your players into teams. A team needs at least 2 players.' : 'Add at least 2 players first, then come back to create a team.'}</p>
-        ${hasPlayers && isAdmin() ? '<button class="btn btn-primary" onclick="showTeamModal()">+ Add Team</button>' : ''}
+        ${hasPlayers && isAdminMode() ? '<button class="btn btn-primary" onclick="showTeamModal()">+ Add Team</button>' : ''}
       </div>`;
       return;
     }
@@ -1580,8 +2033,8 @@ const Render = {
             <div class="card-subtitle small">${players.length} player${players.length !== 1 ? 's' : ''} · ${s.wins}-${s.losses}${s.ties ? '-' + s.ties : ''}</div>
           </div>
           <div class="card-actions">
-            ${isAdmin() ? `<button class="btn-icon" title="Edit" onclick="showTeamModal('${t.id}')">✎</button>` : ''}
-            ${isAdmin() ? `<button class="btn-icon" title="Delete" onclick="deleteTeam('${t.id}')">🗑</button>` : ''}
+            ${isAdminMode() ? `<button class="btn-icon" title="Edit" onclick="showTeamModal('${t.id}')">✎</button>` : ''}
+            ${isAdminMode() ? `<button class="btn-icon" title="Delete" onclick="deleteTeam('${t.id}')">🗑</button>` : ''}
           </div>
         </div>
         <div class="stat-section-title">Roster</div>
@@ -1606,7 +2059,7 @@ const Render = {
       c.innerHTML = `<div class="empty-state">
         <h3>No games yet</h3>
         <p>${hasTwoTeams ? 'Pick two teams and start tracking a game.' : 'Create at least 2 teams to start a game.'}</p>
-        ${hasTwoTeams && isAdmin() ? '<button class="btn btn-primary" onclick="showNewGameModal()">+ New Game</button>' : ''}
+        ${hasTwoTeams && isAdminMode() ? '<button class="btn btn-primary" onclick="showNewGameModal()">+ New Game</button>' : ''}
       </div>`;
       return;
     }
@@ -1626,7 +2079,7 @@ const Render = {
             <div class="card-subtitle small" style="margin-top:6px">${date} · ${g.numInnings} innings</div>
           </div>
           <div class="card-actions" onclick="event.stopPropagation()">
-            ${isAdmin() ? `<button class="btn-icon" title="Delete" onclick="deleteGame('${g.id}')">🗑</button>` : ''}
+            ${isAdminMode() ? `<button class="btn-icon" title="Delete" onclick="deleteGame('${g.id}')">🗑</button>` : ''}
           </div>
         </div>
         <div class="game-vs">
@@ -3016,6 +3469,9 @@ Object.assign(window, {
   renderLiveGame, rerenderLive,
   showBipOutTypeModal, showBipHitModal, showBipErrorModal,
   askLocation, cancelLocation, confirmLocation, finishHit,
+  // Admin mode + player view
+  setAdminMode, setPlayersView, selectPlayer, setPlayerDetailTab,
+  sortStats, showCreateMyPlayerModal, submitMyPlayer,
 });
 </script>
 </body>
