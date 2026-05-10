@@ -1096,6 +1096,17 @@
   .gs-feed-batter { font-weight: 600; color: #111827; flex-shrink: 0; }
   .gs-feed-desc { color: #6b7280; }
 
+  /* ---------- Tournaments ---------- */
+  .tourn-section-title {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #6b7280;
+    margin: 0 0 8px;
+  }
+  .tourn-leader td { background: #f0fdf4; font-weight: 600; }
+
   /* ---------- Admin edit bar ---------- */
   .admin-edit-bar {
     display: flex;
@@ -1229,6 +1240,7 @@
   <button class="tab-btn active" data-view="players">Players</button>
   <button class="tab-btn" data-view="teams">Teams</button>
   <button class="tab-btn" data-view="games">Games</button>
+  <button class="tab-btn" data-view="tournaments">Tournaments</button>
   <button class="tab-btn" data-view="gamestream">Gamestream</button>
   <button class="tab-btn admin-only-tab" data-view="users" style="display:none">Users</button>
   <button class="tab-btn" data-view="rules">Rules</button>
@@ -1254,6 +1266,19 @@
       <button id="btn-add-team" class="btn btn-primary" style="display:none">+ Add Team</button>
     </div>
     <div id="teams-container"></div>
+  </section>
+
+  <section id="view-tournaments" class="view">
+    <div class="toolbar">
+      <h2>Tournaments</h2>
+      <button id="btn-add-tournament" class="btn btn-primary" style="display:none">+ New Tournament</button>
+    </div>
+    <div class="player-split" id="tournaments-split">
+      <div class="player-list-panel" id="tournaments-list"></div>
+      <div class="player-detail-panel" id="tournaments-detail">
+        <div class="player-detail-empty"><span>← Select a tournament</span></div>
+      </div>
+    </div>
   </section>
 
   <section id="view-gamestream" class="view">
@@ -1416,16 +1441,18 @@ const Storage = {
 
   async loadAll() {
     const fs = window._fs;
-    const [ps, ts, gs, us] = await Promise.all([
+    const [ps, ts, gs, us, tr] = await Promise.all([
       fs.getDocs(fs.collection(fs.db, 'players')),
       fs.getDocs(fs.collection(fs.db, 'teams')),
       fs.getDocs(fs.collection(fs.db, 'games')),
       fs.getDocs(fs.collection(fs.db, 'users')),
+      fs.getDocs(fs.collection(fs.db, 'tournaments')),
     ]);
-    State.players = ps.docs.map(d => d.data());
-    State.teams   = ts.docs.map(d => d.data());
-    State.games   = gs.docs.map(d => d.data());
-    State.users   = us.docs.map(d => d.data());
+    State.players     = ps.docs.map(d => d.data());
+    State.teams       = ts.docs.map(d => d.data());
+    State.games       = gs.docs.map(d => d.data());
+    State.users       = us.docs.map(d => d.data());
+    State.tournaments = tr.docs.map(d => d.data());
   },
 
   unsubAll() {
@@ -1461,6 +1488,11 @@ const Storage = {
         if (LiveGameId && $('#live-game-root')) rerenderLive();
         Render.gamestream && Render.gamestream();
       }, err => console.warn('games listener:', err.message)),
+
+      fs.onSnapshot(fs.collection(fs.db, 'tournaments'), snap => {
+        State.tournaments = snap.docs.map(d => d.data());
+        Render.tournaments && Render.tournaments();
+      }, err => console.warn('tournaments listener:', err.message)),
 
       fs.onSnapshot(fs.collection(fs.db, 'users'), snap => {
         State.users = snap.docs.map(d => d.data());
@@ -1509,9 +1541,17 @@ const Storage = {
     const fs = window._fs;
     await fs.deleteDoc(fs.doc(fs.db, 'games', id));
   },
+  async saveTournament(t) {
+    const fs = window._fs;
+    await fs.setDoc(fs.doc(fs.db, 'tournaments', t.id), t);
+  },
+  async removeTournament(id) {
+    const fs = window._fs;
+    await fs.deleteDoc(fs.doc(fs.db, 'tournaments', id));
+  },
 
   async exportJson() {
-    const blob = new Blob([JSON.stringify(State.snapshot(), null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify({ ...State.snapshot(), tournaments: State.tournaments }, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = 'wiffleball-data-' + new Date().toISOString().slice(0,10) + '.json';
@@ -1523,9 +1563,10 @@ const Storage = {
     const text = await file.text();
     const data = JSON.parse(text);
     await Promise.all([
-      ...(data.players || []).map(p => Storage.savePlayer(p)),
-      ...(data.teams   || []).map(t => Storage.saveTeam(t)),
-      ...(data.games   || []).map(g => Storage.saveGame(g)),
+      ...(data.players     || []).map(p => Storage.savePlayer(p)),
+      ...(data.teams       || []).map(t => Storage.saveTeam(t)),
+      ...(data.games       || []).map(g => Storage.saveGame(g)),
+      ...(data.tournaments || []).map(t => Storage.saveTournament(t)),
     ]);
     toast('Imported successfully', 'success');
   },
@@ -1538,14 +1579,50 @@ const State = {
   players: [],
   teams: [],
   games: [],
-  users: [],   // registered user profiles (admin-visible)
+  users: [],
+  tournaments: [],
 
   snapshot() { return { players: this.players, teams: this.teams, games: this.games }; },
-  getUser(uid) { return this.users.find(u => u.uid === uid) || null; },
+  getUser(uid)         { return this.users.find(u => u.uid === uid) || null; },
+  getPlayer(id)        { return this.players.find(p => p.id === id); },
+  getTeam(id)          { return this.teams.find(t => t.id === id); },
+  getGame(id)          { return this.games.find(g => g.id === id); },
+  getTournament(id)    { return this.tournaments.find(t => t.id === id); },
 
-  getPlayer(id) { return this.players.find(p => p.id === id); },
-  getTeam(id)   { return this.teams.find(t => t.id === id); },
-  getGame(id)   { return this.games.find(g => g.id === id); },
+  // ---- Tournament CRUD ----
+  async addTournament(data) {
+    const t = { id: uid(), name: data.name.trim(), teamIds: [...(data.teamIds||[])], createdAt: Date.now(), status: 'active' };
+    this.tournaments.push(t);
+    await Storage.saveTournament(t);
+    return t;
+  },
+  async updateTournament(id, patch) {
+    const t = this.getTournament(id); if (!t) return;
+    Object.assign(t, patch);
+    await Storage.saveTournament(t);
+  },
+  async deleteTournament(id) {
+    this.tournaments = this.tournaments.filter(t => t.id !== id);
+    await Storage.removeTournament(id);
+  },
+
+  computeTournamentStandings(tournamentId) {
+    const tourn = this.getTournament(tournamentId); if (!tourn) return [];
+    const games = this.games.filter(g => g.tournamentId === tournamentId && g.status === 'completed');
+    return tourn.teamIds.map(teamId => {
+      const team = this.getTeam(teamId); if (!team) return null;
+      let W=0, L=0, T=0, RF=0, RA=0;
+      games.forEach(g => {
+        if (g.homeTeamId !== teamId && g.awayTeamId !== teamId) return;
+        const isHome = g.homeTeamId === teamId;
+        const my = isHome ? g.score.home : g.score.away;
+        const opp = isHome ? g.score.away : g.score.home;
+        RF += my; RA += opp;
+        if (my > opp) W++; else if (my < opp) L++; else T++;
+      });
+      return { team, W, L, T, RF, RA, pts: W*2+T, rd: RF-RA };
+    }).filter(Boolean).sort((a, b) => b.pts - a.pts || b.rd - a.rd);
+  },
 
   // ---- Player CRUD ----
   async addPlayer(data) {
@@ -1634,6 +1711,7 @@ const State = {
       events: [],
 
       isOver: false,
+      ...(data.tournamentId ? { tournamentId: data.tournamentId } : {}),
     };
     this.games.push(g);
     await Storage.saveGame(g);
@@ -2178,7 +2256,27 @@ async function toggleCanScore(uid) {
 }
 
 const Render = {
-  all() { this.players(); this.teams(); this.games(); this.users(); this.gamestream(); },
+  all() { this.players(); this.teams(); this.games(); this.users(); this.gamestream(); this.tournaments(); },
+
+  tournaments() {
+    const btnAdd = $('#btn-add-tournament');
+    if (btnAdd) btnAdd.style.display = isAdminMode() ? '' : 'none';
+    const listEl = $('#tournaments-list'); if (!listEl) return;
+    const sorted = [...State.tournaments].sort((a, b) => b.createdAt - a.createdAt);
+    if (!sorted.length) {
+      listEl.innerHTML = '<div class="empty-state" style="padding:24px"><p>No tournaments yet.</p></div>';
+      return;
+    }
+    listEl.innerHTML = sorted.map(t => {
+      const games = State.games.filter(g => g.tournamentId === t.id);
+      const done  = games.filter(g => g.status === 'completed').length;
+      return `<div class="player-list-item${selectedTournamentId === t.id ? ' selected' : ''}" onclick="selectTournament('${t.id}')">
+        <div class="player-name">${escapeHtml(t.name)}</div>
+        <div class="player-meta">${t.teamIds.length} teams · ${done}/${games.length} games played</div>
+      </div>`;
+    }).join('');
+    if (selectedTournamentId) renderTournamentDetail(selectedTournamentId);
+  },
 
   users() {
     const c = $('#users-container'); if (!c) return;
@@ -2864,6 +2962,150 @@ function openGame(id) {
   if (!g) return;
   if (g.status === 'setup') renderGameSetup(g);
   else                      renderLiveGame(g.id);
+}
+
+/* ============================================================
+   TOURNAMENTS
+   ============================================================ */
+let selectedTournamentId = null;
+
+function selectTournament(id) {
+  selectedTournamentId = id;
+  Render.tournaments();
+}
+
+function renderTournamentDetail(id) {
+  const detail = $('#tournaments-detail'); if (!detail) return;
+  const t = State.getTournament(id);
+  if (!t) { detail.innerHTML = '<div class="player-detail-empty"><span>Tournament not found</span></div>'; return; }
+
+  const standings = State.computeTournamentStandings(id);
+  const allGames  = State.games.filter(g => g.tournamentId === id)
+    .sort((a, b) => b.createdAt - a.createdAt);
+
+  const standingsRows = standings.map((row, i) => `
+    <tr class="${i === 0 ? 'tourn-leader' : ''}">
+      <td>${i+1}</td>
+      <td><strong>${escapeHtml(row.team.name)}</strong></td>
+      <td>${row.W}</td><td>${row.L}</td><td>${row.T}</td>
+      <td>${row.pts}</td><td>${row.RF}</td><td>${row.RA}</td>
+      <td>${row.rd >= 0 ? '+' : ''}${row.rd}</td>
+    </tr>`).join('');
+
+  const gameRows = allGames.length ? allGames.map(g => {
+    const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
+    const label = `${away?.name||'?'} @ ${home?.name||'?'}`;
+    const score = g.status === 'completed' ? `${g.score.away}–${g.score.home}` : g.status.replace('_',' ');
+    return `<div class="player-list-item" style="cursor:pointer" onclick="openGame('${g.id}')">
+      <div class="player-name">${escapeHtml(label)}</div>
+      <div class="player-meta">${score}</div>
+    </div>`;
+  }).join('') : '<div class="help-text" style="padding:8px">No games yet. Generate games below.</div>';
+
+  const pairsLeft = isAdminMode() ? (() => {
+    const existing = allGames.map(g => `${g.homeTeamId}|${g.awayTeamId}`);
+    let missing = 0;
+    for (let i=0; i<t.teamIds.length; i++)
+      for (let j=i+1; j<t.teamIds.length; j++)
+        if (!existing.includes(`${t.teamIds[i]}|${t.teamIds[j]}`) && !existing.includes(`${t.teamIds[j]}|${t.teamIds[i]}`))
+          missing++;
+    return missing;
+  })() : 0;
+
+  detail.innerHTML = `
+    <div style="padding:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+        <h3 style="margin:0">${escapeHtml(t.name)}</h3>
+        ${isAdminMode() ? `<div style="display:flex;gap:8px">
+          ${pairsLeft > 0 ? `<button class="btn btn-sm btn-primary" onclick="generateTournamentGames('${id}')">⚙ Generate ${pairsLeft} game${pairsLeft>1?'s':''}</button>` : ''}
+          <button class="btn btn-sm btn-danger" onclick="deleteTournamentUI('${id}')">Delete</button>
+        </div>` : ''}
+      </div>
+
+      <div class="tourn-section-title">Standings</div>
+      ${standings.length ? `
+      <div style="overflow-x:auto;margin-bottom:16px">
+        <table class="stats-table" style="width:100%">
+          <thead><tr><th>#</th><th>Team</th><th>W</th><th>L</th><th>T</th><th>Pts</th><th>RF</th><th>RA</th><th>+/-</th></tr></thead>
+          <tbody>${standingsRows}</tbody>
+        </table>
+      </div>` : '<div class="help-text" style="margin-bottom:16px">No completed games yet.</div>'}
+
+      <div class="tourn-section-title">Games</div>
+      <div>${gameRows}</div>
+    </div>`;
+}
+
+function showNewTournamentModal() {
+  const teamOpts = State.teams.map(t =>
+    `<label style="display:flex;align-items:center;gap:6px;padding:4px 0">
+       <input type="checkbox" name="tourn-team" value="${t.id}"> ${escapeHtml(t.name)}
+     </label>`).join('');
+  Modal.show(`
+    <div class="modal-header">
+      <h2>New Tournament</h2>
+      <button class="btn-icon" onclick="Modal.hide()">✕</button>
+    </div>
+    <form onsubmit="submitNewTournament(event)">
+      <div class="modal-body">
+        <div class="form-row">
+          <label>Tournament name</label>
+          <input type="text" id="tourn-name" required placeholder="e.g. Summer Classic 2025">
+        </div>
+        <div class="form-row">
+          <label>Teams (select 3 or more)</label>
+          <div id="tourn-teams">${teamOpts || '<span class="help-text">Add teams first.</span>'}</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" onclick="Modal.hide()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create</button>
+      </div>
+    </form>`);
+}
+
+async function submitNewTournament(e) {
+  e.preventDefault();
+  const name = $('#tourn-name').value.trim();
+  const teamIds = $$('input[name="tourn-team"]:checked').map(cb => cb.value);
+  if (!name) return;
+  if (teamIds.length < 2) { toast('Select at least 2 teams', 'error'); return; }
+  const t = await State.addTournament({ name, teamIds });
+  Modal.hide();
+  selectedTournamentId = t.id;
+  Render.tournaments();
+  switchTab('tournaments');
+  toast('Tournament created!', 'success');
+}
+
+async function generateTournamentGames(tournId) {
+  const t = State.getTournament(tournId); if (!t) return;
+  const existing = State.games.filter(g => g.tournamentId === tournId)
+    .map(g => `${g.homeTeamId}|${g.awayTeamId}`);
+  const pairs = [];
+  for (let i=0; i<t.teamIds.length; i++)
+    for (let j=i+1; j<t.teamIds.length; j++) {
+      const a = t.teamIds[i], b = t.teamIds[j];
+      if (!existing.includes(`${a}|${b}`) && !existing.includes(`${b}|${a}`))
+        pairs.push([a, b]);
+    }
+  if (!pairs.length) { toast('All matchups already generated', 'error'); return; }
+  await Promise.all(pairs.map(([homeId, awayId]) =>
+    State.addGame({ homeTeamId: homeId, awayTeamId: awayId, numInnings: 6, tournamentId: tournId })
+  ));
+  Render.all();
+  renderTournamentDetail(tournId);
+  toast(`${pairs.length} game${pairs.length>1?'s':''} generated`, 'success');
+}
+
+async function deleteTournamentUI(id) {
+  if (!confirm('Delete this tournament? Games will not be deleted.')) return;
+  selectedTournamentId = null;
+  await State.deleteTournament(id);
+  Render.tournaments();
+  const detail = $('#tournaments-detail');
+  if (detail) detail.innerHTML = '<div class="player-detail-empty"><span>← Select a tournament</span></div>';
+  toast('Tournament deleted');
 }
 
 /* ============================================================
@@ -4310,6 +4552,7 @@ $$('.tab-btn').forEach(btn => {
 // btn-add-player is dynamically rendered inside #players-toolbar-right — no static listener needed
 $('#btn-add-team').addEventListener('click', () => showTeamModal());
 $('#btn-add-game').addEventListener('click', () => showNewGameModal());
+$('#btn-add-tournament').addEventListener('click', () => showNewTournamentModal());
 
 $('#btn-sign-in').addEventListener('click', () => showAuthModal('signin'));
 $('#btn-sign-out').addEventListener('click', () => signOutUser());
@@ -4415,6 +4658,8 @@ Object.assign(window, {
   endHalfInning, endGameEarly,
   showEditScoreModal, reopenGame, _esAdj, _esSave,
   showRecapModal, _copyRecap, _shareRecap,
+  showNewTournamentModal, submitNewTournament, selectTournament,
+  generateTournamentGames, deleteTournamentUI,
   selectPlay, clearPlaySelection,
   onFielderClick, swapFielder,
   renderLiveGame, rerenderLive,
