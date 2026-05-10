@@ -3174,6 +3174,7 @@ function liveGameHTML(g, home, away) {
         `}
 
         ${isCompleted ? renderAccolades(g) : ''}
+        ${isCompleted ? `<div style="margin-bottom:12px"><button class="btn btn-sm btn-primary" onclick="showRecapModal('${g.id}')">📋 Share Recap</button></div>` : ''}
         ${isCompleted ? '<div id="replay-banner" class="replay-banner" style="display:none"></div>' : ''}
         <div class="play-log">
           <h3>Play-by-play</h3>
@@ -4154,6 +4155,120 @@ function renderAccolades(g) {
 }
 
 /* ============================================================
+   GAME RECAP / SHARE
+   ============================================================ */
+function buildRecapText(g) {
+  const home = State.getTeam(g.homeTeamId);
+  const away = State.getTeam(g.awayTeamId);
+  const date = new Date(g.createdAt).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+  const winner = g.score.away > g.score.home ? away.name
+               : g.score.home > g.score.away ? home.name : null;
+  const lines = [];
+
+  lines.push(`⚾ WiffleCast Game Recap — ${date}`);
+  lines.push(`${away.name} @ ${home.name}`);
+  lines.push('');
+  lines.push(`FINAL: ${away.name} ${g.score.away}, ${home.name} ${g.score.home}${winner ? ` — ${winner} wins!` : ' — Tie'}`);
+  lines.push('');
+
+  // Line score
+  const ls = g.lineScore || [];
+  const innings = Math.max(g.numInnings, ls.length);
+  const header = ['Inn', ...Array.from({length: innings}, (_, i) => String(i+1)), 'R'];
+  const awayRow = [away.name, ...Array.from({length: innings}, (_, i) => {
+    const e = ls.find(x => x.inning === i+1); return e != null ? String(e.top) : '-';
+  }), String(g.score.away)];
+  const homeRow = [home.name, ...Array.from({length: innings}, (_, i) => {
+    const e = ls.find(x => x.inning === i+1); return e != null ? String(e.bottom) : '-';
+  }), String(g.score.home)];
+  const colW = header.map((_, ci) => Math.max(header[ci].length, awayRow[ci].length, homeRow[ci].length));
+  const pad = (s, w) => s.padEnd(w);
+  lines.push(header.map((h, i) => pad(h, colW[i])).join('  '));
+  lines.push(awayRow.map((v, i) => pad(v, colW[i])).join('  '));
+  lines.push(homeRow.map((v, i) => pad(v, colW[i])).join('  '));
+  lines.push('');
+
+  // Top performers
+  const paEvents = (g.events||[]).filter(e => e.type === 'pa_end');
+  const pids = [...new Set(paEvents.map(e => e.batterId).filter(Boolean))];
+  const perf = pids.map(pid => {
+    const p = State.getPlayer(pid); if (!p) return null;
+    const evs = paEvents.filter(e => e.batterId === pid);
+    const H = evs.filter(e => ['1B','2B','3B','HR'].includes(e.outcome)).length;
+    const AB = evs.filter(e => !['BB'].includes(e.outcome)).length;
+    const HR = evs.filter(e => e.outcome === 'HR').length;
+    const RBI = evs.reduce((s, e) => s + (e.rbi||0), 0);
+    const BB = evs.filter(e => e.outcome === 'BB').length;
+    return { name: p.name, H, AB, HR, RBI, BB };
+  }).filter(Boolean).filter(p => p.H > 0 || p.HR > 0 || p.RBI > 0);
+  perf.sort((a, b) => (b.H + b.HR*2 + b.RBI) - (a.H + a.HR*2 + a.RBI));
+
+  if (perf.length) {
+    lines.push('TOP PERFORMERS');
+    perf.slice(0, 5).forEach(p => {
+      const parts = [];
+      if (p.H)   parts.push(`${p.H}-for-${p.AB}`);
+      if (p.HR)  parts.push(`${p.HR} HR`);
+      if (p.RBI) parts.push(`${p.RBI} RBI`);
+      if (p.BB)  parts.push(`${p.BB} BB`);
+      lines.push(`  ${p.name}: ${parts.join(', ')}`);
+    });
+    lines.push('');
+  }
+
+  // Accolades
+  const accolades = computeGameAccolades(g).filter(a => a.label !== 'Game Played');
+  if (accolades.length) {
+    lines.push('AWARDS');
+    accolades.forEach(a => lines.push(`  ${a.emoji} ${a.label}: ${a.player.name} (${a.detail})`));
+    lines.push('');
+  }
+
+  lines.push('— Tracked with WiffleCast');
+  return lines.join('\n');
+}
+
+function showRecapModal(gameId) {
+  const g = State.getGame(gameId); if (!g) return;
+  const text = buildRecapText(g);
+  const canShare = !!navigator.share;
+  Modal.show(`
+    <div class="modal-header">
+      <h2>Game Recap</h2>
+      <button class="btn-icon" onclick="Modal.hide()">✕</button>
+    </div>
+    <div class="modal-body">
+      <pre id="recap-text" style="font-size:12px;line-height:1.6;white-space:pre-wrap;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:12px;margin:0;max-height:340px;overflow-y:auto">${escapeHtml(text)}</pre>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="Modal.hide()">Close</button>
+      ${canShare ? `<button class="btn btn-primary" onclick="_shareRecap('${gameId}')">Share…</button>` : ''}
+      <button class="btn btn-primary" onclick="_copyRecap('${gameId}')">Copy</button>
+    </div>`);
+}
+
+function _copyRecap(gameId) {
+  const g = State.getGame(gameId); if (!g) return;
+  const text = buildRecapText(g);
+  navigator.clipboard.writeText(text).then(() => toast('Recap copied!', 'success')).catch(() => {
+    const el = document.getElementById('recap-text');
+    if (el) { const r = document.createRange(); r.selectNode(el); window.getSelection().removeAllRanges(); window.getSelection().addRange(r); }
+    toast('Press Ctrl+C to copy', 'error');
+  });
+}
+
+async function _shareRecap(gameId) {
+  const g = State.getGame(gameId); if (!g) return;
+  const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
+  try {
+    await navigator.share({
+      title: `${away.name} @ ${home.name} — WiffleCast Recap`,
+      text: buildRecapText(g),
+    });
+  } catch (e) { if (e.name !== 'AbortError') toast('Could not share: ' + e.message, 'error'); }
+}
+
+/* ============================================================
    LINE SCORE
    ============================================================ */
 function renderLineScore(g, away, home) {
@@ -4299,6 +4414,7 @@ Object.assign(window, {
   startGame, setPosition, moveBatter,
   endHalfInning, endGameEarly,
   showEditScoreModal, reopenGame, _esAdj, _esSave,
+  showRecapModal, _copyRecap, _shareRecap,
   selectPlay, clearPlaySelection,
   onFielderClick, swapFielder,
   renderLiveGame, rerenderLive,
