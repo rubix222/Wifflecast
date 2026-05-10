@@ -1096,6 +1096,33 @@
   .gs-feed-batter { font-weight: 600; color: #111827; flex-shrink: 0; }
   .gs-feed-desc { color: #6b7280; }
 
+  /* ---------- Admin edit bar ---------- */
+  .admin-edit-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #fefce8;
+    border: 1px solid #fde68a;
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .admin-edit-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #92400e;
+    margin-right: 4px;
+  }
+  .score-edit-cell {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 0;
+  }
+
   /* ---------- Rules ---------- */
   .rules-grid {
     display: grid;
@@ -2104,24 +2131,13 @@ async function signOutUser() {
 async function invitePlayer(playerId) {
   const player = State.getPlayer(playerId);
   if (!player) return;
-  const email = window.prompt(`Enter email address to invite for ${player.name}:`);
+  const email = window.prompt(`Enter email address for ${player.name}:\n(They can then sign up at this site using that address.)`);
   if (!email || !email.includes('@')) { if (email !== null) toast('Invalid email', 'error'); return; }
-  const actionCodeSettings = {
-    url: window.location.origin + window.location.pathname + '?invitePlayerId=' + playerId,
-    handleCodeInApp: true,
-  };
-  try {
-    await window._fs.sendSignInLinkToEmail(window._fs.auth, email, actionCodeSettings);
-    localStorage.setItem('wc_invite_email', email);
-    localStorage.setItem('wc_invite_pid', playerId);
-    player.inviteEmail = email;
-    player.invitePending = true;
-    await Storage.savePlayer(player);
-    Render.players();
-    toast('Invite sent to ' + email, 'success');
-  } catch (err) {
-    toast('Could not send invite: ' + err.message, 'error');
-  }
+  player.inviteEmail = email;
+  player.invitePending = true;
+  await Storage.savePlayer(player);
+  Render.players();
+  toast(`Email saved for ${player.name} — ask them to sign up at this site`, 'success');
 }
 
 async function handleEmailLinkSignIn() {
@@ -3065,6 +3081,13 @@ function liveGameHTML(g, home, away) {
   const inningStr = (g.currentHalf === 'top' ? '▲ Top ' : '▼ Bot ') + g.currentInning;
   const isCompleted = g.status === 'completed';
 
+  const adminEditBar = isCompleted && isAdminMode() ? `
+    <div class="admin-edit-bar">
+      <span class="admin-edit-label">Admin</span>
+      <button class="btn btn-sm" onclick="showEditScoreModal('${g.id}')">✏️ Edit Score</button>
+      <button class="btn btn-sm btn-warning" onclick="reopenGame('${g.id}')">↺ Reopen Game</button>
+    </div>` : '';
+
   const finishBanner = isCompleted ? `
     <div class="game-finish-banner">
       🏆 Final: ${escapeHtml(away.name)} ${g.score.away} — ${g.score.home} ${escapeHtml(home.name)}
@@ -3080,6 +3103,7 @@ function liveGameHTML(g, home, away) {
     </div>
     <div class="live-game">
       <div class="live-game-left">
+        ${adminEditBar}
         ${finishBanner}
         <div class="scoreboard">
           <div class="team-side ${battingSide === 'away' && !isCompleted ? 'batting' : ''}">
@@ -3992,6 +4016,88 @@ async function endGameEarly(gameId) {
 }
 
 /* ============================================================
+   ADMIN: EDIT GAME AFTER THE FACT
+   ============================================================ */
+let _editScoreLS = null;
+
+function showEditScoreModal(gameId) {
+  const g = State.getGame(gameId); if (!g) return;
+  const home = State.getTeam(g.homeTeamId);
+  const away = State.getTeam(g.awayTeamId);
+  _editScoreLS = JSON.parse(JSON.stringify(ensureLineScore(g)));
+
+  const renderRows = () => _editScoreLS.map((inn, i) => `
+    <tr>
+      <td style="text-align:center;font-weight:600;padding:4px 8px">${inn.inning}</td>
+      <td>
+        <div class="score-edit-cell">
+          <button class="btn btn-sm" onclick="_esAdj(${i},'top',-1)">−</button>
+          <span id="es-top-${i}" style="min-width:24px;text-align:center;display:inline-block">${inn.top}</span>
+          <button class="btn btn-sm" onclick="_esAdj(${i},'top',1)">+</button>
+        </div>
+      </td>
+      <td>
+        <div class="score-edit-cell">
+          <button class="btn btn-sm" onclick="_esAdj(${i},'bottom',-1)">−</button>
+          <span id="es-bot-${i}" style="min-width:24px;text-align:center;display:inline-block">${inn.bottom}</span>
+          <button class="btn btn-sm" onclick="_esAdj(${i},'bottom',1)">+</button>
+        </div>
+      </td>
+    </tr>`).join('');
+
+  Modal.show(`
+    <div class="modal-header">
+      <h2>Edit Score — ${escapeHtml(away.name)} @ ${escapeHtml(home.name)}</h2>
+      <button class="btn-icon" onclick="Modal.hide()">✕</button>
+    </div>
+    <div class="modal-body">
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr>
+            <th style="text-align:center;padding:4px 8px;font-size:12px;color:#6b7280">Inn</th>
+            <th style="padding:4px 8px;font-size:12px;color:#6b7280">${escapeHtml(away.name)} (Away)</th>
+            <th style="padding:4px 8px;font-size:12px;color:#6b7280">${escapeHtml(home.name)} (Home)</th>
+          </tr>
+        </thead>
+        <tbody id="es-tbody">${renderRows()}</tbody>
+      </table>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="Modal.hide()">Cancel</button>
+      <button class="btn btn-primary" onclick="_esSave('${gameId}')">Save</button>
+    </div>`);
+}
+
+function _esAdj(idx, half, delta) {
+  if (!_editScoreLS) return;
+  const key = half === 'top' ? 'top' : 'bottom';
+  _editScoreLS[idx][key] = Math.max(0, (_editScoreLS[idx][key] || 0) + delta);
+  const spanId = half === 'top' ? `es-top-${idx}` : `es-bot-${idx}`;
+  const span = document.getElementById(spanId);
+  if (span) span.textContent = _editScoreLS[idx][key];
+}
+
+async function _esSave(gameId) {
+  const g = State.getGame(gameId); if (!g || !_editScoreLS) return;
+  let awayScore = 0, homeScore = 0;
+  _editScoreLS.forEach(inn => { awayScore += inn.top; homeScore += inn.bottom; });
+  await State.updateGame(gameId, { lineScore: _editScoreLS, score: { away: awayScore, home: homeScore } });
+  _editScoreLS = null;
+  Modal.hide();
+  renderLiveGame(gameId);
+  toast('Score updated');
+}
+
+async function reopenGame(gameId) {
+  if (!confirm('Reopen this game? It will go back to in-progress status.')) return;
+  const g = State.getGame(gameId); if (!g) return;
+  await State.updateGame(gameId, { status: 'in_progress', isOver: false });
+  renderLiveGame(gameId);
+  Render.games();
+  toast('Game reopened');
+}
+
+/* ============================================================
    END-OF-GAME ACCOLADES
    ============================================================ */
 function computeGameAccolades(g) {
@@ -4192,6 +4298,7 @@ Object.assign(window, {
   submitPlayer, submitTeam, submitNewGame,
   startGame, setPosition, moveBatter,
   endHalfInning, endGameEarly,
+  showEditScoreModal, reopenGame, _esAdj, _esSave,
   selectPlay, clearPlaySelection,
   onFielderClick, swapFielder,
   renderLiveGame, rerenderLive,
