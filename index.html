@@ -422,6 +422,20 @@
   .game-team .score-big { font-size: 28px; font-weight: 700; color: #166534; line-height: 1.1; }
   .game-vs .vs-divider { font-weight: 700; color: #9ca3af; font-size: 13px; }
 
+  /* ---------- Inline game header ---------- */
+  .inline-game-header {
+    padding: 14px 20px 12px;
+    border-bottom: 1px solid #e5e7eb;
+    margin-bottom: 0;
+  }
+  .inline-game-header h3 { margin: 0; font-size: 16px; font-weight: 700; color: #111827; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+  /* ---------- Games split panel ---------- */
+  .games-split { grid-template-columns: 210px 1fr; }
+  .games-detail-panel { padding: 0; overflow-y: auto; max-height: 82vh; }
+  #games-detail .live-game { height: auto; min-height: 400px; overflow: visible; }
+  #games-detail .live-game-left, #games-detail .live-game-right { overflow-y: visible; }
+
   /* ============================================================
      LIVE GAME SCREEN
      ============================================================ */
@@ -1002,6 +1016,24 @@
     margin-bottom: 14px;
   }
 
+  /* ---------- Accolades ---------- */
+  .accolades-section { margin-bottom: 14px; }
+  .accolades-section h3 { font-size: 13px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 8px; }
+  .accolades-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+  .accolade-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 10px 12px;
+    text-align: center;
+    min-width: 90px;
+    flex-shrink: 0;
+  }
+  .accolade-emoji { font-size: 22px; margin-bottom: 3px; }
+  .accolade-label { font-size: 10px; font-weight: 700; color: #166534; text-transform: uppercase; letter-spacing: 0.4px; }
+  .accolade-name { font-size: 12px; font-weight: 600; color: #111827; margin-top: 2px; }
+  .accolade-detail { font-size: 11px; color: #6b7280; margin-top: 1px; }
+
   /* ---------- Toast ---------- */
   .toast {
     position: fixed;
@@ -1090,7 +1122,12 @@
       <h2>Games</h2>
       <button id="btn-add-game" class="btn btn-primary" style="display:none">+ New Game</button>
     </div>
-    <div id="games-container"></div>
+    <div class="player-split games-split">
+      <div class="player-list-panel" id="games-list"></div>
+      <div class="player-detail-panel games-detail-panel" id="games-detail">
+        <div class="player-detail-empty"><span>← Select a game</span></div>
+      </div>
+    </div>
   </section>
 </main>
 
@@ -1358,6 +1395,7 @@ const State = {
       outs: 0,
       balls: 0,
       strikes: 0,
+      fouls: 0,
       bases: { 1: null, 2: null, 3: null }, // runner objects
       runnerCounter: 0,
       homeBatterIdx: 0,
@@ -1384,7 +1422,8 @@ const State = {
   // ---- Stat aggregation from event log ----
   computePlayerStats(playerId) {
     let AB=0, H=0, R=0, RBI=0, BB=0, HBP=0, SF=0, TB=0, K_bat=0;
-    let pK=0, pBB=0, pIP_outs=0, pER=0;
+    let K_looking=0, K_swinging=0, K_foul=0;
+    let pK=0, pBB=0, pIP_outs=0, pER=0, pKL=0, pKS=0, pKF=0;
     let E=0; // errors
     let singles=0, doubles=0, triples=0, hrs=0;
     const pitchedGames = new Set();
@@ -1401,14 +1440,24 @@ const State = {
           else if (e.outcome === '2B') { AB++; H++; doubles++; TB += 2; }
           else if (e.outcome === '3B') { AB++; H++; triples++; TB += 3; }
           else if (e.outcome === 'HR') { AB++; H++; hrs++; TB += 4; }
-          else if (e.outcome === 'K')  { AB++; K_bat++; }
+          else if (e.outcome === 'K')  {
+            AB++; K_bat++;
+            if (e.kType === 'looking')  K_looking++;
+            else if (e.kType === 'swinging') K_swinging++;
+            else if (e.kType === 'foul_out') K_foul++;
+          }
           else if (e.outcome === 'OUT') { AB++; }
           else if (e.outcome === 'ERR_REACH') { AB++; } // reached on error: AB but no hit
           RBI += e.rbi || 0;
         }
         if (isPit) {
           if (e.outcome === 'BB') pBB++;
-          if (e.outcome === 'K')  pK++;
+          if (e.outcome === 'K') {
+            pK++;
+            if (e.kType === 'looking')  pKL++;
+            else if (e.kType === 'swinging') pKS++;
+            else if (e.kType === 'foul_out') pKF++;
+          }
           // Innings pitched: count outs recorded by this pitcher (K, OUT)
           if (e.outcome === 'K' || e.outcome === 'OUT') pIP_outs++;
           pER += e.earnedRuns || 0;
@@ -1429,9 +1478,9 @@ const State = {
     const pGP = pitchedGames.size;
 
     return {
-      AB, H, R, RBI, BB, K_bat, AVG, OBP, SLG, OPS, PA, TB,
+      AB, H, R, RBI, BB, K_bat, K_looking, K_swinging, K_foul, AVG, OBP, SLG, OPS, PA, TB,
       singles, doubles, triples, hrs,
-      pK, pBB, pER, IP, ERA, E, pGP,
+      pK, pKL, pKS, pKF, pBB, pER, IP, ERA, E, pGP,
     };
   },
 
@@ -1453,6 +1502,51 @@ const State = {
       gamesScheduled: games.length - completed.length,
       wins, losses, ties, runsFor, runsAgainst,
     };
+  },
+
+  computeTeamBattingStats(teamId) {
+    let AB=0, H=0, R=0, RBI=0, BB=0, TB=0, K=0, singles=0, doubles=0, triples=0, hrs=0;
+    this.games.forEach(g => {
+      if (g.homeTeamId !== teamId && g.awayTeamId !== teamId) return;
+      const battingHalf = g.homeTeamId === teamId ? 'bottom' : 'top';
+      (g.events || []).forEach(e => {
+        if (e.type !== 'pa_end' || e.half !== battingHalf) return;
+        if (e.outcome === 'BB') BB++;
+        else if (e.outcome === '1B') { AB++; H++; singles++; TB += 1; }
+        else if (e.outcome === '2B') { AB++; H++; doubles++; TB += 2; }
+        else if (e.outcome === '3B') { AB++; H++; triples++; TB += 3; }
+        else if (e.outcome === 'HR') { AB++; H++; hrs++; TB += 4; }
+        else if (e.outcome === 'K')  { AB++; K++; }
+        else if (e.outcome === 'OUT' || e.outcome === 'ERR_REACH') AB++;
+        RBI += e.rbi || 0;
+        R += (e.runsScoredBy || []).length;
+      });
+    });
+    const PA = AB + BB;
+    return {
+      PA, AB, H, R, RBI, BB, K, TB, singles, doubles, triples, hrs,
+      AVG: AB ? H / AB : 0,
+      OBP: PA ? (H + BB) / PA : 0,
+      SLG: AB ? TB / AB : 0,
+    };
+  },
+
+  computeTeamPitchingStats(teamId) {
+    let outs=0, ER=0, K=0, BB=0, H=0;
+    this.games.forEach(g => {
+      if (g.homeTeamId !== teamId && g.awayTeamId !== teamId) return;
+      const pitchingHalf = g.homeTeamId === teamId ? 'top' : 'bottom';
+      (g.events || []).forEach(e => {
+        if (e.type !== 'pa_end' || e.half !== pitchingHalf) return;
+        if (e.outcome === 'K')  { K++; outs++; }
+        else if (e.outcome === 'OUT') outs++;
+        else if (e.outcome === 'BB') BB++;
+        else if (['1B','2B','3B','HR'].includes(e.outcome)) H++;
+        ER += e.earnedRuns || 0;
+      });
+    });
+    const IP = outs / 3;
+    return { IP, ER, K, BB, H, ERA: IP > 0 ? (ER * 9) / IP : null };
   },
 
   // Hit locations across all games for a player
@@ -1581,6 +1675,13 @@ function setAdminMode(val) {
 let selectedPlayerId = null;
 let playerDetailTab = 'batting'; // 'batting' | 'pitching'
 let playersView = 'roster';      // 'roster' | 'batting' | 'pitching'
+
+// Team view state
+let selectedTeamId = null;
+let teamDetailTab = 'batting'; // 'batting' | 'pitching'
+
+// Game view state
+let selectedGameId = null;
 let statsSort  = { col: 'AVG', dir: -1 };
 let pitchSort  = { col: 'IP',  dir: -1 };
 
@@ -1592,6 +1693,14 @@ function setPlayersView(view) {
 function selectPlayer(id) {
   selectedPlayerId = id;
   Render.players();
+}
+function selectTeam(id) {
+  selectedTeamId = id;
+  Render.teams();
+}
+function setTeamDetailTab(tab) {
+  teamDetailTab = tab;
+  Render.teams();
 }
 function setPlayerDetailTab(tab) {
   playerDetailTab = tab;
@@ -1910,6 +2019,9 @@ const Render = {
             <div class="stat-lg"><div class="stat-label">RBI</div><div class="stat-value">${s.RBI}</div></div>
             <div class="stat-lg"><div class="stat-label">BB</div><div class="stat-value">${s.BB}</div></div>
             <div class="stat-lg"><div class="stat-label">K</div><div class="stat-value">${s.K_bat}</div></div>
+            <div class="stat-lg"><div class="stat-label">KL</div><div class="stat-value">${s.K_looking}</div></div>
+            <div class="stat-lg"><div class="stat-label">KS</div><div class="stat-value">${s.K_swinging}</div></div>
+            <div class="stat-lg"><div class="stat-label">KF</div><div class="stat-value">${s.K_foul}</div></div>
             <div class="stat-lg"><div class="stat-label">E</div><div class="stat-value">${s.E}</div></div>
           </div>`;
 
@@ -1923,6 +2035,9 @@ const Render = {
           <div class="stat-row-lg">
             <div class="stat-lg"><div class="stat-label">GP</div><div class="stat-value">${s.pGP}</div></div>
             <div class="stat-lg"><div class="stat-label">K</div><div class="stat-value">${s.pK}</div></div>
+            <div class="stat-lg"><div class="stat-label">KL</div><div class="stat-value">${s.pKL}</div></div>
+            <div class="stat-lg"><div class="stat-label">KS</div><div class="stat-value">${s.pKS}</div></div>
+            <div class="stat-lg"><div class="stat-label">KF</div><div class="stat-value">${s.pKF}</div></div>
             <div class="stat-lg"><div class="stat-label">BB</div><div class="stat-value">${s.pBB}</div></div>
             <div class="stat-lg"><div class="stat-label">ER</div><div class="stat-value">${s.pER}</div></div>
           </div>
@@ -2047,48 +2162,111 @@ const Render = {
       return;
     }
     const sorted = [...State.teams].sort((a, b) => a.name.localeCompare(b.name));
-    c.innerHTML = '<div class="card-grid">' + sorted.map(t => {
+    if (!selectedTeamId || !State.getTeam(selectedTeamId)) {
+      selectedTeamId = sorted[0]?.id || null;
+    }
+    const sel = selectedTeamId ? State.getTeam(selectedTeamId) : null;
+
+    const listItems = sorted.map(t => {
       const s = State.computeTeamStats(t.id);
-      const players = t.playerIds.map(id => State.getPlayer(id)).filter(Boolean);
-      return `<div class="card">
-        <div class="card-header">
-          <div>
-            <h3 class="card-title">${escapeHtml(t.name)}</h3>
-            <div class="card-subtitle small">${players.length} player${players.length !== 1 ? 's' : ''} · ${s.wins}-${s.losses}${s.ties ? '-' + s.ties : ''}</div>
-          </div>
-          <div class="card-actions">
-            ${isAdminMode() ? `<button class="btn-icon" title="Edit" onclick="showTeamModal('${t.id}')">✎</button>` : ''}
-            ${isAdminMode() ? `<button class="btn-icon" title="Delete" onclick="deleteTeam('${t.id}')">🗑</button>` : ''}
-          </div>
-        </div>
-        <div class="stat-section-title">Roster</div>
-        <div class="row-flex">
-          ${players.map(p => `<span class="pill">${escapeHtml(p.jerseyNumber ? '#' + p.jerseyNumber + ' ' : '')}${escapeHtml(p.name)}</span>`).join('')}
-        </div>
-        <div class="stat-section-title">Record</div>
-        <div class="stats-grid">
-          <div class="stat"><div class="stat-label">GP</div><div class="stat-value">${s.gamesPlayed}</div></div>
-          <div class="stat"><div class="stat-label">W</div><div class="stat-value">${s.wins}</div></div>
-          <div class="stat"><div class="stat-label">L</div><div class="stat-value">${s.losses}</div></div>
-          <div class="stat"><div class="stat-label">RF</div><div class="stat-value">${s.runsFor}</div></div>
+      const active = t.id === selectedTeamId ? 'selected' : '';
+      return `<div class="player-list-item ${active}" onclick="selectTeam('${t.id}')">
+        <div>
+          <div class="pli-name">${escapeHtml(t.name)}</div>
+          <div class="pli-sub">${s.wins}-${s.losses}${s.ties ? '-'+s.ties : ''} · ${s.gamesPlayed} GP</div>
         </div>
       </div>`;
-    }).join('') + '</div>';
+    }).join('');
+
+    let detailHtml = '<div class="player-detail-empty"><span>← Select a team</span></div>';
+    if (sel) {
+      const s = State.computeTeamStats(sel.id);
+      const bat = State.computeTeamBattingStats(sel.id);
+      const pit = State.computeTeamPitchingStats(sel.id);
+      const players = sel.playerIds.map(id => State.getPlayer(id)).filter(Boolean);
+      const actions = isAdminMode()
+        ? `<button class="btn-icon" title="Edit" onclick="showTeamModal('${sel.id}')">✎</button>
+           <button class="btn-icon" title="Delete" onclick="deleteTeam('${sel.id}')">🗑</button>`
+        : '';
+
+      const batHtml = `
+        <div class="stat-section-title" style="margin-top:0">Rate</div>
+        <div class="stat-row-lg">
+          <div class="stat-lg hi"><div class="stat-label">AVG</div><div class="stat-value">${fmt.avg(bat.AVG)}</div></div>
+          <div class="stat-lg hi"><div class="stat-label">OBP</div><div class="stat-value">${fmt.avg(bat.OBP)}</div></div>
+          <div class="stat-lg hi"><div class="stat-label">SLG</div><div class="stat-value">${fmt.avg(bat.SLG)}</div></div>
+        </div>
+        <div class="stat-section-title">Counting</div>
+        <div class="stat-row-lg">
+          <div class="stat-lg"><div class="stat-label">PA</div><div class="stat-value">${bat.PA}</div></div>
+          <div class="stat-lg"><div class="stat-label">AB</div><div class="stat-value">${bat.AB}</div></div>
+          <div class="stat-lg"><div class="stat-label">H</div><div class="stat-value">${bat.H}</div></div>
+          <div class="stat-lg"><div class="stat-label">1B</div><div class="stat-value">${bat.singles}</div></div>
+          <div class="stat-lg"><div class="stat-label">2B</div><div class="stat-value">${bat.doubles}</div></div>
+          <div class="stat-lg"><div class="stat-label">3B</div><div class="stat-value">${bat.triples}</div></div>
+          <div class="stat-lg"><div class="stat-label">HR</div><div class="stat-value">${bat.hrs}</div></div>
+          <div class="stat-lg"><div class="stat-label">R</div><div class="stat-value">${bat.R}</div></div>
+          <div class="stat-lg"><div class="stat-label">RBI</div><div class="stat-value">${bat.RBI}</div></div>
+          <div class="stat-lg"><div class="stat-label">BB</div><div class="stat-value">${bat.BB}</div></div>
+          <div class="stat-lg"><div class="stat-label">K</div><div class="stat-value">${bat.K}</div></div>
+        </div>`;
+
+      const pitHtml = `
+        <div class="stat-section-title" style="margin-top:0">Rate</div>
+        <div class="stat-row-lg">
+          <div class="stat-lg hi"><div class="stat-label">ERA</div><div class="stat-value">${pit.ERA !== null ? pit.ERA.toFixed(2) : '—'}</div></div>
+          <div class="stat-lg hi"><div class="stat-label">IP</div><div class="stat-value">${fmt.ip(pit.IP)}</div></div>
+        </div>
+        <div class="stat-section-title">Counting</div>
+        <div class="stat-row-lg">
+          <div class="stat-lg"><div class="stat-label">K</div><div class="stat-value">${pit.K}</div></div>
+          <div class="stat-lg"><div class="stat-label">BB</div><div class="stat-value">${pit.BB}</div></div>
+          <div class="stat-lg"><div class="stat-label">H</div><div class="stat-value">${pit.H}</div></div>
+          <div class="stat-lg"><div class="stat-label">ER</div><div class="stat-value">${pit.ER}</div></div>
+        </div>`;
+
+      detailHtml = `
+        <div class="detail-player-header">
+          <div>
+            <div class="detail-player-name">${escapeHtml(sel.name)}</div>
+            <div class="detail-player-sub">${s.wins}-${s.losses}${s.ties ? '-'+s.ties : ''} · ${s.gamesPlayed} GP · RF ${s.runsFor} / RA ${s.runsAgainst}</div>
+          </div>
+          <div class="detail-actions">${actions}</div>
+        </div>
+        <div class="stat-section-title">Roster</div>
+        <div class="row-flex" style="margin-bottom:14px">
+          ${players.map(p => `<span class="pill">${escapeHtml(p.jerseyNumber ? '#' + p.jerseyNumber + ' ' : '')}${escapeHtml(p.name)}</span>`).join('')}
+        </div>
+        <div class="detail-tabs">
+          <button class="${teamDetailTab === 'batting' ? 'active' : ''}" onclick="setTeamDetailTab('batting')">Batting</button>
+          <button class="${teamDetailTab === 'pitching' ? 'active' : ''}" onclick="setTeamDetailTab('pitching')">Pitching</button>
+        </div>
+        <div class="detail-tab-body">
+          ${teamDetailTab === 'batting' ? batHtml : pitHtml}
+        </div>`;
+    }
+
+    c.innerHTML = `<div class="player-split">
+      <div class="player-list-panel">${listItems}</div>
+      <div class="player-detail-panel">${detailHtml}</div>
+    </div>`;
   },
 
   games() {
-    const c = $('#games-container');
+    const listEl = $('#games-list');
+    if (!listEl) return;
     if (!State.games.length) {
       const hasTwoTeams = State.teams.length >= 2;
-      c.innerHTML = `<div class="empty-state">
-        <h3>No games yet</h3>
-        <p>${hasTwoTeams ? 'Pick two teams and start tracking a game.' : 'Create at least 2 teams to start a game.'}</p>
-        ${hasTwoTeams && isAdminMode() ? '<button class="btn btn-primary" onclick="showNewGameModal()">+ New Game</button>' : ''}
+      listEl.innerHTML = `<div style="padding:16px;color:#6b7280;font-size:13px">
+        ${hasTwoTeams ? 'No games yet.' : 'Create at least 2 teams first.'}
+        ${hasTwoTeams && isAdminMode() ? '<br><br><button class="btn btn-primary btn-sm" onclick="showNewGameModal()">+ New Game</button>' : ''}
       </div>`;
       return;
     }
     const sorted = [...State.games].sort((a, b) => b.createdAt - a.createdAt);
-    c.innerHTML = '<div class="card-grid">' + sorted.map(g => {
+    // Keep selectedGameId valid
+    if (selectedGameId && !State.getGame(selectedGameId)) selectedGameId = null;
+    listEl.innerHTML = sorted.map(g => {
       const home = State.getTeam(g.homeTeamId);
       const away = State.getTeam(g.awayTeamId);
       const date = new Date(g.createdAt).toLocaleDateString();
@@ -2096,32 +2274,19 @@ const Render = {
       const inningStr = g.status === 'in_progress'
         ? `${g.currentHalf === 'top' ? 'Top' : 'Bot'} ${g.currentInning}`
         : (g.status === 'completed' ? 'Final' : '');
-      return `<div class="card" style="cursor:pointer" onclick="openGame('${g.id}')">
-        <div class="card-header">
-          <div>
-            <span class="game-card-status status-${g.status}">${g.status.replace('_', ' ')}${inningStr ? ' · ' + inningStr : ''}</span>
-            <div class="card-subtitle small" style="margin-top:6px">${date} · ${g.numInnings} innings</div>
+      const active = g.id === selectedGameId ? 'selected' : '';
+      return `<div class="player-list-item game-list-item ${active}" onclick="selectGame('${g.id}')">
+        <div style="width:100%">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span class="game-card-status status-${g.status}" style="font-size:11px">${g.status.replace('_',' ')}${inningStr ? ' · '+inningStr : ''}</span>
+            <span style="font-size:11px;color:#9ca3af">${date}</span>
           </div>
-          <div class="card-actions" onclick="event.stopPropagation()">
-            ${isAdminMode() ? `<button class="btn-icon" title="Delete" onclick="deleteGame('${g.id}')">🗑</button>` : ''}
-          </div>
+          <div style="font-weight:600;font-size:13px;margin-top:3px">${escapeHtml(away?.name||'?')} @ ${escapeHtml(home?.name||'?')}</div>
+          ${showScore ? `<div style="font-size:12px;color:#6b7280">${g.score.away} — ${g.score.home}</div>` : ''}
+          ${isAdminMode() ? `<button class="btn-icon" style="float:right;margin-top:-18px" title="Delete" onclick="event.stopPropagation();deleteGame('${g.id}')">🗑</button>` : ''}
         </div>
-        <div class="game-vs">
-          <div class="game-team">
-            <div class="label">Away</div>
-            <div class="name">${escapeHtml(away?.name || '—')}</div>
-            ${showScore ? `<div class="score-big">${g.score.away}</div>` : ''}
-          </div>
-          <div class="vs-divider">${showScore ? '—' : '@'}</div>
-          <div class="game-team">
-            <div class="label">Home</div>
-            <div class="name">${escapeHtml(home?.name || '—')}</div>
-            ${showScore ? `<div class="score-big">${g.score.home}</div>` : ''}
-          </div>
-        </div>
-        <button class="btn btn-sm" style="width:100%">${g.status === 'setup' ? 'Open setup' : (g.status === 'in_progress' ? 'Continue game' : 'View game')}</button>
       </div>`;
-    }).join('') + '</div>';
+    }).join('');
   }
 };
 
@@ -2307,12 +2472,28 @@ async function submitNewGame(e) {
 }
 async function deleteGame(id) {
   if (!confirm('Delete this game?')) return;
+  if (id === selectedGameId) deselectGame();
   await State.deleteGame(id);
   Render.all();
   toast('Game deleted');
 }
 
+function selectGame(id) {
+  selectedGameId = id;
+  Render.games();
+  openGame(id);
+}
+function deselectGame() {
+  selectedGameId = null;
+  LiveGameId = null;
+  Render.games();
+  const detail = $('#games-detail');
+  if (detail) detail.innerHTML = '<div class="player-detail-empty"><span>← Select a game</span></div>';
+}
 function openGame(id) {
+  selectedGameId = id;
+  switchTab('games');
+  Render.games();
   const g = State.getGame(id);
   if (!g) return;
   if (g.status === 'setup') renderGameSetup(g);
@@ -2326,14 +2507,15 @@ function renderGameSetup(g) {
   const home = State.getTeam(g.homeTeamId);
   const away = State.getTeam(g.awayTeamId);
   if (!home || !away) { toast('Game has missing teams', 'error'); return; }
-  Modal.show(`
-    <div class="modal-header">
-      <h3>Game setup
+  const detail = $('#games-detail');
+  if (!detail) return;
+  detail.innerHTML = `
+    <div class="inline-game-header">
+      <h3>${escapeHtml(away.name)} @ ${escapeHtml(home.name)}
         <span class="game-card-status status-setup" style="margin-left:8px">setup</span>
       </h3>
-      <button class="btn-icon" onclick="Modal.hide()">✕</button>
     </div>
-    <div class="modal-body">
+    <div style="padding:0 20px 8px">
       <p class="help-text" style="margin-bottom:18px">
         Set the batting order (drag the ⋮⋮ handle or use ↑/↓) and assign starting field positions.
         Batting order stays fixed once the game starts; positions can be changed any time during the game.
@@ -2349,10 +2531,9 @@ function renderGameSetup(g) {
         </div>
       </div>
     </div>
-    <div class="modal-footer">
-      <button class="btn" onclick="Modal.hide()">Save & close</button>
+    <div style="padding:12px 20px;border-top:1px solid #e5e7eb;display:flex;gap:8px;justify-content:flex-end">
       <button class="btn btn-primary" onclick="startGame('${g.id}')">Start game →</button>
-    </div>`, { wide: true });
+    </div>`;
   renderLineup(g, 'away');
   renderLineup(g, 'home');
 }
@@ -2479,9 +2660,10 @@ function renderLiveGame(gameId) {
   if (!g) return;
   const home = State.getTeam(g.homeTeamId);
   const away = State.getTeam(g.awayTeamId);
-  Modal.show(`
-    <div id="live-game-root">${liveGameHTML(g, home, away)}</div>
-  `, { full: true });
+  const detail = $('#games-detail');
+  if (detail) {
+    detail.innerHTML = `<div id="live-game-root">${liveGameHTML(g, home, away)}</div>`;
+  }
   drawField();
   drawBases();
   attachPitchHandlers();
@@ -2500,13 +2682,11 @@ function liveGameHTML(g, home, away) {
     </div>` : '';
 
   return `
-    <div class="modal-header">
+    <div class="inline-game-header">
       <h3>
-        <button class="btn btn-sm" onclick="Modal.hide(); Render.games();">← Back</button>
         ${escapeHtml(away.name)} @ ${escapeHtml(home.name)}
         <span class="game-card-status status-${g.status}" style="margin-left:8px">${g.status.replace('_',' ')}</span>
       </h3>
-      <button class="btn-icon" onclick="Modal.hide(); Render.games();">✕</button>
     </div>
     <div class="live-game">
       <div class="live-game-left">
@@ -2560,6 +2740,7 @@ function liveGameHTML(g, home, away) {
           <div class="count-row">
             <div class="count-block"><span class="label">B</span><span class="val" id="count-b">${g.balls}</span></div>
             <div class="count-block"><span class="label">S</span><span class="val" id="count-s">${g.strikes}</span></div>
+            <div class="count-block"><span class="label">F</span><span class="val" id="count-f">${g.fouls || 0}</span></div>
             <div class="count-block"><span class="label">Outs</span><span class="val" id="count-o">${g.outs}</span></div>
           </div>
         </div>
@@ -2577,6 +2758,7 @@ function liveGameHTML(g, home, away) {
         </div>
         `}
 
+        ${isCompleted ? renderAccolades(g) : ''}
         ${isCompleted ? '<div id="replay-banner" class="replay-banner" style="display:none"></div>' : ''}
         <div class="play-log">
           <h3>Play-by-play</h3>
@@ -2982,7 +3164,7 @@ async function handlePitch(kind) {
   if (kind === 'strike_swinging' || kind === 'strike_looking') {
     g.strikes++;
     if (g.strikes >= 3) {
-      await applyPaEnd(g, { outcome: 'K', strikeType: kind });
+      await applyPaEnd(g, { outcome: 'K', kType: kind === 'strike_swinging' ? 'swinging' : 'looking' });
     } else {
       await State.updateGame(g.id, { strikes: g.strikes });
       renderLiveGame(g.id);
@@ -2990,9 +3172,14 @@ async function handlePitch(kind) {
     return;
   }
   if (kind === 'foul') {
-    if (g.strikes < 2) g.strikes++;
-    await State.updateGame(g.id, { strikes: g.strikes });
-    renderLiveGame(g.id);
+    g.fouls = (g.fouls || 0) + 1;
+    if (g.fouls >= 4) {
+      await applyPaEnd(g, { outcome: 'K', kType: 'foul_out' });
+    } else {
+      if (g.strikes < 2) g.strikes++;
+      await State.updateGame(g.id, { strikes: g.strikes, fouls: g.fouls });
+      renderLiveGame(g.id);
+    }
     return;
   }
   if (kind === 'bip') {
@@ -3223,6 +3410,7 @@ async function applyPaEnd(g, ev) {
     batterId,
     pitcherId,
     outcome: ev.outcome,
+    kType: ev.kType || null,
     hitType: ev.hitType || null,
     errBase: ev.errBase || null,
     errorById: ev.errorById || null,
@@ -3295,6 +3483,7 @@ async function applyPaEnd(g, ev) {
     outs: newOuts,
     balls: 0,
     strikes: 0,
+    fouls: 0,
     score: newScore,
     lineScore,
     events: newEvents,
@@ -3348,7 +3537,7 @@ async function endHalfInningInternal(g) {
   }
   await State.updateGame(g.id, {
     currentInning, currentHalf,
-    outs: 0, balls: 0, strikes: 0,
+    outs: 0, balls: 0, strikes: 0, fouls: 0,
     bases: { 1: null, 2: null, 3: null },
   });
   const fresh = State.getGame(g.id);
@@ -3373,6 +3562,62 @@ async function endGameEarly(gameId) {
   await State.updateGame(gameId, { status: 'completed', isOver: true });
   renderLiveGame(gameId);
   Render.games();
+}
+
+/* ============================================================
+   END-OF-GAME ACCOLADES
+   ============================================================ */
+function computeGameAccolades(g) {
+  const allPids = [...new Set([...(g.homeBattingOrder||[]), ...(g.awayBattingOrder||[])])];
+  const ps = {};
+  allPids.forEach(id => { ps[id] = { hits:0, rbi:0, hr:0, r:0, bb:0, kp:0, xbh:0, err:0 }; });
+  (g.events||[]).forEach(e => {
+    if (e.type !== 'pa_end') return;
+    const b = ps[e.batterId], pit = ps[e.pitcherId];
+    if (b) {
+      if (e.outcome==='BB') b.bb++;
+      if (['1B','2B','3B','HR'].includes(e.outcome)) { b.hits++; if (e.outcome!=='1B') b.xbh++; }
+      if (e.outcome==='HR') b.hr++;
+      b.rbi += e.rbi||0;
+    }
+    if (pit) { if (e.outcome==='K') pit.kp++; }
+    if (e.errorById && ps[e.errorById]) ps[e.errorById].err++;
+    (e.runsScoredBy||[]).forEach(pid => { if (ps[pid]) ps[pid].r++; });
+  });
+  const mx = fn => Math.max(0, ...allPids.map(id => fn(ps[id])));
+  const mHit=mx(s=>s.hits), mRbi=mx(s=>s.rbi), mHr=mx(s=>s.hr),
+        mR=mx(s=>s.r), mKp=mx(s=>s.kp), mBb=mx(s=>s.bb),
+        mXbh=mx(s=>s.xbh), mErr=mx(s=>s.err);
+  return allPids.map(pid => {
+    const player = State.getPlayer(pid); if (!player) return null;
+    const s = ps[pid];
+    const c = [];
+    if (s.hr>0  && s.hr===mHr)   c.push({ label:'Home Run Hero',   emoji:'🚀', detail:`${s.hr} HR` });
+    if (s.rbi>0 && s.rbi===mRbi) c.push({ label:'RBI Machine',     emoji:'💥', detail:`${s.rbi} RBI` });
+    if (s.hits>0&& s.hits===mHit) c.push({ label:'Hit Machine',    emoji:'⚾', detail:`${s.hits} H` });
+    if (s.kp>0  && s.kp===mKp)   c.push({ label:'Strikeout King',  emoji:'🔥', detail:`${s.kp} K` });
+    if (s.r>0   && s.r===mR)     c.push({ label:'Run Scorer',      emoji:'🏃', detail:`${s.r} R` });
+    if (s.bb>0  && s.bb===mBb)   c.push({ label:'On-Base Machine', emoji:'🎯', detail:`${s.bb} BB` });
+    if (s.xbh>0 && s.xbh===mXbh) c.push({ label:'Extra Bases',    emoji:'💪', detail:`${s.xbh} XBH` });
+    if (s.err>0 && s.err===mErr) c.push({ label:'Tough Day',       emoji:'😬', detail:`${s.err} E` });
+    const accolade = c[0] || (s.hits>0
+      ? { label:'Solid Contact', emoji:'⭐', detail:`${s.hits} H` }
+      : { label:'Game Played',   emoji:'🤝', detail:'' });
+    return { player, ...accolade };
+  }).filter(Boolean);
+}
+
+function renderAccolades(g) {
+  const list = computeGameAccolades(g);
+  if (!list.length) return '';
+  const cards = list.map(a => `
+    <div class="accolade-card">
+      <div class="accolade-emoji">${a.emoji}</div>
+      <div class="accolade-label">${a.label}</div>
+      <div class="accolade-name">${escapeHtml(a.player.name)}</div>
+      ${a.detail ? `<div class="accolade-detail">${a.detail}</div>` : ''}
+    </div>`).join('');
+  return `<div class="accolades-section"><h3>Game Awards</h3><div class="accolades-row">${cards}</div></div>`;
 }
 
 /* ============================================================
@@ -3405,11 +3650,12 @@ function renderLineScore(g, away, home) {
 /* ============================================================
    TAB NAVIGATION + WIRE-UP
    ============================================================ */
+function switchTab(view) {
+  $$('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  $$('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + view));
+}
 $$('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const view = btn.dataset.view;
-    $$('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
-    $$('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + view));
+  btn.addEventListener('click', () => switchTab(btn.dataset.view));
   });
 });
 
@@ -3442,6 +3688,7 @@ async function migrateGames() {
     if (g.outs         === undefined) { g.outs         = 0;                             changed = true; }
     if (g.balls        === undefined) { g.balls        = 0;                             changed = true; }
     if (g.strikes      === undefined) { g.strikes      = 0;                             changed = true; }
+    if (g.fouls        === undefined) { g.fouls        = 0;                             changed = true; }
     if (g.bases        === undefined) { g.bases        = { 1: null, 2: null, 3: null }; changed = true; }
     if (g.runnerCounter=== undefined) { g.runnerCounter= 0;                             changed = true; }
     if (g.homeBatterIdx=== undefined) { g.homeBatterIdx= 0;                             changed = true; }
@@ -3513,7 +3760,7 @@ Object.assign(window, {
   Modal, Render, State,
   showAuthModal, submitAuth, signOutUser, invitePlayer,
   showPlayerModal, deletePlayer, showTeamModal, deleteTeam,
-  showNewGameModal, openGame, deleteGame,
+  showNewGameModal, openGame, selectGame, deselectGame, deleteGame,
   submitPlayer, submitTeam, submitNewGame,
   startGame, setPosition, moveBatter,
   endHalfInning, endGameEarly,
@@ -3524,6 +3771,8 @@ Object.assign(window, {
   askLocation, cancelLocation, confirmLocation, finishHit,
   // Admin mode + player view
   setAdminMode, setPlayersView, selectPlayer, setPlayerDetailTab,
+  selectTeam, setTeamDetailTab,
+  switchTab,
   sortStats, showCreateMyPlayerModal, submitMyPlayer,
 });
 </script>
