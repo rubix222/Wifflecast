@@ -511,13 +511,21 @@
     display: flex;
     flex-direction: column;
   }
-  .field-wrap h3 {
+  .field-wrap-title {
     margin: 0 0 10px;
     font-size: 14px;
     color: #6b7280;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     font-weight: 600;
+  }
+  .field-wrap-hint {
+    font-size: 11px;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    margin-left: 8px;
+    color: #9ca3af;
   }
   .field-svg {
     width: 100%;
@@ -816,14 +824,6 @@
   .field-and-bases { display: flex; gap: 4px; align-items: flex-start; }
   .field-panel { flex: 1; min-width: 0; }
   .bases-panel { flex: 0 0 140px; }
-  .bases-panel h3 {
-    margin: 0 0 8px;
-    font-size: 14px;
-    color: #6b7280;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    font-weight: 600;
-  }
   .bases-svg { width: 100%; height: auto; display: block; user-select: none; }
   .bases-svg .diamond-outline { fill: none; stroke: #c89968; stroke-width: 2; }
   .bases-svg .base { fill: #f9fafb; stroke: #1f2937; stroke-width: 1; }
@@ -1096,6 +1096,35 @@
   .gs-feed-batter { font-weight: 600; color: #111827; flex-shrink: 0; }
   .gs-feed-desc { color: #6b7280; }
 
+  /* ---------- Rules ---------- */
+  .rules-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+  }
+  .rules-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 18px 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  .rules-card h3 {
+    margin: 0 0 12px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #1f2937;
+  }
+  .rules-card ul {
+    margin: 0;
+    padding-left: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .rules-card li { font-size: 13px; color: #374151; line-height: 1.5; }
+  .rules-card strong { color: #166534; }
+  .rules-card em { color: #6b7280; font-style: normal; font-weight: 500; }
+
   /* ---------- Accolades ---------- */
   .accolades-section { margin-bottom: 14px; }
   .accolades-section h3 { font-size: 13px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 8px; }
@@ -1175,6 +1204,7 @@
   <button class="tab-btn" data-view="games">Games</button>
   <button class="tab-btn" data-view="gamestream">Gamestream</button>
   <button class="tab-btn admin-only-tab" data-view="users" style="display:none">Users</button>
+  <button class="tab-btn" data-view="rules">Rules</button>
 </nav>
 
 <main>
@@ -1214,6 +1244,67 @@
       <h2>Users</h2>
     </div>
     <div id="users-container"></div>
+  </section>
+
+  <section id="view-rules" class="view">
+    <div class="toolbar"><h2>Rules</h2></div>
+    <div class="rules-grid">
+      <div class="rules-card">
+        <h3>⚾ The Count</h3>
+        <ul>
+          <li><strong>4 balls</strong> = walk (batter advances to 1B, runners advance if forced)</li>
+          <li><strong>3 strikes</strong> = strikeout — tracked as <em>looking</em>, <em>swinging</em>, or <em>foul-out</em></li>
+          <li><strong>4 fouls</strong> = strikeout (foul-out)</li>
+          <li>A foul with 2 strikes adds to the foul count but does <em>not</em> add a strike</li>
+        </ul>
+      </div>
+      <div class="rules-card">
+        <h3>🏏 Batting</h3>
+        <ul>
+          <li><strong>1B / 2B / 3B / HR</strong> — runners advance the same number of bases as the batter</li>
+          <li><strong>Ball in play (out)</strong> — tap a fielder + location to record the out</li>
+          <li><strong>Error</strong> — batter reaches base; no RBI credited</li>
+          <li><strong>Home run</strong> — all runners and batter score; mark where the ball left the field</li>
+        </ul>
+      </div>
+      <div class="rules-card">
+        <h3>📋 Innings &amp; Game</h3>
+        <ul>
+          <li>Default game length: <strong>6 innings</strong> (configurable when creating a game)</li>
+          <li><strong>3 outs</strong> end a half-inning</li>
+          <li>Home team bats in the bottom half; away team bats in the top half</li>
+          <li><strong>Walk-off</strong>: if the home team takes the lead in the bottom of the final inning, the game ends immediately</li>
+          <li>Tied after regulation → extra innings until a winner is decided</li>
+        </ul>
+      </div>
+      <div class="rules-card">
+        <h3>🏃 Base Running</h3>
+        <ul>
+          <li>On a hit, all runners advance the same number of bases as the hit type</li>
+          <li>On a walk, only runners forced advance</li>
+          <li>Runs scored are credited to the batter as RBI (except on errors)</li>
+          <li>Runners who score are credited with an R in the stats</li>
+        </ul>
+      </div>
+      <div class="rules-card">
+        <h3>📊 Stats Tracked</h3>
+        <ul>
+          <li><strong>Batting:</strong> AB, H, 1B, 2B, 3B, HR, BB, K, R, RBI, AVG, OBP, SLG, OPS</li>
+          <li><strong>Pitching:</strong> IP, H, ER, BB, K, ERA</li>
+          <li><strong>Strikeouts:</strong> broken out by looking (KL), swinging (KS), and foul-out (KF)</li>
+          <li><strong>Teams:</strong> W/L/T record, runs for/against</li>
+        </ul>
+      </div>
+      <div class="rules-card">
+        <h3>🔧 Scoring &amp; Admin</h3>
+        <ul>
+          <li>Only users with <strong>scoring privilege</strong> (granted by admin) can record plays</li>
+          <li>Use <strong>↩ Undo / ↪ Redo</strong> in the scoring panel to correct mistakes</li>
+          <li>Tap a fielder on the field diagram to swap their position during a game</li>
+          <li>Admin can end a half-inning early or end a game at any time</li>
+        </ul>
+      </div>
+    </div>
   </section>
 
   <section id="view-games" class="view">
@@ -3013,14 +3104,15 @@ function liveGameHTML(g, home, away) {
         </div>
 
         <div class="field-wrap">
+          <h3 class="field-wrap-title">
+            ${isCompleted ? 'Field &amp; Bases' : escapeHtml(fieldingTeam.name) + ' in the field'}
+            ${isCompleted ? '<span class="field-wrap-hint">Click a play to replay bases</span>' : ''}
+          </h3>
           <div class="field-and-bases">
             <div class="field-panel">
-              <h3>${isCompleted ? 'Field' : escapeHtml(fieldingTeam.name) + ' in the field'}</h3>
               <div id="field-container"></div>
             </div>
             <div class="bases-panel">
-              <h3>On base</h3>
-              ${isCompleted ? '<div class="help-text" style="margin-bottom:6px;font-size:11px">Click a play.</div>' : ''}
               <div id="bases-container"></div>
             </div>
           </div>
