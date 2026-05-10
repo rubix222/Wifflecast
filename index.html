@@ -2911,8 +2911,48 @@ async function startGame(gameId) {
    ============================================================ */
 let LiveGameId = null;
 let _selectedPlayTs = null;
+const _undoStack = [];
+const _redoStack = [];
+
+const _SNAPSHOT_KEYS = [
+  'bases','outs','balls','strikes','fouls',
+  'score','lineScore','events',
+  'awayBatterIdx','homeBatterIdx',
+  'currentInning','currentHalf','status','runnerCounter'
+];
+
+function captureSnapshot(g) {
+  return _SNAPSHOT_KEYS.reduce((s, k) => {
+    s[k] = JSON.parse(JSON.stringify(g[k] ?? null));
+    return s;
+  }, {});
+}
+
+async function undoPlay() {
+  if (!_undoStack.length) { toast('Nothing to undo', 'error'); return; }
+  const g = State.getGame(LiveGameId); if (!g) return;
+  const snap = _undoStack.pop();
+  _redoStack.push(captureSnapshot(g));
+  await State.updateGame(g.id, snap);
+  renderLiveGame(g.id);
+  toast('Undone');
+}
+
+async function redoPlay() {
+  if (!_redoStack.length) { toast('Nothing to redo', 'error'); return; }
+  const g = State.getGame(LiveGameId); if (!g) return;
+  const snap = _redoStack.pop();
+  _undoStack.push(captureSnapshot(g));
+  await State.updateGame(g.id, snap);
+  renderLiveGame(g.id);
+  toast('Redone');
+}
 
 function renderLiveGame(gameId) {
+  if (gameId !== LiveGameId) {
+    _undoStack.length = 0;
+    _redoStack.length = 0;
+  }
   LiveGameId = gameId;
   _selectedPlayTs = null;
   const g = State.getGame(gameId);
@@ -3026,6 +3066,8 @@ function liveGameHTML(g, home, away) {
 
         ${isCompleted ? '' : `
         <div class="game-controls">
+          <button class="btn btn-sm" onclick="undoPlay()" ${_undoStack.length ? '' : 'disabled'}>↩ Undo</button>
+          <button class="btn btn-sm" onclick="redoPlay()" ${_redoStack.length ? '' : 'disabled'}>↪ Redo</button>
           <button class="btn btn-warning" onclick="endHalfInning('${g.id}')">End half early</button>
           <button class="btn btn-danger" onclick="endGameEarly('${g.id}')">End game</button>
         </div>`}
@@ -3419,6 +3461,8 @@ async function handlePitch(kind) {
   const g = State.getGame(LiveGameId); if (!g) return;
   if (g.status === 'completed') return;
   if (!canUserScore()) { toast('You need scoring privilege to record plays', 'error'); return; }
+  _undoStack.push(captureSnapshot(g));
+  _redoStack.length = 0;
 
   if (kind === 'ball') {
     g.balls++;
@@ -3657,6 +3701,8 @@ async function confirmLocation() {
   if (!__pendingPlay || !__pendingPlay.location) return;
   const needFielder = __pendingPlay.kind === 'out' || __pendingPlay.kind === 'error';
   if (needFielder && !__pendingPlay.fielderId) return;
+  const gSnap = State.getGame(LiveGameId);
+  if (gSnap) { _undoStack.push(captureSnapshot(gSnap)); _redoStack.length = 0; }
   const { kind, detail, fielderId, location } = __pendingPlay;
   __pendingPlay = null;
   __fieldClickMode = null;
