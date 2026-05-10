@@ -588,28 +588,22 @@
   .badge-invited { background:#fef3c7; color:#92400e; }
   .badge-linked { background:#d1fae5; color:#065f46; }
 
-  /* ---------- Admin mode toggle ---------- */
-  .admin-mode-toggle {
-    display: flex;
-    align-items: center;
-    background: rgba(255,255,255,0.12);
-    border-radius: 20px;
-    padding: 2px;
-    gap: 0;
+  /* ---------- Admin panel ---------- */
+  .admin-panel-section {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
   }
-  .admin-mode-toggle button {
-    padding: 3px 10px;
-    border-radius: 16px;
-    border: none;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    background: transparent;
-    color: rgba(255,255,255,0.65);
-    transition: background 0.15s, color 0.15s;
-    white-space: nowrap;
+  .admin-panel-heading {
+    margin: 0 0 16px 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: #374151;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #f3f4f6;
   }
-  .admin-mode-toggle button.active { background: #facc15; color: #14532d; }
 
   /* ---------- Players sub-nav ---------- */
   .players-subnav {
@@ -1435,13 +1429,6 @@
   </h1>
   <div class="storage-controls">
     <span id="storage-status" class="storage-status connected">☁️ Firestore</span>
-    <button id="btn-export" class="btn btn-sm">Export</button>
-    <button id="btn-import" class="btn btn-sm">Import</button>
-    <input type="file" id="import-file" accept="application/json" hidden />
-    <div id="admin-mode-toggle" class="admin-mode-toggle" style="display:none">
-      <button id="btn-admin-mode" onclick="setAdminMode(true)">👑 Admin</button>
-      <button id="btn-user-mode" onclick="setAdminMode(false)">👤 User</button>
-    </div>
     <span id="auth-user-name" style="display:none;font-size:13px;color:#fef9c3;font-weight:600"></span>
     <button id="btn-sign-in" class="btn btn-sm">Sign In</button>
     <button id="btn-sign-out" class="btn btn-sm" style="display:none">Sign Out</button>
@@ -1454,7 +1441,7 @@
   <button class="tab-btn" data-view="games">Games</button>
   <button class="tab-btn" data-view="tournaments">Tournaments</button>
   <button class="tab-btn" data-view="gamestream">Gamestream</button>
-  <button class="tab-btn admin-only-tab" data-view="users" style="display:none">Users</button>
+  <button class="tab-btn admin-only-tab" data-view="admin" style="display:none">Admin</button>
   <button class="tab-btn" data-view="rules">Rules</button>
 </nav>
 
@@ -1513,11 +1500,23 @@
     <div id="gamestream-container"></div>
   </section>
 
-  <section id="view-users" class="view">
+  <section id="view-admin" class="view">
     <div class="toolbar">
-      <h2>Users</h2>
+      <h2>Admin</h2>
     </div>
-    <div id="users-container"></div>
+    <div class="admin-panel-section">
+      <h3 class="admin-panel-heading">Users</h3>
+      <div id="users-container"></div>
+    </div>
+    <div class="admin-panel-section">
+      <h3 class="admin-panel-heading">Data Management</h3>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button id="btn-export" class="btn">⬇ Export JSON</button>
+        <button id="btn-import" class="btn">⬆ Import JSON</button>
+        <input type="file" id="import-file" accept="application/json" hidden />
+      </div>
+      <p class="help-text" style="margin-top:10px">Export saves all players, teams, games, and tournaments to a JSON file. Import replaces all current data.</p>
+    </div>
   </section>
 
   <section id="view-rules" class="view">
@@ -1721,7 +1720,7 @@ const Storage = {
 
       fs.onSnapshot(fs.collection(fs.db, 'users'), snap => {
         State.users = snap.docs.map(d => d.data());
-        if (isAdminMode()) Render.users && Render.users();
+        if (isAdmin()) Render.users && Render.users();
         // Refresh currentUserProfile in case canScore was changed
         if (currentUser) {
           currentUserProfile = State.getUser(currentUser.uid) || currentUserProfile;
@@ -2209,14 +2208,6 @@ let currentUserProfile = null;
 function isAdmin() { return currentUser?.email === ADMIN_EMAIL; }
 function canUserScore() { return isAdmin() || (currentUser && currentUserProfile?.canScore); }
 
-// Admin can toggle between full Admin Mode and normal User Mode
-let adminMode = true;
-function isAdminMode() { return isAdmin() && adminMode; }
-function setAdminMode(val) {
-  adminMode = val;
-  updateAuthUI();
-  Render.players();
-}
 
 // Player view state
 let selectedPlayerId = null;
@@ -2332,45 +2323,30 @@ async function submitMyPlayer(e) {
 }
 
 function updateAuthUI() {
-  const btnIn    = $('#btn-sign-in');
-  const btnOut   = $('#btn-sign-out');
-  const nameEl   = $('#auth-user-name');
-  const modeWrap = $('#admin-mode-toggle');
-  const addTeam  = $('#btn-add-team');
-  const addGame  = $('#btn-add-game');
+  const btnIn  = $('#btn-sign-in');
+  const btnOut = $('#btn-sign-out');
+  const nameEl = $('#auth-user-name');
   if (!btnIn) return;
 
   if (currentUser) {
     btnIn.style.display  = 'none';
     btnOut.style.display = '';
     nameEl.style.display = '';
-    const name = currentUserProfile?.name || currentUser.email.split('@')[0];
-    nameEl.textContent = name;
+    nameEl.textContent = currentUserProfile?.name || currentUser.email.split('@')[0];
   } else {
     btnIn.style.display  = '';
     btnOut.style.display = 'none';
     nameEl.style.display = 'none';
   }
 
-  // Admin mode toggle — only visible when admin is signed in
-  if (modeWrap) {
-    modeWrap.style.display = isAdmin() ? '' : 'none';
-    $('#btn-admin-mode')?.classList.toggle('active', adminMode);
-    $('#btn-user-mode')?.classList.toggle('active', !adminMode);
-  }
+  // Add-team / add-game buttons — admin only
+  const addTeam = $('#btn-add-team');
+  const addGame = $('#btn-add-game');
+  if (addTeam) addTeam.style.display = isAdmin() ? '' : 'none';
+  if (addGame) addGame.style.display = isAdmin() ? '' : 'none';
 
-  // Teams & Games add buttons — admin mode only
-  if (addTeam) addTeam.style.display = isAdminMode() ? '' : 'none';
-  if (addGame) addGame.style.display = isAdminMode() ? '' : 'none';
-
-  // Import/export — admin mode only
-  const btnExport = $('#btn-export');
-  const btnImport = $('#btn-import');
-  if (btnExport) btnExport.style.display = isAdminMode() ? '' : 'none';
-  if (btnImport) btnImport.style.display = isAdminMode() ? '' : 'none';
-
-  // Users tab — admin mode only
-  $$('.admin-only-tab').forEach(t => { t.style.display = isAdminMode() ? '' : 'none'; });
+  // Admin tab — admin only
+  $$('.admin-only-tab').forEach(t => { t.style.display = isAdmin() ? '' : 'none'; });
 }
 
 async function createOrLinkUserProfile(user, playerId, name) {
@@ -2510,7 +2486,7 @@ function selectGamestream(id) {
 }
 
 function showLinkPlayerModal(uid) {
-  if (!isAdminMode()) return;
+  if (!isAdmin()) return;
   const user = State.getUser(uid); if (!user) return;
   const currentPlayer = user.playerId ? State.getPlayer(user.playerId) : null;
   const sorted = [...State.players].sort((a, b) => a.name.localeCompare(b.name));
@@ -2538,7 +2514,7 @@ function showLinkPlayerModal(uid) {
 }
 
 async function submitLinkPlayer(uid) {
-  if (!isAdminMode()) return;
+  if (!isAdmin()) return;
   const user = State.getUser(uid); if (!user) return;
   const newPlayerId = document.getElementById('link-player-select')?.value || null;
   const oldPlayerId = user.playerId || null;
@@ -2583,7 +2559,7 @@ const Render = {
 
   tournaments() {
     const btnAdd = $('#btn-add-tournament');
-    if (btnAdd) btnAdd.style.display = isAdminMode() ? '' : 'none';
+    if (btnAdd) btnAdd.style.display = isAdmin() ? '' : 'none';
     const listEl = $('#tournaments-list'); if (!listEl) return;
     const sorted = [...State.tournaments].sort((a, b) => b.createdAt - a.createdAt);
     if (!sorted.length) {
@@ -2688,7 +2664,7 @@ const Render = {
 
   users() {
     const c = $('#users-container'); if (!c) return;
-    if (!isAdminMode()) { c.innerHTML = ''; return; }
+    if (!isAdmin()) { c.innerHTML = ''; return; }
     if (!State.users.length) {
       c.innerHTML = '<div class="empty-state"><h3>No registered users yet</h3><p>Users appear here after they create an account.</p></div>';
       return;
@@ -2822,7 +2798,7 @@ const Render = {
     // Toolbar buttons
     if (toolbar) {
       let btns = '';
-      if (isAdminMode()) {
+      if (isAdmin()) {
         btns = '<button class="btn btn-primary" onclick="showPlayerModal()">+ Add Player</button>';
       } else if (currentUser && !currentUserProfile?.playerId) {
         btns = '<button class="btn btn-primary" onclick="showCreateMyPlayerModal()">+ Create My Player</button>';
@@ -2867,8 +2843,8 @@ const Render = {
           ? '<span class="badge badge-linked">Linked</span>'
           : sel.invitePending ? '<span class="badge badge-invited">Invited</span>'
           : '<span class="badge badge-guest">Guest</span>';
-        const canEdit = isAdminMode() || (currentUser && sel.userId === currentUser.uid);
-        const actions = isAdminMode()
+        const canEdit = isAdmin() || (currentUser && sel.userId === currentUser.uid);
+        const actions = isAdmin()
           ? `<button class="btn-icon" title="Edit" onclick="showPlayerModal('${sel.id}')">✎</button>
              ${!sel.userId ? `<button class="btn-icon" title="Invite" onclick="invitePlayer('${sel.id}')">✉</button>` : ''}
              <button class="btn-icon" title="Delete" onclick="deletePlayer('${sel.id}')">🗑</button>`
@@ -3031,7 +3007,7 @@ const Render = {
     if (!c) return;
     const toolbar = $('#stats-toolbar-right');
     if (toolbar && statsMainView === 'teams') {
-      toolbar.innerHTML = isAdminMode() ? '<button class="btn btn-primary" onclick="showTeamModal()">+ Add Team</button>' : '';
+      toolbar.innerHTML = isAdmin() ? '<button class="btn btn-primary" onclick="showTeamModal()">+ Add Team</button>' : '';
     }
 
     if (!State.teams.length) {
@@ -3039,7 +3015,7 @@ const Render = {
       c.innerHTML = `<div class="empty-state">
         <h3>No teams yet</h3>
         <p>${hasPlayers ? 'Group your players into teams.' : 'Add at least 2 players first, then create a team.'}</p>
-        ${hasPlayers && isAdminMode() ? '<button class="btn btn-primary" onclick="showTeamModal()">+ Add Team</button>' : ''}
+        ${hasPlayers && isAdmin() ? '<button class="btn btn-primary" onclick="showTeamModal()">+ Add Team</button>' : ''}
       </div>`;
       return;
     }
@@ -3155,7 +3131,7 @@ const Render = {
       const bat = State.computeTeamBattingStats(sel.id);
       const pit = State.computeTeamPitchingStats(sel.id);
       const players = sel.playerIds.map(id => State.getPlayer(id)).filter(Boolean);
-      const actions = isAdminMode()
+      const actions = isAdmin()
         ? `<button class="btn-icon" title="Edit" onclick="showTeamModal('${sel.id}')">✎</button>
            <button class="btn-icon" title="Delete" onclick="deleteTeam('${sel.id}')">🗑</button>`
         : '';
@@ -3230,7 +3206,7 @@ const Render = {
       const hasTwoTeams = State.teams.length >= 2;
       listEl.innerHTML = `<div style="padding:16px;color:#6b7280;font-size:13px">
         ${hasTwoTeams ? 'No games yet.' : 'Create at least 2 teams first.'}
-        ${hasTwoTeams && isAdminMode() ? '<br><br><button class="btn btn-primary btn-sm" onclick="showNewGameModal()">+ New Game</button>' : ''}
+        ${hasTwoTeams && isAdmin() ? '<br><br><button class="btn btn-primary btn-sm" onclick="showNewGameModal()">+ New Game</button>' : ''}
       </div>`;
       return;
     }
@@ -3254,7 +3230,7 @@ const Render = {
           </div>
           <div style="font-weight:600;font-size:13px;margin-top:3px">${escapeHtml(away?.name||'?')} @ ${escapeHtml(home?.name||'?')}</div>
           ${showScore ? `<div style="font-size:12px;color:#6b7280">${g.score.away} — ${g.score.home}</div>` : ''}
-          ${isAdminMode() ? `<button class="btn-icon" style="float:right;margin-top:-18px" title="Delete" onclick="event.stopPropagation();deleteGame('${g.id}')">🗑</button>` : ''}
+          ${isAdmin() ? `<button class="btn-icon" style="float:right;margin-top:-18px" title="Delete" onclick="event.stopPropagation();deleteGame('${g.id}')">🗑</button>` : ''}
         </div>
       </div>`;
     }).join('');
@@ -3324,7 +3300,7 @@ async function submitPlayer(e, id) {
   toast(id ? 'Player updated' : 'Player added', 'success');
 }
 async function deleteUser(uid) {
-  if (!isAdminMode()) return;
+  if (!isAdmin()) return;
   if (uid === currentUser?.uid) { toast('Cannot delete your own account', 'error'); return; }
   if (!confirm('Delete this user? Their player profile (if any) will remain.')) return;
   try {
@@ -3538,7 +3514,7 @@ function renderTournamentDetail(id) {
       </div>`;
     } else if (!champGame) {
       const top2 = standings.slice(0, 2);
-      const canGenerate = isAdminMode() && top2.length === 2;
+      const canGenerate = isAdmin() && top2.length === 2;
       champSection = `<div class="champ-bracket champ-pending">
         <div class="champ-bracket-label">🏆 Championship</div>
         <div class="champ-finalists">
@@ -3584,7 +3560,7 @@ function renderTournamentDetail(id) {
           <h3 style="margin:0 0 2px">${escapeHtml(t.name)}</h3>
           <span class="tourn-format-badge">${isPlayoff ? 'Round Robin + Finals' : 'Round Robin'}</span>
         </div>
-        ${isAdminMode() ? `<div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${isAdmin() ? `<div style="display:flex;gap:8px;flex-wrap:wrap">
           ${rrPairsLeft > 0 ? `<button class="btn btn-sm btn-primary" onclick="generateTournamentGames('${id}')">⚙ Generate ${rrPairsLeft} RR game${rrPairsLeft>1?'s':''}</button>` : ''}
           <button class="btn btn-sm btn-danger" onclick="deleteTournamentUI('${id}')">Delete</button>
         </div>` : ''}
@@ -3935,7 +3911,7 @@ function liveGameHTML(g, home, away) {
   const inningStr = (g.currentHalf === 'top' ? '▲ Top ' : '▼ Bot ') + g.currentInning;
   const isCompleted = g.status === 'completed';
 
-  const adminEditBar = isCompleted && isAdminMode() ? `
+  const adminEditBar = isCompleted && isAdmin() ? `
     <div class="admin-edit-bar">
       <span class="admin-edit-label">Admin</span>
       <button class="btn btn-sm" onclick="showEditScoreModal('${g.id}')">✏️ Edit Score</button>
@@ -4139,7 +4115,7 @@ function renderPlayLog(g) {
     const batter = State.getPlayer(e.batterId);
     const desc = describeOutcome(e);
     const handler = isCompleted ? `data-ts="${e.ts}" onclick="selectPlay(${e.ts})"` : '';
-    const scorerTag = isAdminMode() && e.scoredByName ? ` <span class="play-scorer" title="Scored by ${escapeHtml(e.scoredByName)}">✎${escapeHtml(e.scoredByName)}</span>` : '';
+    const scorerTag = isAdmin() && e.scoredByName ? ` <span class="play-scorer" title="Scored by ${escapeHtml(e.scoredByName)}">✎${escapeHtml(e.scoredByName)}</span>` : '';
     parts.push(`<li class="play-entry${isCompleted ? ' clickable' : ''}" ${handler}><span class="play-meta">${e.half === 'top' ? 'T' : 'B'}${e.inning}</span> ${escapeHtml(batter?.name || '?')} — ${desc}${scorerTag}</li>`);
   });
   return parts.join('');
@@ -5273,9 +5249,15 @@ $('#btn-add-tournament').addEventListener('click', () => showNewTournamentModal(
 
 $('#btn-sign-in').addEventListener('click', () => showAuthModal('signin'));
 $('#btn-sign-out').addEventListener('click', () => signOutUser());
-$('#btn-export').addEventListener('click', () => Storage.exportJson());
-$('#btn-import').addEventListener('click', () => $('#import-file').click());
-$('#import-file').addEventListener('change', async (e) => {
+
+// Export / import live in the Admin tab — attach via event delegation so they
+// work regardless of when the admin tab is first rendered.
+document.addEventListener('click', e => {
+  if (e.target.id === 'btn-export') Storage.exportJson();
+  if (e.target.id === 'btn-import') $('#import-file')?.click();
+});
+document.addEventListener('change', async e => {
+  if (e.target.id !== 'import-file') return;
   const f = e.target.files[0]; if (!f) return;
   if (!confirm('Importing will replace your current data. Continue?')) { e.target.value = ''; return; }
   try { await Storage.importJson(f); }
@@ -5383,7 +5365,7 @@ Object.assign(window, {
   showBipOutTypeModal, showBipHitModal, showBipErrorModal,
   askLocation, cancelLocation, confirmLocation, finishHit,
   // Admin mode + player view
-  setAdminMode, setPlayersView, selectPlayer, setPlayerDetailTab,
+  setPlayersView, selectPlayer, setPlayerDetailTab,
   setStatsMain, setTeamsView, sortTeamStats,
   selectTeam, setTeamDetailTab,
   switchTab,
