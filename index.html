@@ -2509,6 +2509,67 @@ function selectGamestream(id) {
   Render.gamestream();
 }
 
+function showLinkPlayerModal(uid) {
+  if (!isAdminMode()) return;
+  const user = State.getUser(uid); if (!user) return;
+  const currentPlayer = user.playerId ? State.getPlayer(user.playerId) : null;
+  const sorted = [...State.players].sort((a, b) => a.name.localeCompare(b.name));
+  const opts = sorted.map(p => {
+    const taken = p.userId && p.userId !== uid ? ' (linked to another user)' : '';
+    return `<option value="${p.id}" ${p.id === user.playerId ? 'selected' : ''}>${escapeHtml(p.name)}${taken ? escapeHtml(taken) : ''}</option>`;
+  }).join('');
+  Modal.show(`
+    <div class="modal-header">
+      <h3>Link Player — ${escapeHtml(user.name || user.email || uid)}</h3>
+      <button class="btn-icon" onclick="Modal.hide()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="help-text" style="margin-bottom:12px">Select the player profile to link to this account. This lets the user edit their player and see their personal stats on the Home tab.</p>
+      <label class="form-label">Player</label>
+      <select id="link-player-select" class="form-input">
+        <option value="">— none —</option>
+        ${opts}
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="Modal.hide()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitLinkPlayer('${uid}')">Save</button>
+    </div>`);
+}
+
+async function submitLinkPlayer(uid) {
+  if (!isAdminMode()) return;
+  const user = State.getUser(uid); if (!user) return;
+  const newPlayerId = document.getElementById('link-player-select')?.value || null;
+  const oldPlayerId = user.playerId || null;
+  if (newPlayerId === oldPlayerId) { Modal.hide(); return; }
+
+  // Clear old player's userId if it was set to this user
+  if (oldPlayerId) {
+    const oldP = State.getPlayer(oldPlayerId);
+    if (oldP && oldP.userId === uid) {
+      oldP.userId = null;
+      oldP.invitePending = false;
+      await Storage.savePlayer(oldP);
+    }
+  }
+
+  // Link new player
+  if (newPlayerId) {
+    const newP = State.getPlayer(newPlayerId);
+    if (newP) {
+      newP.userId = uid;
+      newP.invitePending = false;
+      await Storage.savePlayer(newP);
+    }
+  }
+
+  const updated = { ...user, playerId: newPlayerId || null };
+  await Storage.saveUser(updated);
+  Modal.hide();
+  toast('Player link updated', 'success');
+}
+
 async function toggleCanScore(uid) {
   const user = State.getUser(uid);
   if (!user) return;
@@ -2637,7 +2698,10 @@ const Render = {
       return `<tr>
         <td>${escapeHtml(u.name || '—')}</td>
         <td><span class="muted small">${escapeHtml(u.email || u.uid)}</span></td>
-        <td>${player ? escapeHtml(player.name) : '<span class="muted">—</span>'}</td>
+        <td>
+          <span style="margin-right:6px">${player ? escapeHtml(player.name) : '<span class="muted">—</span>'}</span>
+          <button class="btn-icon" title="${player ? 'Change linked player' : 'Link a player'}" onclick="showLinkPlayerModal('${u.uid}')">✎</button>
+        </td>
         <td>
           <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
             <input type="checkbox" ${u.canScore ? 'checked' : ''} onchange="toggleCanScore('${u.uid}')" />
@@ -5304,7 +5368,7 @@ Object.assign(window, {
   Modal, Render, State,
   showAuthModal, submitAuth, signOutUser, invitePlayer,
   showPlayerModal, deletePlayer, deleteUser, showTeamModal, deleteTeam,
-  toggleCanScore, selectGamestream,
+  toggleCanScore, showLinkPlayerModal, submitLinkPlayer, selectGamestream,
   showNewGameModal, openGame, selectGame, deselectGame, deleteGame,
   submitPlayer, submitTeam, submitNewGame,
   startGame, setPosition, moveBatter,
