@@ -640,7 +640,33 @@
     gap: 14px;
     align-items: start;
   }
-  @media (max-width: 600px) { .player-split { grid-template-columns: 1fr; } }
+  @media (max-width: 600px) {
+    .player-split, .games-split { grid-template-columns: 1fr; }
+    main { padding: 12px; }
+    .toolbar { flex-wrap: wrap; gap: 8px; }
+    .modal-backdrop .modal { margin: 0 8px; }
+    .field-and-bases { flex-direction: column; }
+    .bases-panel { flex: none; width: 100%; }
+    .count-row { gap: 8px; }
+    .count-block { min-width: 44px; }
+    .pitch-buttons button { padding: 12px 8px; font-size: 13px; }
+    .at-bat-card { padding: 12px; }
+    .scoreboard { gap: 8px; }
+    .scoreboard .score { font-size: 32px; }
+    .player-detail-panel { max-height: none; }
+    .games-detail-panel { max-height: none; }
+  }
+  @media (max-width: 480px) {
+    header { padding: 10px 14px; }
+    header h1 { font-size: 18px; }
+    .storage-controls { gap: 6px; font-size: 12px; }
+    nav.tabs button { padding: 10px 14px; font-size: 13px; }
+    .stat-row-lg { gap: 6px; }
+    .stat-lg { min-width: 44px; }
+    .live-game { padding: 10px; gap: 10px; }
+    .detail-player-name { font-size: 17px; }
+    .outcome-grid { grid-template-columns: 1fr 1fr; }
+  }
 
   .player-list-panel {
     background: #fff;
@@ -912,6 +938,7 @@
     color: #374151;
   }
   .play-log li:last-child { border-bottom: none; }
+  .play-scorer { font-size: 10px; color: #9ca3af; margin-left: 6px; font-style: italic; }
   .play-log .play-meta {
     font-size: 11px;
     color: #6b7280;
@@ -1016,6 +1043,59 @@
     margin-bottom: 14px;
   }
 
+  /* ---------- Gamestream ---------- */
+  .gs-layout { display: grid; grid-template-columns: 1fr 140px 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 700px) { .gs-layout { grid-template-columns: 1fr; } }
+
+  .gs-scoreboard {
+    display: flex; align-items: center; gap: 0;
+    background: #14532d; border-radius: 12px; overflow: hidden;
+    margin-bottom: 0;
+  }
+  .gs-team { flex: 1; padding: 16px 12px; text-align: center; }
+  .gs-team.gs-batting { background: rgba(250,204,21,0.15); }
+  .gs-team-name { font-size: 13px; font-weight: 700; color: #d1fae5; }
+  .gs-team-score { font-size: 42px; font-weight: 800; color: #fff; line-height: 1; }
+  .gs-middle { padding: 12px 8px; text-align: center; border-left: 1px solid rgba(255,255,255,0.1); border-right: 1px solid rgba(255,255,255,0.1); min-width: 64px; }
+  .gs-inning-display { font-size: 14px; font-weight: 700; color: #fef9c3; }
+  .gs-outs-display { font-size: 16px; color: #d1fae5; margin: 2px 0; }
+  .gs-count-display { font-size: 12px; color: #86efac; }
+
+  .gs-diamond-wrap { text-align: center; }
+  .gs-diamond { display: inline-grid; grid-template-rows: repeat(3, 28px); gap: 2px; transform: rotate(0deg); margin: 12px auto; }
+  .gs-diamond-row { display: flex; justify-content: center; gap: 40px; align-items: center; }
+  .gs-diamond-top, .gs-diamond-bot { gap: 0; }
+  .gs-base-dot { width: 22px; height: 22px; border-radius: 3px; background: #e5e7eb; border: 2px solid #9ca3af; transform: rotate(45deg); }
+  .gs-base-dot.gs-base-occupied { background: #facc15; border-color: #d97706; box-shadow: 0 0 8px rgba(250,204,21,0.6); }
+  .gs-at-bat { font-size: 12px; color: #6b7280; margin-top: 4px; }
+
+  .gs-feed { display: flex; flex-direction: column; gap: 10px; }
+  .gs-no-plays { color: #9ca3af; font-size: 13px; text-align: center; padding: 20px; }
+  .gs-latest-play {
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+    padding: 14px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .gs-animate-in { animation: gsSlideIn 0.4s ease-out; }
+  @keyframes gsSlideIn {
+    from { opacity: 0; transform: translateY(-16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .gs-play-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .gs-inning-badge { font-size: 11px; font-weight: 700; color: #6b7280; background: #f3f4f6; padding: 2px 7px; border-radius: 10px; }
+  .gs-badge { font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.4px; }
+  .gs-badge-good { background: #d1fae5; color: #065f46; }
+  .gs-badge-bad  { background: #fee2e2; color: #991b1b; }
+  .gs-badge-neutral { background: #f3f4f6; color: #374151; }
+  .gs-play-batter { font-size: 18px; font-weight: 700; color: #111827; }
+  .gs-play-desc { font-size: 13px; color: #374151; margin-top: 2px; }
+  .gs-play-scorer { font-size: 11px; color: #9ca3af; margin-top: 4px; font-style: italic; }
+
+  .gs-feed-log { display: flex; flex-direction: column; gap: 4px; }
+  .gs-feed-item { display: flex; gap: 8px; align-items: baseline; font-size: 12px; padding: 4px 0; border-bottom: 1px solid #f3f4f6; }
+  .gs-feed-half { color: #9ca3af; font-size: 11px; flex-shrink: 0; width: 28px; }
+  .gs-feed-batter { font-weight: 600; color: #111827; flex-shrink: 0; }
+  .gs-feed-desc { color: #6b7280; }
+
   /* ---------- Accolades ---------- */
   .accolades-section { margin-bottom: 14px; }
   .accolades-section h3 { font-size: 13px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 8px; }
@@ -1093,6 +1173,8 @@
   <button class="tab-btn active" data-view="players">Players</button>
   <button class="tab-btn" data-view="teams">Teams</button>
   <button class="tab-btn" data-view="games">Games</button>
+  <button class="tab-btn" data-view="gamestream">Gamestream</button>
+  <button class="tab-btn admin-only-tab" data-view="users" style="display:none">Users</button>
 </nav>
 
 <main>
@@ -1115,6 +1197,23 @@
       <button id="btn-add-team" class="btn btn-primary" style="display:none">+ Add Team</button>
     </div>
     <div id="teams-container"></div>
+  </section>
+
+  <section id="view-gamestream" class="view">
+    <div class="toolbar">
+      <h2>Gamestream</h2>
+      <select id="gs-game-select" class="btn btn-sm" onchange="selectGamestream(this.value)" style="padding:6px 10px">
+        <option value="">— select a game —</option>
+      </select>
+    </div>
+    <div id="gamestream-container"></div>
+  </section>
+
+  <section id="view-users" class="view">
+    <div class="toolbar">
+      <h2>Users</h2>
+    </div>
+    <div id="users-container"></div>
   </section>
 
   <section id="view-games" class="view">
@@ -1199,14 +1298,16 @@ const Storage = {
 
   async loadAll() {
     const fs = window._fs;
-    const [ps, ts, gs] = await Promise.all([
+    const [ps, ts, gs, us] = await Promise.all([
       fs.getDocs(fs.collection(fs.db, 'players')),
       fs.getDocs(fs.collection(fs.db, 'teams')),
       fs.getDocs(fs.collection(fs.db, 'games')),
+      fs.getDocs(fs.collection(fs.db, 'users')),
     ]);
     State.players = ps.docs.map(d => d.data());
     State.teams   = ts.docs.map(d => d.data());
     State.games   = gs.docs.map(d => d.data());
+    State.users   = us.docs.map(d => d.data());
   },
 
   unsubAll() {
@@ -1240,7 +1341,17 @@ const Storage = {
         });
         Render.games();
         if (LiveGameId && $('#live-game-root')) rerenderLive();
-      }, err => console.warn('games listener:', err.message))
+        Render.gamestream && Render.gamestream();
+      }, err => console.warn('games listener:', err.message)),
+
+      fs.onSnapshot(fs.collection(fs.db, 'users'), snap => {
+        State.users = snap.docs.map(d => d.data());
+        if (isAdminMode()) Render.users && Render.users();
+        // Refresh currentUserProfile in case canScore was changed
+        if (currentUser) {
+          currentUserProfile = State.getUser(currentUser.uid) || currentUserProfile;
+        }
+      }, err => console.warn('users listener:', err.message))
     );
   },
 
@@ -1309,8 +1420,10 @@ const State = {
   players: [],
   teams: [],
   games: [],
+  users: [],   // registered user profiles (admin-visible)
 
   snapshot() { return { players: this.players, teams: this.teams, games: this.games }; },
+  getUser(uid) { return this.users.find(u => u.uid === uid) || null; },
 
   getPlayer(id) { return this.players.find(p => p.id === id); },
   getTeam(id)   { return this.teams.find(t => t.id === id); },
@@ -1661,6 +1774,7 @@ const ADMIN_EMAIL = 'rubix222@gmail.com';
 let currentUser = null;
 let currentUserProfile = null;
 function isAdmin() { return currentUser?.email === ADMIN_EMAIL; }
+function canUserScore() { return isAdmin() || (currentUser && currentUserProfile?.canScore); }
 
 // Admin can toggle between full Admin Mode and normal User Mode
 let adminMode = true;
@@ -1796,6 +1910,9 @@ function updateAuthUI() {
   const btnImport = $('#btn-import');
   if (btnExport) btnExport.style.display = isAdminMode() ? '' : 'none';
   if (btnImport) btnImport.style.display = isAdminMode() ? '' : 'none';
+
+  // Users tab — admin mode only
+  $$('.admin-only-tab').forEach(t => { t.style.display = isAdminMode() ? '' : 'none'; });
 }
 
 async function createOrLinkUserProfile(user, playerId, name) {
@@ -1936,8 +2053,150 @@ async function handleEmailLinkSignIn() {
   }
 }
 
+let gamestreamGameId = null;
+let gamestreamLastEventCount = 0;
+
+function selectGamestream(id) {
+  gamestreamGameId = id || null;
+  gamestreamLastEventCount = 0;
+  Render.gamestream();
+}
+
+async function toggleCanScore(uid) {
+  const user = State.getUser(uid);
+  if (!user) return;
+  const updated = { ...user, canScore: !user.canScore };
+  await Storage.saveUser(updated);
+  toast(`${updated.name || uid}: scoring ${updated.canScore ? 'enabled' : 'disabled'}`, 'success');
+}
+
 const Render = {
-  all() { this.players(); this.teams(); this.games(); },
+  all() { this.players(); this.teams(); this.games(); this.users(); this.gamestream(); },
+
+  users() {
+    const c = $('#users-container'); if (!c) return;
+    if (!isAdminMode()) { c.innerHTML = ''; return; }
+    if (!State.users.length) {
+      c.innerHTML = '<div class="empty-state"><h3>No registered users yet</h3><p>Users appear here after they create an account.</p></div>';
+      return;
+    }
+    const rows = State.users.map(u => {
+      const player = u.playerId ? State.getPlayer(u.playerId) : null;
+      return `<tr>
+        <td>${escapeHtml(u.name || '—')}</td>
+        <td><span class="muted small">${escapeHtml(u.email || u.uid)}</span></td>
+        <td>${player ? escapeHtml(player.name) : '<span class="muted">—</span>'}</td>
+        <td>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <input type="checkbox" ${u.canScore ? 'checked' : ''} onchange="toggleCanScore('${u.uid}')" />
+            <span style="font-size:13px">${u.canScore ? 'Allowed' : 'Not allowed'}</span>
+          </label>
+        </td>
+      </tr>`;
+    }).join('');
+    c.innerHTML = `<div class="stats-table-wrap"><table class="stats-table">
+      <thead><tr><th>Name</th><th>Email/ID</th><th>Player</th><th>Can Score</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+  },
+
+  gamestream() {
+    const c = $('#gamestream-container'); if (!c) return;
+    // Populate game selector
+    const sel = $('#gs-game-select');
+    if (sel) {
+      const inProgress = State.games.filter(g => g.status === 'in_progress' || g.status === 'completed')
+        .sort((a, b) => b.createdAt - a.createdAt);
+      const opts = inProgress.map(g => {
+        const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
+        const label = `${away?.name||'?'} @ ${home?.name||'?'} (${g.status === 'in_progress' ? 'LIVE' : 'Final'})`;
+        return `<option value="${g.id}" ${g.id === gamestreamGameId ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+      }).join('');
+      sel.innerHTML = '<option value="">— select a game —</option>' + opts;
+    }
+
+    if (!gamestreamGameId) {
+      c.innerHTML = '<div class="empty-state"><h3>Select a game above to watch the feed</h3></div>';
+      return;
+    }
+    const g = State.getGame(gamestreamGameId);
+    if (!g) { c.innerHTML = '<div class="empty-state"><h3>Game not found</h3></div>'; return; }
+
+    const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
+    const events = (g.events || []).filter(e => e.type === 'pa_end');
+    const latest = events[events.length - 1];
+    const isNew = events.length > gamestreamLastEventCount && gamestreamLastEventCount > 0;
+    gamestreamLastEventCount = events.length;
+
+    const battingSide = g.currentHalf === 'top' ? 'away' : 'home';
+    const batterId = battingSide === 'away'
+      ? g.awayBattingOrder[g.awayBatterIdx % (g.awayBattingOrder?.length || 1)]
+      : g.homeBattingOrder[g.homeBatterIdx % (g.homeBattingOrder?.length || 1)];
+    const batter = batterId ? State.getPlayer(batterId) : null;
+    const isCompleted = g.status === 'completed';
+
+    const outcomeBadge = outcome => {
+      const map = { '1B':'Single','2B':'Double','3B':'Triple','HR':'Home Run','BB':'Walk','K':'Strikeout','OUT':'Out','ERR_REACH':'Error' };
+      const cls = ['BB','1B','2B','3B','HR'].includes(outcome) ? 'gs-badge-good' : ['K','OUT'].includes(outcome) ? 'gs-badge-bad' : 'gs-badge-neutral';
+      return `<span class="gs-badge ${cls}">${map[outcome] || outcome}</span>`;
+    };
+
+    const latestCard = latest ? `
+      <div class="gs-latest-play ${isNew ? 'gs-animate-in' : ''}">
+        <div class="gs-play-header">
+          <span class="gs-inning-badge">${latest.half === 'top' ? '▲' : '▼'} ${ordinal(latest.inning)}</span>
+          ${outcomeBadge(latest.outcome)}
+        </div>
+        <div class="gs-play-batter">${escapeHtml(State.getPlayer(latest.batterId)?.name || '?')}</div>
+        <div class="gs-play-desc">${describeOutcome(latest)}</div>
+        ${latest.scoredByName ? `<div class="gs-play-scorer">scored by ${escapeHtml(latest.scoredByName)}</div>` : ''}
+      </div>` : '<div class="gs-no-plays">No plays recorded yet</div>';
+
+    const recentPlays = events.slice().reverse().slice(0, 12).map(e => {
+      const b = State.getPlayer(e.batterId);
+      return `<div class="gs-feed-item">
+        <span class="gs-feed-half">${e.half === 'top' ? '▲' : '▼'}${e.inning}</span>
+        <span class="gs-feed-batter">${escapeHtml(b?.name || '?')}</span>
+        <span class="gs-feed-desc">${describeOutcome(e)}</span>
+      </div>`;
+    }).join('');
+
+    const bases = g.bases || { 1: null, 2: null, 3: null };
+    const baseDot = occ => `<div class="gs-base-dot${occ ? ' gs-base-occupied' : ''}"></div>`;
+
+    c.innerHTML = `
+      <div class="gs-layout">
+        <div class="gs-scoreboard">
+          <div class="gs-team ${battingSide==='away'&&!isCompleted?'gs-batting':''}">
+            <div class="gs-team-name">${escapeHtml(away?.name||'Away')}</div>
+            <div class="gs-team-score">${g.score?.away ?? 0}</div>
+          </div>
+          <div class="gs-middle">
+            <div class="gs-inning-display">${isCompleted ? 'FINAL' : (g.currentHalf === 'top' ? '▲' : '▼') + ' ' + g.currentInning}</div>
+            <div class="gs-outs-display">${'●'.repeat(g.outs || 0)}${'○'.repeat(Math.max(0,2-(g.outs||0)))}</div>
+            <div class="gs-count-display">${g.balls||0}-${g.strikes||0}</div>
+          </div>
+          <div class="gs-team ${battingSide==='home'&&!isCompleted?'gs-batting':''}">
+            <div class="gs-team-name">${escapeHtml(home?.name||'Home')}</div>
+            <div class="gs-team-score">${g.score?.home ?? 0}</div>
+          </div>
+        </div>
+
+        <div class="gs-diamond-wrap">
+          <div class="gs-diamond">
+            <div class="gs-diamond-row gs-diamond-top">${baseDot(!!bases[2])}</div>
+            <div class="gs-diamond-row gs-diamond-mid">${baseDot(!!bases[3])}${baseDot(!!bases[1])}</div>
+            <div class="gs-diamond-row gs-diamond-bot">${baseDot(false)}</div>
+          </div>
+          ${!isCompleted && batter ? `<div class="gs-at-bat">At bat: <strong>${escapeHtml(batter.name)}</strong></div>` : ''}
+        </div>
+
+        <div class="gs-feed">
+          ${latestCard}
+          <div class="gs-feed-log">${recentPlays}</div>
+        </div>
+      </div>`;
+  },
 
   players() {
     const c = $('#players-container');
@@ -2733,7 +2992,7 @@ function liveGameHTML(g, home, away) {
       </div>
 
       <div class="live-game-right">
-        ${isCompleted ? '' : `
+        ${isCompleted ? '' : !canUserScore() ? `<div class="help-text" style="padding:12px;text-align:center">Sign in with scoring privilege to record plays.</div>` : `
         <div class="at-bat-card">
           <h3>At bat</h3>
           ${renderBatterRow(g)}
@@ -2866,7 +3125,8 @@ function renderPlayLog(g) {
     const batter = State.getPlayer(e.batterId);
     const desc = describeOutcome(e);
     const handler = isCompleted ? `data-ts="${e.ts}" onclick="selectPlay(${e.ts})"` : '';
-    parts.push(`<li class="play-entry${isCompleted ? ' clickable' : ''}" ${handler}><span class="play-meta">${e.half === 'top' ? 'T' : 'B'}${e.inning}</span> ${escapeHtml(batter?.name || '?')} — ${desc}</li>`);
+    const scorerTag = isAdminMode() && e.scoredByName ? ` <span class="play-scorer" title="Scored by ${escapeHtml(e.scoredByName)}">✎${escapeHtml(e.scoredByName)}</span>` : '';
+    parts.push(`<li class="play-entry${isCompleted ? ' clickable' : ''}" ${handler}><span class="play-meta">${e.half === 'top' ? 'T' : 'B'}${e.inning}</span> ${escapeHtml(batter?.name || '?')} — ${desc}${scorerTag}</li>`);
   });
   return parts.join('');
 }
@@ -3028,12 +3288,7 @@ function drawField(overrideBases = null) {
   container.innerHTML = svg;
 
   const svgEl = $('#field-svg');
-  svgEl.addEventListener('click', (e) => {
-    if (!__fieldClickMode) return;
-    if (e.target.closest('.fielder')) return;
-    const pt = svgPoint(svgEl, e);
-    __fieldClickMode.onClick({ x: pt.x, y: pt.y });
-  });
+  attachSvgLocationHandlers(svgEl);
 }
 
 function drawBases(overrideBases = null) {
@@ -3082,9 +3337,22 @@ function drawBases(overrideBases = null) {
 
 function svgPoint(svg, evt) {
   const pt = svg.createSVGPoint();
-  pt.x = evt.clientX;
-  pt.y = evt.clientY;
+  const src = (evt.changedTouches || evt.touches)?.[0] || evt;
+  pt.x = src.clientX;
+  pt.y = src.clientY;
   return pt.matrixTransform(svg.getScreenCTM().inverse());
+}
+
+function attachSvgLocationHandlers(svgEl) {
+  const handle = (e) => {
+    if (!__fieldClickMode) return;
+    if (e.target.closest('.fielder')) return;
+    e.preventDefault();
+    const pt = svgPoint(svgEl, e);
+    __fieldClickMode.onClick({ x: Math.round(pt.x), y: Math.round(pt.y) });
+  };
+  svgEl.addEventListener('click', handle);
+  svgEl.addEventListener('touchend', handle, { passive: false });
 }
 
 function onFielderClick(pid, pos) {
@@ -3150,6 +3418,7 @@ function attachPitchHandlers() {
 async function handlePitch(kind) {
   const g = State.getGame(LiveGameId); if (!g) return;
   if (g.status === 'completed') return;
+  if (!canUserScore()) { toast('You need scoring privilege to record plays', 'error'); return; }
 
   if (kind === 'ball') {
     g.balls++;
@@ -3239,7 +3508,7 @@ function showBipHitModal() {
         <button onclick="askLocation('hit','1B')">Single<span class="sub">1B</span></button>
         <button onclick="askLocation('hit','2B')">Double<span class="sub">2B</span></button>
         <button onclick="askLocation('hit','3B')">Triple<span class="sub">3B</span></button>
-        <button onclick="finishHit('HR', null, null)">Home Run<span class="sub">HR</span></button>
+        <button onclick="askLocation('hr','HR')">Home Run<span class="sub">HR</span></button>
       </div>
     </div>
   `);
@@ -3270,26 +3539,36 @@ function showBipErrorModal() {
 let __pendingPlay = null;
 
 function askLocation(kind, detail) {
-  if (kind === 'hit' && detail === 'HR') { finishHit('HR', null, null); return; }
-
   __pendingPlay = { kind, detail, fielderId: null, location: null };
   const g = State.getGame(LiveGameId);
-  const fieldingPos = fieldingPositions(g);
-  const team = State.getTeam(fieldingTeamId(g));
-  const fielderButtons = team.playerIds.map(pid => {
-    const p = State.getPlayer(pid);
-    const pos = fieldingPos[pid] || 'BENCH';
-    return `<button class="btn" data-fielder="${pid}" style="margin:3px">${escapeHtml(p.name)} <span class="pill" style="margin-left:4px">${pos}</span></button>`;
-  }).join('');
+  const needFielder = kind === 'out' || kind === 'error';
+
+  let fielderSection = '';
+  if (needFielder) {
+    const fieldingPos = fieldingPositions(g);
+    const team = State.getTeam(fieldingTeamId(g));
+    const fielderButtons = team.playerIds.map(pid => {
+      const p = State.getPlayer(pid);
+      const pos = fieldingPos[pid] || 'BENCH';
+      return `<button class="btn" data-fielder="${pid}" style="margin:3px">${escapeHtml(p.name)} <span class="pill" style="margin-left:4px">${pos}</span></button>`;
+    }).join('');
+    fielderSection = `<div id="loc-fielders" class="row-flex" style="margin-bottom:10px">${fielderButtons}</div>`;
+  }
 
   const titleByKind = {
     out:   `Out — ${hitTypeLabel(detail)}`,
     hit:   ({ '1B': 'Single', '2B': 'Double', '3B': 'Triple' })[detail] || 'Hit',
+    hr:    'Home Run — mark where it left the field',
     error: `Error — batter reached ${detail}`
   };
-  const purpose = kind === 'error'
-    ? '1) Pick the fielder who committed the error.<br>2) Click the spot on the field where the ball ended up.'
-    : '1) Pick the fielder who made the play.<br>2) Click the spot on the field where the ball ended up.';
+  const purpose = kind === 'hr'
+    ? 'Touch or click the boundary where the ball left the field.'
+    : kind === 'hit'
+      ? 'Touch or drag to where the ball went.'
+      : kind === 'error'
+        ? '1) Pick the fielder who committed the error. 2) Tap the spot on the field.'
+        : '1) Pick the fielder who made the play. 2) Tap the spot on the field.';
+  const initStatus = needFielder ? 'Pick a fielder, then tap the field.' : 'Tap the field to mark the location.';
 
   Modal.show(`
     <div class="modal-header">
@@ -3298,9 +3577,9 @@ function askLocation(kind, detail) {
     </div>
     <div class="modal-body">
       <p class="help-text" style="margin-bottom:10px">${purpose}</p>
-      <div id="loc-fielders" class="row-flex" style="margin-bottom:10px">${fielderButtons}</div>
+      ${fielderSection}
       <div id="loc-field-wrap"></div>
-      <div class="help-text center" id="loc-status" style="margin-top:8px">Pick a fielder, then click the field.</div>
+      <div class="help-text center" id="loc-status" style="margin-top:8px">${initStatus}</div>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="cancelLocation()">Cancel</button>
@@ -3329,11 +3608,11 @@ function askLocation(kind, detail) {
     }
   };
 
-  $$('#loc-fielders button[data-fielder]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      __fieldClickMode.onPickFielder(btn.dataset.fielder);
+  if (needFielder) {
+    $$('#loc-fielders button[data-fielder]').forEach(btn => {
+      btn.addEventListener('click', () => __fieldClickMode.onPickFielder(btn.dataset.fielder));
     });
-  });
+  }
 }
 
 function drawBallMarker(loc) {
@@ -3350,15 +3629,20 @@ function drawBallMarker(loc) {
 }
 
 function updateLocConfirm() {
-  const ok = __pendingPlay && __pendingPlay.fielderId && __pendingPlay.location;
+  if (!__pendingPlay) return;
+  const needFielder = __pendingPlay.kind === 'out' || __pendingPlay.kind === 'error';
+  const ok = __pendingPlay.location && (!needFielder || __pendingPlay.fielderId);
   $('#loc-confirm').disabled = !ok;
+  const statusEl = $('#loc-status'); if (!statusEl) return;
   if (ok) {
-    const f = State.getPlayer(__pendingPlay.fielderId);
-    $('#loc-status').textContent = `Fielder: ${f?.name || '?'} · Location set. Tap Confirm.`;
-  } else if (__pendingPlay && __pendingPlay.fielderId) {
-    $('#loc-status').textContent = 'Now click the field where the ball ended up.';
-  } else if (__pendingPlay && __pendingPlay.location) {
-    $('#loc-status').textContent = 'Now pick the fielder.';
+    const f = __pendingPlay.fielderId ? State.getPlayer(__pendingPlay.fielderId) : null;
+    statusEl.textContent = (f ? `Fielder: ${f.name} · ` : '') + 'Location set. Tap Confirm.';
+  } else if (needFielder && __pendingPlay.fielderId) {
+    statusEl.textContent = 'Now tap the field where the ball ended up.';
+  } else if (needFielder && __pendingPlay.location) {
+    statusEl.textContent = 'Now pick the fielder.';
+  } else if (!needFielder) {
+    statusEl.textContent = __pendingPlay.location ? 'Location set. Tap Confirm.' : 'Tap the field to mark the location.';
   }
 }
 
@@ -3370,12 +3654,15 @@ function cancelLocation() {
 }
 
 async function confirmLocation() {
-  if (!__pendingPlay || !__pendingPlay.fielderId || !__pendingPlay.location) return;
+  if (!__pendingPlay || !__pendingPlay.location) return;
+  const needFielder = __pendingPlay.kind === 'out' || __pendingPlay.kind === 'error';
+  if (needFielder && !__pendingPlay.fielderId) return;
   const { kind, detail, fielderId, location } = __pendingPlay;
   __pendingPlay = null;
   __fieldClickMode = null;
   if (kind === 'out')   await finishOut(detail, fielderId, location);
   if (kind === 'hit')   await finishHit(detail, fielderId, location);
+  if (kind === 'hr')    await finishHit('HR', null, location);
   if (kind === 'error') await finishError(detail, fielderId, location);
 }
 
@@ -3409,6 +3696,8 @@ async function applyPaEnd(g, ev) {
     inning, half,
     batterId,
     pitcherId,
+    scoredBy: currentUser?.uid || null,
+    scoredByName: currentUserProfile?.name || currentUser?.email?.split('@')[0] || null,
     outcome: ev.outcome,
     kType: ev.kType || null,
     hitType: ev.hitType || null,
@@ -3760,6 +4049,7 @@ Object.assign(window, {
   Modal, Render, State,
   showAuthModal, submitAuth, signOutUser, invitePlayer,
   showPlayerModal, deletePlayer, showTeamModal, deleteTeam,
+  toggleCanScore, selectGamestream,
   showNewGameModal, openGame, selectGame, deselectGame, deleteGame,
   submitPlayer, submitTeam, submitNewGame,
   startGame, setPosition, moveBatter,
