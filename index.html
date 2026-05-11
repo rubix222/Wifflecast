@@ -4129,6 +4129,8 @@ function liveGameHTML(g, home, away) {
           </div>
         </div>
 
+        ${isCompleted ? '' : !canUserScore() ? '' : `<div id="bip-panel">${renderBipPanel(g)}</div>`}
+
         <div class="line-score">
           ${renderLineScore(g, away, home)}
         </div>
@@ -4147,8 +4149,6 @@ function liveGameHTML(g, home, away) {
             <div class="count-block"><span class="label">Outs</span><span class="val" id="count-o">${g.outs}</span></div>
           </div>
         </div>
-
-        <div id="bip-panel">${renderBipPanel(g)}</div>
         `}
 
         ${isCompleted ? renderAccolades(g) : ''}
@@ -4671,7 +4671,7 @@ async function handlePitch(kind) {
 }
 
 /* ============================================================
-   INLINE BIP FLOW (replaces all BIP modals)
+   BIP FLOW — choices via modal, locate step inline on field
    ============================================================ */
 let __pendingPlay = null;
 
@@ -4681,7 +4681,21 @@ function bipStart() {
   __bipDetail = null;
   __pendingPlay = null;
   __fieldClickMode = null;
-  rerenderBipPanel();
+  Modal.show(`
+    <div class="modal-header">
+      <h3>Ball in play</h3>
+      <button class="btn-icon" onclick="bipCancel()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="outcome-grid">
+        <button onclick="bipChooseKind('out')" style="background:#fee2e2;border-color:#fca5a5;color:#991b1b">Out</button>
+        <button onclick="bipChooseKind('hit')" style="background:#dcfce7;border-color:#86efac;color:#166534">Hit</button>
+        <button onclick="bipChooseKind('error')" style="background:#fef9c3;border-color:#fde047;color:#854d0e">Error</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="bipCancel()">Cancel</button>
+    </div>`);
 }
 
 function bipChooseKind(kind) {
@@ -4689,16 +4703,45 @@ function bipChooseKind(kind) {
   if (kind === 'hr') {
     __bipDetail = 'HR';
     __bipStep = 'locate';
+    Modal.hide();
     bipEnterLocate();
-  } else {
-    __bipStep = 'subtype';
+    rerenderBipPanel();
+    return;
   }
-  rerenderBipPanel();
+  __bipStep = 'subtype';
+  const titles = { out: 'Type of out', hit: 'Hit', error: 'Error — batter reaches' };
+  const grids = {
+    out: `
+      <button onclick="bipChooseDetail('GB')">Ground ball<span class="sub">GB</span></button>
+      <button onclick="bipChooseDetail('LD')">Line drive<span class="sub">LD</span></button>
+      <button onclick="bipChooseDetail('FB')">Fly ball<span class="sub">FB</span></button>`,
+    hit: `
+      <button onclick="bipChooseDetail('1B')">Single<span class="sub">1B</span></button>
+      <button onclick="bipChooseDetail('2B')">Double<span class="sub">2B</span></button>
+      <button onclick="bipChooseKind('hr')">Home Run<span class="sub">HR</span></button>`,
+    error: `
+      <button onclick="bipChooseDetail('1B')">Single<span class="sub">1B</span></button>
+      <button onclick="bipChooseDetail('2B')">Double<span class="sub">2B</span></button>
+      <button onclick="bipChooseDetail('HR')">Home Run<span class="sub">HR</span></button>`,
+  };
+  Modal.show(`
+    <div class="modal-header">
+      <h3>${titles[kind]}</h3>
+      <button class="btn-icon" onclick="bipCancel()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="outcome-grid">${grids[kind]}</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="bipStart()">← Back</button>
+      <button class="btn" onclick="bipCancel()">Cancel</button>
+    </div>`);
 }
 
 function bipChooseDetail(detail) {
   __bipDetail = detail;
   __bipStep = 'locate';
+  Modal.hide();
   bipEnterLocate();
   rerenderBipPanel();
 }
@@ -4740,70 +4783,27 @@ function rerenderBipPanel() {
 }
 
 function renderBipPanel(g) {
-  if (!__bipStep) {
+  if (__bipStep === 'locate') {
+    const labels = { out: `Out — ${hitTypeLabel(__bipDetail)}`, hit: ({'1B':'Single','2B':'Double'})[__bipDetail]||'Hit', hr:'Home Run', error:`Error — ${({'1B':'Single','2B':'Double','HR':'Home Run'})[__bipDetail]||__bipDetail}` };
+    const needFielder = __bipKind === 'out' || __bipKind === 'error';
     return `
       <div class="at-bat-card">
-        <h3>Pitch outcome</h3>
+        <h3>${labels[__bipKind] || 'Ball in play'}</h3>
         ${renderPitcherRow(g)}
-        <div class="pitch-buttons">
-          <button data-pitch="ball">Ball</button>
-          <button data-pitch="foul">Foul</button>
-          <button data-pitch="strike_swinging">Strike (swinging)</button>
-          <button data-pitch="strike_looking">Strike (looking)</button>
-          <button data-pitch="bip" class="btn-bip">⚾ Ball in play</button>
-        </div>
+        <p class="help-text" style="margin-top:8px">${needFielder ? 'Drag a fielder to where the play happened' : __bipKind === 'hr' ? 'Tap the field where the ball left' : 'Tap the field where the ball landed'}</p>
+        <div style="margin-top:10px"><button class="btn btn-sm" onclick="bipCancel()">✕ Cancel</button></div>
       </div>`;
   }
-
-  let body = '';
-  if (__bipStep === 'choose') {
-    body = `
-      <p class="help-text" style="margin-bottom:14px">What was the result?</p>
-      <div class="outcome-grid">
-        <button onclick="bipChooseKind('out')" style="background:#fee2e2;border-color:#fca5a5;color:#991b1b">Out</button>
-        <button onclick="bipChooseKind('hit')" style="background:#dcfce7;border-color:#86efac;color:#166534">Hit</button>
-        <button onclick="bipChooseKind('error')" style="background:#fef9c3;border-color:#fde047;color:#854d0e">Error</button>
-      </div>`;
-  } else if (__bipStep === 'subtype') {
-    if (__bipKind === 'out') {
-      body = `
-        <p class="help-text" style="margin-bottom:14px">Type of out</p>
-        <div class="outcome-grid">
-          <button onclick="bipChooseDetail('GB')">Ground ball<span class="sub">GB</span></button>
-          <button onclick="bipChooseDetail('LD')">Line drive<span class="sub">LD</span></button>
-          <button onclick="bipChooseDetail('FB')">Fly ball<span class="sub">FB</span></button>
-        </div>`;
-    } else if (__bipKind === 'hit') {
-      body = `
-        <p class="help-text" style="margin-bottom:14px">Hit type</p>
-        <div class="outcome-grid">
-          <button onclick="bipChooseDetail('1B')">Single<span class="sub">1B</span></button>
-          <button onclick="bipChooseDetail('2B')">Double<span class="sub">2B</span></button>
-          <button onclick="bipChooseKind('hr')">Home Run<span class="sub">HR</span></button>
-        </div>`;
-    } else if (__bipKind === 'error') {
-      body = `
-        <p class="help-text" style="margin-bottom:14px">How far did the batter reach?</p>
-        <div class="outcome-grid">
-          <button onclick="bipChooseDetail('1B')">Single<span class="sub">1B</span></button>
-          <button onclick="bipChooseDetail('2B')">Double<span class="sub">2B</span></button>
-          <button onclick="bipChooseDetail('HR')">Home Run<span class="sub">HR</span></button>
-        </div>`;
-    }
-  } else if (__bipStep === 'locate') {
-    const labels = { out: `Out — ${hitTypeLabel(__bipDetail)}`, hit: ({'1B':'Single','2B':'Double','3B':'Triple'})[__bipDetail]||'Hit', hr:'Home Run', error:`Error — ${({'1B':'Single','2B':'Double','HR':'Home Run'})[__bipDetail]||__bipDetail}` };
-    const needFielder = __bipKind === 'out' || __bipKind === 'error';
-    body = `
-      <p style="font-weight:600;margin-bottom:4px">${labels[__bipKind] || ''}</p>
-      <p class="help-text">${needFielder ? 'Drag a fielder on the field to where the play happened' : __bipKind === 'hr' ? 'Tap the field where the ball left' : 'Tap the field where the ball landed'}</p>`;
-  }
-
   return `
     <div class="at-bat-card">
-      <h3>Ball in play</h3>
-      ${body}
-      <div style="margin-top:14px">
-        <button class="btn btn-sm" onclick="bipCancel()">✕ Cancel</button>
+      <h3>Pitch outcome</h3>
+      ${renderPitcherRow(g)}
+      <div class="pitch-buttons">
+        <button data-pitch="ball">Ball</button>
+        <button data-pitch="foul">Foul</button>
+        <button data-pitch="strike_swinging">Strike (swinging)</button>
+        <button data-pitch="strike_looking">Strike (looking)</button>
+        <button data-pitch="bip" class="btn-bip">⚾ Ball in play</button>
       </div>
     </div>`;
 }
@@ -4828,6 +4828,7 @@ function bipCancel() {
   __pendingPlay = null;
   __fieldClickMode = null;
   __bipStep = null; __bipKind = null; __bipDetail = null;
+  Modal.hide();
   renderLiveGame(LiveGameId);
 }
 
