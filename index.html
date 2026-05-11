@@ -2164,6 +2164,11 @@ const State = {
     const home = this.getTeam(data.homeTeamId);
     const away = this.getTeam(data.awayTeamId);
     if (!home || !away) throw new Error('Both teams required');
+    const shared = (home.playerIds || []).filter(id => (away.playerIds || []).includes(id));
+    if (shared.length) {
+      const names = shared.map(id => this.getPlayer(id)?.name || id).join(', ');
+      throw new Error(`Player(s) on both teams: ${names}`);
+    }
 
     const defaultPositions = (team) => {
       const positions = {};
@@ -3801,7 +3806,13 @@ async function submitNewGame(e) {
   const numInnings = parseInt($('#game-innings').value, 10) || 6;
   if (!homeTeamId || !awayTeamId) return;
   if (homeTeamId === awayTeamId) { toast('Pick two different teams', 'error'); return; }
-  const game = await State.addGame({ homeTeamId, awayTeamId, numInnings });
+  let game;
+  try {
+    game = await State.addGame({ homeTeamId, awayTeamId, numInnings });
+  } catch (err) {
+    toast(err.message, 'error');
+    return;
+  }
   Modal.hide();
   Render.all();
   openGame(game.id);
