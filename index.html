@@ -1703,12 +1703,14 @@ const Storage = {
       fs.onSnapshot(fs.collection(fs.db, 'players'), snap => {
         State.players = snap.docs.map(d => d.data());
         Render.players();
+        Render.adminPlayers();
         Render.home();
       }, err => console.warn('players listener:', err.message)),
 
       fs.onSnapshot(fs.collection(fs.db, 'teams'), snap => {
         State.teams = snap.docs.map(d => d.data());
         Render.teams();
+        Render.adminTeams();
         Render.home();
       }, err => console.warn('teams listener:', err.message)),
 
