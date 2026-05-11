@@ -2447,13 +2447,23 @@ async function signOutUser() {
 async function invitePlayer(playerId) {
   const player = State.getPlayer(playerId);
   if (!player) return;
-  const email = window.prompt(`Enter email address for ${player.name}:\n(They can then sign up at this site using that address.)`);
+  const email = window.prompt(`Enter email address for ${player.name}:\n(They'll receive a sign-in link to join WiffleCast.)`);
   if (!email || !email.includes('@')) { if (email !== null) toast('Invalid email', 'error'); return; }
+
+  const fs = window._fs;
+  const url = window.location.origin + window.location.pathname + '?invitePlayerId=' + encodeURIComponent(playerId);
+  try {
+    await fs.sendSignInLinkToEmail(fs.auth, email, { url, handleCodeInApp: true });
+  } catch (err) {
+    toast('Failed to send invite: ' + err.message, 'error');
+    return;
+  }
+
   player.inviteEmail = email;
   player.invitePending = true;
   await Storage.savePlayer(player);
   Render.players();
-  toast(`Email saved for ${player.name} — ask them to sign up at this site`, 'success');
+  toast(`Invite sent to ${email}`, 'success');
 }
 
 async function handleEmailLinkSignIn() {
