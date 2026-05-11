@@ -4499,7 +4499,12 @@ function attachSvgLocationHandlers(svgEl) {
   const onStart = (e) => {
     const fielderEl = e.target.closest('.fielder');
     const pt = svgPoint(svgEl, e);
-    pointerStart = { x: pt.x, y: pt.y, fielderId: fielderEl?.dataset.pid || null, fielderEl };
+    let origX = 0, origY = 0;
+    if (fielderEl) {
+      const m = (fielderEl.getAttribute('transform') || '').match(/translate\(([^,]+),([^)]+)\)/);
+      if (m) { origX = parseFloat(m[1]); origY = parseFloat(m[2]); }
+    }
+    pointerStart = { x: pt.x, y: pt.y, fielderId: fielderEl?.dataset.pid || null, fielderEl, origX, origY };
     if (__fieldClickMode) e.preventDefault();
   };
 
@@ -4509,8 +4514,13 @@ function attachSvgLocationHandlers(svgEl) {
     const pt = svgPoint(svgEl, e);
     const dist = Math.hypot(pt.x - pointerStart.x, pt.y - pointerStart.y);
     if (dist > DRAG_THRESHOLD) {
-      if (pointerStart.fielderEl) pointerStart.fielderEl.classList.add('drag-source');
-      drawBallMarker({ x: Math.round(pt.x), y: Math.round(pt.y) });
+      if (pointerStart.fielderEl) {
+        // Move the fielder circle itself
+        pointerStart.fielderEl.setAttribute('transform', `translate(${Math.round(pt.x)},${Math.round(pt.y)})`);
+      } else {
+        // Hit / HR with no fielder: show ball marker
+        drawBallMarker({ x: Math.round(pt.x), y: Math.round(pt.y) });
+      }
     }
   };
 
@@ -4518,7 +4528,11 @@ function attachSvgLocationHandlers(svgEl) {
     if (!pointerStart) return;
     const start = pointerStart;
     pointerStart = null;
-    if (start.fielderEl) start.fielderEl.classList.remove('drag-source');
+
+    // Snap fielder back to original position
+    if (start.fielderEl) {
+      start.fielderEl.setAttribute('transform', `translate(${start.origX},${start.origY})`);
+    }
 
     const pt = svgPoint(svgEl, e);
     const loc = { x: Math.round(pt.x), y: Math.round(pt.y) };
@@ -4529,7 +4543,6 @@ function attachSvgLocationHandlers(svgEl) {
       if (__fieldClickMode.needFielder) {
         // Out / error: must drag from a fielder marker
         if (start.fielderId && isDrag) {
-          drawBallMarker(loc);
           __fieldClickMode.onDragEnd(start.fielderId, loc);
         }
       } else {
@@ -4773,14 +4786,13 @@ function renderBipPanel(g) {
       body = `
         <p class="help-text" style="margin-bottom:14px">How far did the batter reach?</p>
         <div class="outcome-grid">
-          <button onclick="bipChooseDetail('1B')">Reached 1B</button>
-          <button onclick="bipChooseDetail('2B')">Reached 2B</button>
-          <button onclick="bipChooseDetail('3B')">Reached 3B</button>
-          <button onclick="bipChooseDetail('HR')">Inside-the-park HR</button>
+          <button onclick="bipChooseDetail('1B')">Single<span class="sub">1B</span></button>
+          <button onclick="bipChooseDetail('2B')">Double<span class="sub">2B</span></button>
+          <button onclick="bipChooseDetail('HR')">Home Run<span class="sub">HR</span></button>
         </div>`;
     }
   } else if (__bipStep === 'locate') {
-    const labels = { out: `Out — ${hitTypeLabel(__bipDetail)}`, hit: ({  '1B':'Single','2B':'Double','3B':'Triple'})[__bipDetail]||'Hit', hr:'Home Run', error:`Error — reached ${__bipDetail}` };
+    const labels = { out: `Out — ${hitTypeLabel(__bipDetail)}`, hit: ({'1B':'Single','2B':'Double','3B':'Triple'})[__bipDetail]||'Hit', hr:'Home Run', error:`Error — ${({'1B':'Single','2B':'Double','HR':'Home Run'})[__bipDetail]||__bipDetail}` };
     const needFielder = __bipKind === 'out' || __bipKind === 'error';
     body = `
       <p style="font-weight:600;margin-bottom:4px">${labels[__bipKind] || ''}</p>
