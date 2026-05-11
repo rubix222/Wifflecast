@@ -424,26 +424,185 @@
   /* ---------- Games split panel ---------- */
   .games-split { grid-template-columns: 210px 1fr; }
   .games-detail-panel { padding: 0; overflow-y: auto; max-height: 82vh; }
-  #games-detail .live-game { height: auto; min-height: 400px; overflow: visible; }
-  #games-detail .live-game-left, #games-detail .live-game-right { overflow-y: visible; }
+  #games-detail .live-game { height: 82vh; }
 
   /* ============================================================
      LIVE GAME SCREEN
      ============================================================ */
   .live-game {
-    display: grid;
-    grid-template-columns: 1fr 360px;
-    gap: 18px;
-    padding: 18px;
+    display: flex;
+    flex-direction: column;
     background: #f4f6f8;
-    height: 95vh;
+    height: 100dvh;
     overflow: hidden;
   }
-  @media (max-width: 920px) {
-    .live-game { grid-template-columns: 1fr; height: auto; max-height: none; overflow-y: auto; }
+  @media (min-width: 601px) {
+    .live-game { height: 82vh; }
   }
-  .live-game-left { display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow: hidden; }
-  .live-game-right { display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow: hidden; }
+  .lg-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    background: #fff;
+    border-bottom: 1px solid #e5e7eb;
+    flex-shrink: 0;
+    gap: 8px;
+  }
+  .lg-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #111827;
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .lg-menu-wrap { position: relative; flex-shrink: 0; }
+  .lg-menu-btn { font-size: 20px; padding: 2px 8px; }
+  .lg-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.14);
+    z-index: 200;
+    min-width: 170px;
+    overflow: hidden;
+  }
+  .lg-menu button {
+    display: block;
+    width: 100%;
+    padding: 13px 16px;
+    text-align: left;
+    background: none;
+    border: none;
+    border-bottom: 1px solid #f3f4f6;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .lg-menu button:last-child { border-bottom: none; }
+  .lg-menu button:hover { background: #f9fafb; }
+  .lg-tab-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+  }
+  .lg-pane {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .lg-pane[hidden] { display: none; }
+  .lg-batter-strip {
+    padding: 6px 14px;
+    font-size: 13px;
+    background: #f9fafb;
+    border-bottom: 1px solid #f3f4f6;
+    flex-shrink: 0;
+    color: #374151;
+  }
+  .lg-batter-strip strong { color: #111827; }
+  .lg-tab-bar {
+    display: flex;
+    border-top: 2px solid #e5e7eb;
+    background: #fff;
+    flex-shrink: 0;
+  }
+  .lg-tab-btn {
+    flex: 1;
+    padding: 11px 6px 10px;
+    border: none;
+    background: none;
+    font-size: 13px;
+    font-weight: 600;
+    color: #6b7280;
+    cursor: pointer;
+    border-top: 3px solid transparent;
+    margin-top: -2px;
+    transition: color 0.12s;
+  }
+  .lg-tab-btn.active { color: #166534; border-top-color: #166534; }
+  .lg-stats {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+  }
+  .lg-stats table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .lg-stats th, .lg-stats td {
+    padding: 6px 8px;
+    text-align: center;
+    border-bottom: 1px solid #f3f4f6;
+  }
+  .lg-stats td:first-child, .lg-stats th:first-child { text-align: left; }
+  .lg-stats .stats-team-hdr th {
+    background: #14532d;
+    color: #fff;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 7px 8px;
+  }
+  .lg-stats .stats-col-hdr th {
+    color: #6b7280;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-weight: 600;
+    background: #f9fafb;
+  }
+  /* compact horizontal pitch buttons */
+  .pitch-buttons-compact {
+    display: flex;
+    gap: 6px;
+    padding: 8px 10px;
+    background: #fff;
+    border-top: 1px solid #e5e7eb;
+    flex-shrink: 0;
+  }
+  .pitch-buttons-compact button {
+    flex: 1;
+    padding: 10px 4px;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    background: #fff;
+    font-weight: 600;
+    font-size: 12px;
+    text-align: center;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .pitch-buttons-compact button:hover { background: #f9fafb; }
+  .pitch-buttons-compact .btn-bip {
+    background: #166534;
+    color: #fff;
+    border-color: #166534;
+    flex: 1.4;
+  }
+  .pitch-buttons-compact .btn-bip:hover { background: #14532d; }
+  .locate-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: #fff;
+    border-top: 1px solid #e5e7eb;
+    flex-shrink: 0;
+  }
+  .locate-bar .locate-label { font-weight: 700; font-size: 13px; color: #111827; }
+  .locate-bar .locate-hint { flex: 1; font-size: 12px; color: #6b7280; }
 
   .scoreboard {
     background: #14532d;
@@ -4091,117 +4250,168 @@ function renderLastScorerPill(g) {
   return (name && notMe) ? '<div class="last-scorer-pill">🟢 ' + escapeHtml(name) + ' is scoring</div>' : '';
 }
 
+let _liveTab = 'score';
+
+function switchLiveTab(tab) {
+  _liveTab = tab;
+  $$('.lg-pane').forEach(p => { p.hidden = p.dataset.tab !== tab; });
+  $$('.lg-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+}
+
+function toggleLiveMenu() {
+  const m = $('#lg-menu');
+  if (m) m.hidden = !m.hidden;
+}
+function closeLiveMenu() {
+  const m = $('#lg-menu');
+  if (m) m.hidden = true;
+}
+
+function renderLiveStats(g, away, home) {
+  const renderTeam = (team, orderKey) => {
+    const order = g[orderKey] || [];
+    if (!order.length) return `<tr><td colspan="5" class="muted" style="padding:8px;text-align:center">No lineup set</td></tr>`;
+    return order.map(pid => {
+      const p = State.getPlayer(pid);
+      let ab = 0, h = 0, bb = 0, k = 0, rbi = 0;
+      (g.events || []).forEach(e => {
+        if (e.type !== 'pa_end' || e.batterId !== pid) return;
+        if (e.outcome === 'BB') { bb++; return; }
+        ab++;
+        if (['1B','2B','3B','HR'].includes(e.outcome)) h++;
+        if (e.outcome === 'K') k++;
+        rbi += e.rbi || 0;
+      });
+      return `<tr>
+        <td>${escapeHtml(p?.name || '?')}</td>
+        <td>${h}-${ab}</td>
+        <td>${bb || 0}</td>
+        <td>${k || 0}</td>
+        <td>${rbi || 0}</td>
+      </tr>`;
+    }).join('');
+  };
+  return `<table>
+    <thead>
+      <tr class="stats-team-hdr"><th colspan="5">${escapeHtml(away.name)}</th></tr>
+      <tr class="stats-col-hdr"><th>Player</th><th>H-AB</th><th>BB</th><th>K</th><th>RBI</th></tr>
+    </thead>
+    <tbody>${renderTeam(away, 'awayBattingOrder')}</tbody>
+    <thead>
+      <tr class="stats-team-hdr"><th colspan="5">${escapeHtml(home.name)}</th></tr>
+      <tr class="stats-col-hdr"><th>Player</th><th>H-AB</th><th>BB</th><th>K</th><th>RBI</th></tr>
+    </thead>
+    <tbody>${renderTeam(home, 'homeBattingOrder')}</tbody>
+  </table>`;
+}
+
 function liveGameHTML(g, home, away) {
   const battingSide = g.currentHalf === 'top' ? 'away' : 'home';
   const fieldingTeam = battingSide === 'away' ? home : away;
   const inningStr = (g.currentHalf === 'top' ? '▲ Top ' : '▼ Bot ') + g.currentInning;
   const isCompleted = g.status === 'completed';
+  const canScore = canUserScore();
+  const batterId = currentBatterId(g);
+  const batter = State.getPlayer(batterId);
 
-  const adminEditBar = isCompleted && isAdmin() ? `
-    <div class="admin-edit-bar">
-      <span class="admin-edit-label">Admin</span>
-      <button class="btn btn-sm" onclick="showEditScoreModal('${g.id}')">✏️ Edit Score</button>
-      <button class="btn btn-sm btn-warning" onclick="reopenGame('${g.id}')">↺ Reopen Game</button>
-    </div>` : '';
-
-  const finishBanner = isCompleted ? `
-    <div class="game-finish-banner">
-      🏆 Final: ${escapeHtml(away.name)} ${g.score.away} — ${g.score.home} ${escapeHtml(home.name)}
-      ${g.score.away === g.score.home ? '(tie)' : ''}
-    </div>` : '';
+  const scorePaneHidden = _liveTab !== 'score';
+  const playsPaneHidden = _liveTab !== 'plays';
+  const statsPaneHidden = _liveTab !== 'stats';
 
   return `
-    <div class="inline-game-header">
-      <h3>
-        ${escapeHtml(away.name)} @ ${escapeHtml(home.name)}
-        <span class="game-card-status status-${g.status}" style="margin-left:8px">${g.status.replace('_',' ')}</span>
-      </h3>
-    </div>
     <div class="live-game">
-      <div class="live-game-left">
-        ${adminEditBar}
-        ${finishBanner}
-        <div class="scoreboard">
-          <div class="team-side ${battingSide === 'away' && !isCompleted ? 'batting' : ''}">
-            <div class="name">${escapeHtml(away.name)}</div>
-            <div class="score" id="sb-score-away">${g.score.away}</div>
-          </div>
-          <div class="middle">
-            <div class="inning" id="sb-inning">${isCompleted ? 'FINAL' : inningStr}</div>
-            ${isCompleted ? `<div class="outs" id="sb-outs">
-              Outs
-              <span class="out-dots">
-                <span class="out-dot${g.outs >= 1 ? ' on' : ''}"></span>
-                <span class="out-dot${g.outs >= 2 ? ' on' : ''}"></span>
-                <span class="out-dot${g.outs >= 3 ? ' on' : ''}"></span>
-              </span>
-            </div>` : ''}
-          </div>
-          <div class="team-side ${battingSide === 'home' && !isCompleted ? 'batting' : ''}">
-            <div class="name">${escapeHtml(home.name)}</div>
-            <div class="score" id="sb-score-home">${g.score.home}</div>
-          </div>
-          ${!isCompleted ? `
-          <div class="sb-counts">
-            <div class="count-block"><span class="label">B</span><span class="val" id="count-b">${g.balls}</span></div>
-            <div class="count-block"><span class="label">S</span><span class="val" id="count-s">${g.strikes}</span></div>
-            <div class="count-block"><span class="label">F</span><span class="val" id="count-f">${g.fouls || 0}</span></div>
-            <div class="count-block"><span class="label">Outs</span><span class="val" id="count-o">${g.outs}</span></div>
-          </div>` : ''}
+      <div class="lg-topbar">
+        <div class="lg-title">
+          ${escapeHtml(away.name)} @ ${escapeHtml(home.name)}
+          <span class="game-card-status status-${g.status}" style="margin-left:6px;font-size:11px">${g.status.replace('_',' ')}</span>
         </div>
-
-        <div class="field-wrap">
-          <div class="field-wrap-header">
-            <h3 class="field-wrap-title">
-              ${isCompleted ? 'Field &amp; Bases' : escapeHtml(fieldingTeam.name) + ' in the field'}
-              ${isCompleted ? '<span class="field-wrap-hint">Click a play to replay bases</span>' : ''}
-            </h3>
-            ${!isCompleted ? `
-            <div class="field-undo-redo">
-              <button class="btn-icon" onclick="undoPlay()" ${_undoStack.length ? '' : 'disabled'} title="Undo">↩</button>
-              <button class="btn-icon" onclick="redoPlay()" ${_redoStack.length ? '' : 'disabled'} title="Redo">↪</button>
-            </div>` : ''}
+        ${isCompleted && isAdmin() ? `
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm" onclick="showEditScoreModal('${g.id}')">✏️ Edit</button>
+          <button class="btn btn-sm btn-warning" onclick="reopenGame('${g.id}')">↺ Reopen</button>
+        </div>` : ''}
+        ${!isCompleted && canScore ? `
+        <div class="lg-menu-wrap">
+          <button class="btn-icon lg-menu-btn" onclick="toggleLiveMenu()">⋮</button>
+          <div class="lg-menu" id="lg-menu" hidden>
+            <button onclick="endHalfInning('${g.id}');closeLiveMenu()">End half early</button>
+            <button onclick="endGameEarly('${g.id}');closeLiveMenu()" style="color:#dc2626">End game</button>
           </div>
-          <div class="field-and-bases">
-            <div class="field-panel">
-              <div id="field-instruction" class="field-instruction" style="display:none"></div>
-              <div id="field-container"></div>
-            </div>
-            <div class="bases-panel">
-              <div id="bases-container"></div>
-            </div>
-          </div>
-        </div>
-
-        ${isCompleted ? '' : !canUserScore() ? '' : `<div id="bip-panel">${renderBipPanel(g)}</div>`}
+        </div>` : ''}
       </div>
 
-      <div class="live-game-right">
-        ${renderLastScorerPill(g)}
-        <div class="line-score">
-          ${renderLineScore(g, away, home)}
+      ${isCompleted ? `<div class="game-finish-banner">🏆 Final: ${escapeHtml(away.name)} ${g.score.away} — ${g.score.home} ${escapeHtml(home.name)}${g.score.away === g.score.home ? ' (tie)' : ''}</div>` : ''}
+
+      <div class="scoreboard">
+        <div class="team-side ${battingSide === 'away' && !isCompleted ? 'batting' : ''}">
+          <div class="name">${escapeHtml(away.name)}</div>
+          <div class="score" id="sb-score-away">${g.score.away}</div>
+        </div>
+        <div class="middle">
+          <div class="inning" id="sb-inning">${isCompleted ? 'FINAL' : inningStr}</div>
+          ${isCompleted ? `<div class="outs" id="sb-outs">Outs <span class="out-dots"><span class="out-dot${g.outs >= 1 ? ' on' : ''}"></span><span class="out-dot${g.outs >= 2 ? ' on' : ''}"></span><span class="out-dot${g.outs >= 3 ? ' on' : ''}"></span></span></div>` : ''}
+        </div>
+        <div class="team-side ${battingSide === 'home' && !isCompleted ? 'batting' : ''}">
+          <div class="name">${escapeHtml(home.name)}</div>
+          <div class="score" id="sb-score-home">${g.score.home}</div>
+        </div>
+        ${!isCompleted ? `
+        <div class="sb-counts">
+          <div class="count-block"><span class="label">B</span><span class="val" id="count-b">${g.balls}</span></div>
+          <div class="count-block"><span class="label">S</span><span class="val" id="count-s">${g.strikes}</span></div>
+          <div class="count-block"><span class="label">F</span><span class="val" id="count-f">${g.fouls || 0}</span></div>
+          <div class="count-block"><span class="label">Outs</span><span class="val" id="count-o">${g.outs}</span></div>
+        </div>` : ''}
+      </div>
+
+      <div class="lg-tab-body">
+        <div class="lg-pane" data-tab="score" ${scorePaneHidden ? 'hidden' : ''}>
+          ${renderLastScorerPill(g)}
+          ${!isCompleted && canScore ? `<div class="lg-batter-strip">At bat: <strong>${escapeHtml(batter?.name || '?')}</strong></div>` : ''}
+          ${!isCompleted && !canScore ? `<div class="help-text" style="padding:10px 14px;font-size:13px;text-align:center">Sign in with scoring privilege to record plays.</div>` : ''}
+          <div class="field-wrap">
+            <div class="field-wrap-header">
+              <h3 class="field-wrap-title">
+                ${isCompleted ? 'Field &amp; Bases' : escapeHtml(fieldingTeam.name) + ' in the field'}
+                ${isCompleted ? '<span class="field-wrap-hint">Click a play to replay bases</span>' : ''}
+              </h3>
+              ${!isCompleted ? `
+              <div class="field-undo-redo">
+                <button class="btn-icon" onclick="undoPlay()" ${_undoStack.length ? '' : 'disabled'} title="Undo">↩</button>
+                <button class="btn-icon" onclick="redoPlay()" ${_redoStack.length ? '' : 'disabled'} title="Redo">↪</button>
+              </div>` : ''}
+            </div>
+            <div class="field-and-bases">
+              <div class="field-panel">
+                <div id="field-instruction" class="field-instruction" style="display:none"></div>
+                <div id="field-container"></div>
+              </div>
+              <div class="bases-panel">
+                <div id="bases-container"></div>
+              </div>
+            </div>
+          </div>
+          ${!isCompleted && canScore ? `<div id="bip-panel">${renderBipPanel(g)}</div>` : ''}
+          ${isCompleted ? renderAccolades(g) : ''}
         </div>
 
-        ${isCompleted ? '' : !canUserScore() ? '' : `
-        <div class="game-controls">
-          <button class="btn btn-warning" onclick="endHalfInning('${g.id}')">End half early</button>
-          <button class="btn btn-danger" onclick="endGameEarly('${g.id}')">End game</button>
-        </div>`}
-
-        ${isCompleted ? '' : !canUserScore() ? `<div class="help-text" style="padding:12px;text-align:center">Sign in with scoring privilege to record plays.</div>` : `
-        <div class="at-bat-card">
-          <h3>At bat</h3>
-          ${renderBatterRow(g)}
+        <div class="lg-pane" data-tab="plays" ${playsPaneHidden ? 'hidden' : ''}>
+          ${isCompleted ? `<div id="replay-banner" class="replay-banner" style="display:none;margin:10px 10px 0"></div>` : ''}
+          ${isCompleted ? `<div style="padding:8px 10px"><button class="btn btn-sm btn-primary" onclick="showRecapModal('${g.id}')">📋 Share Recap</button></div>` : ''}
+          <div class="play-log" style="flex:1;overflow-y:auto;border-radius:0;box-shadow:none;background:#fff">
+            <ul id="play-log-list">${renderPlayLog(g)}</ul>
+          </div>
         </div>
-        `}
 
-        ${isCompleted ? renderAccolades(g) : ''}
-        ${isCompleted ? `<div style="margin-bottom:12px"><button class="btn btn-sm btn-primary" onclick="showRecapModal('${g.id}')">📋 Share Recap</button></div>` : ''}
-        ${isCompleted ? '<div id="replay-banner" class="replay-banner" style="display:none"></div>' : ''}
-        <div class="play-log">
-          <h3>Play-by-play</h3>
-          <ul id="play-log-list">${renderPlayLog(g)}</ul>
+        <div class="lg-pane" data-tab="stats" ${statsPaneHidden ? 'hidden' : ''}>
+          <div class="lg-stats">${renderLiveStats(g, away, home)}</div>
         </div>
+      </div>
+
+      <div class="lg-tab-bar">
+        <button class="lg-tab-btn ${_liveTab === 'score' ? 'active' : ''}" data-tab="score" onclick="switchLiveTab('score')">Score</button>
+        <button class="lg-tab-btn ${_liveTab === 'plays' ? 'active' : ''}" data-tab="plays" onclick="switchLiveTab('plays')">Plays</button>
+        <button class="lg-tab-btn ${_liveTab === 'stats' ? 'active' : ''}" data-tab="stats" onclick="switchLiveTab('stats')">Stats</button>
       </div>
     </div>
   `;
@@ -4640,7 +4850,7 @@ async function swapFielder(currentPid, newPid) {
    PITCH HANDLERS
    ============================================================ */
 function attachPitchHandlers() {
-  document.querySelectorAll('.pitch-buttons button').forEach(btn => {
+  document.querySelectorAll('.pitch-buttons button, .pitch-buttons-compact button').forEach(btn => {
     btn.addEventListener('click', () => handlePitch(btn.dataset.pitch));
   });
 }
@@ -4805,25 +5015,21 @@ function renderBipPanel(g) {
   if (__bipStep === 'locate') {
     const labels = { out: `Out — ${hitTypeLabel(__bipDetail)}`, hit: ({'1B':'Single','2B':'Double'})[__bipDetail]||'Hit', hr:'Home Run', error:`Error — ${({'1B':'Single','2B':'Double','HR':'Home Run'})[__bipDetail]||__bipDetail}` };
     const needFielder = __bipKind === 'out' || __bipKind === 'error';
+    const hint = needFielder ? 'Drag fielder to where the play happened' : __bipKind === 'hr' ? 'Tap where the ball left the field' : 'Tap where the ball landed';
     return `
-      <div class="at-bat-card">
-        <h3>${labels[__bipKind] || 'Ball in play'}</h3>
-        ${renderPitcherRow(g)}
-        <p class="help-text" style="margin-top:8px">${needFielder ? 'Drag a fielder to where the play happened' : __bipKind === 'hr' ? 'Tap the field where the ball left' : 'Tap the field where the ball landed'}</p>
-        <div style="margin-top:10px"><button class="btn btn-sm" onclick="bipCancel()">✕ Cancel</button></div>
+      <div class="locate-bar">
+        <span class="locate-label">${labels[__bipKind] || 'Ball in play'}</span>
+        <span class="locate-hint">${hint}</span>
+        <button class="btn btn-sm" onclick="bipCancel()">✕</button>
       </div>`;
   }
   return `
-    <div class="at-bat-card">
-      <h3>Pitch outcome</h3>
-      ${renderPitcherRow(g)}
-      <div class="pitch-buttons">
-        <button data-pitch="ball">Ball</button>
-        <button data-pitch="foul">Foul</button>
-        <button data-pitch="strike_swinging">Strike (swinging)</button>
-        <button data-pitch="strike_looking">Strike (looking)</button>
-        <button data-pitch="bip" class="btn-bip">⚾ Ball in play</button>
-      </div>
+    <div class="pitch-buttons-compact">
+      <button data-pitch="ball">Ball</button>
+      <button data-pitch="foul">Foul</button>
+      <button data-pitch="strike_swinging">Strike ↙</button>
+      <button data-pitch="strike_looking">Strike ◻</button>
+      <button data-pitch="bip" class="btn-bip">⚾ BIP</button>
     </div>`;
 }
 
