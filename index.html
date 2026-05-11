@@ -590,7 +590,7 @@
   .pitch-buttons-compact {
     display: flex;
     gap: 6px;
-    padding: 8px 10px;
+    padding: 10px 28px;
     background: #fff;
     border-top: 1px solid #e5e7eb;
     flex-shrink: 0;
@@ -4411,7 +4411,7 @@ function liveGameHTML(g, home, away) {
           <div class="field-wrap">
             <div class="field-wrap-header">
               <h3 class="field-wrap-title">
-                ${isCompleted ? 'Field &amp; Bases' : escapeHtml(fieldingTeam.name) + ' in the field'}
+                ${isCompleted ? 'Field &amp; Bases' : ''}
                 ${isCompleted ? '<span class="field-wrap-hint">Click a play to replay bases</span>' : ''}
               </h3>
               ${!isCompleted ? `
