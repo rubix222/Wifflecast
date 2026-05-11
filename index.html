@@ -2447,15 +2447,23 @@ async function signOutUser() {
 async function invitePlayer(playerId) {
   const player = State.getPlayer(playerId);
   if (!player) return;
-  const email = window.prompt(`Enter email address for ${player.name}:\n(They'll receive a sign-in link to join WiffleCast.)`);
+  const email = window.prompt(`Enter email address for ${player.name}:\n(They'll receive an invite email with a link to sign up.)`);
   if (!email || !email.includes('@')) { if (email !== null) toast('Invalid email', 'error'); return; }
 
-  const fs = window._fs;
-  const url = window.location.origin + window.location.pathname + '?invitePlayerId=' + encodeURIComponent(playerId);
+  const cfg = getEmailConfig();
+  if (!cfg) { showEmailSetupModal(); return; }
+
+  const appUrl = window.location.origin + window.location.pathname;
   try {
-    await fs.sendSignInLinkToEmail(fs.auth, email, { url, handleCodeInApp: true });
+    emailjs.init(cfg.publicKey);
+    await emailjs.send(cfg.serviceId, cfg.templateId, {
+      to_email: email,
+      to_name: player.name,
+      subject: `You're invited to WiffleCast!`,
+      message: `Hi ${player.name},\n\nYou've been invited to join WiffleCast!\n\nClick here to sign up:\n${appUrl}\n\nUse this email address (${email}) when creating your account and you'll automatically be linked to your player profile.\n\nSee you on the field!`,
+    });
   } catch (err) {
-    toast('Failed to send invite: ' + err.message, 'error');
+    toast('Failed to send invite email: ' + err.message, 'error');
     return;
   }
 
