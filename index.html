@@ -1503,6 +1503,7 @@
   <section id="view-admin" class="view">
     <div class="toolbar">
       <h2>Admin</h2>
+      <div id="admin-features-toggle"></div>
     </div>
     <div class="admin-panel-section">
       <h3 class="admin-panel-heading">Users</h3>
@@ -1734,7 +1735,7 @@ const Storage = {
 
       fs.onSnapshot(fs.collection(fs.db, 'users'), snap => {
         State.users = snap.docs.map(d => d.data());
-        if (isAdmin()) Render.users && Render.users();
+        if (isAdminUser()) Render.users && Render.users();
         // Refresh currentUserProfile in case canScore was changed
         if (currentUser) {
           currentUserProfile = State.getUser(currentUser.uid) || currentUserProfile;
@@ -2219,7 +2220,16 @@ const fmt = {
 const ADMIN_EMAIL = 'rubix222@gmail.com';
 let currentUser = null;
 let currentUserProfile = null;
-function isAdmin() { return currentUser?.email === ADMIN_EMAIL; }
+let adminFeaturesEnabled = localStorage.getItem('wc_admin_features') !== 'false';
+function isAdminUser() { return currentUser?.email === ADMIN_EMAIL; }
+function isAdmin() { return isAdminUser() && adminFeaturesEnabled; }
+
+function toggleAdminFeatures() {
+  adminFeaturesEnabled = !adminFeaturesEnabled;
+  localStorage.setItem('wc_admin_features', String(adminFeaturesEnabled));
+  updateAuthUI();
+  Render.all();
+}
 function canUserScore() { return isAdmin() || (currentUser && currentUserProfile?.canScore); }
 
 
@@ -2360,7 +2370,7 @@ function updateAuthUI() {
   if (addGame) addGame.style.display = isAdmin() ? '' : 'none';
 
   // Admin tab — admin only
-  $$('.admin-only-tab').forEach(t => { t.style.display = isAdmin() ? '' : 'none'; });
+  $$('.admin-only-tab').forEach(t => { t.style.display = isAdminUser() ? '' : 'none'; });
 }
 
 async function createOrLinkUserProfile(user, playerId, name) {
@@ -2530,7 +2540,7 @@ function selectGamestream(id) {
 }
 
 function showLinkPlayerModal(uid) {
-  if (!isAdmin()) return;
+  if (!isAdminUser()) return;
   const user = State.getUser(uid); if (!user) return;
   const currentPlayer = user.playerId ? State.getPlayer(user.playerId) : null;
   const sorted = [...State.players].sort((a, b) => a.name.localeCompare(b.name));
@@ -2558,7 +2568,7 @@ function showLinkPlayerModal(uid) {
 }
 
 async function submitLinkPlayer(uid) {
-  if (!isAdmin()) return;
+  if (!isAdminUser()) return;
   const user = State.getUser(uid); if (!user) return;
   const newPlayerId = document.getElementById('link-player-select')?.value || null;
   const oldPlayerId = user.playerId || null;
@@ -2708,7 +2718,13 @@ const Render = {
 
   users() {
     const c = $('#users-container'); if (!c) return;
-    if (!isAdmin()) { c.innerHTML = ''; return; }
+    if (!isAdminUser()) { c.innerHTML = ''; return; }
+    const tog = $('#admin-features-toggle');
+    if (tog) tog.innerHTML = `
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+        <span style="color:${adminFeaturesEnabled ? '#111827' : '#6b7280'}">${adminFeaturesEnabled ? 'Admin features on' : 'Viewing as non-admin'}</span>
+        <input type="checkbox" ${adminFeaturesEnabled ? 'checked' : ''} onchange="toggleAdminFeatures()" style="width:16px;height:16px;cursor:pointer" />
+      </label>`;
     if (!State.users.length) {
       c.innerHTML = '<div class="empty-state"><h3>No registered users yet</h3><p>Users appear here after they create an account.</p></div>';
       return;
@@ -2741,7 +2757,7 @@ const Render = {
 
   adminPlayers() {
     const c = $('#admin-players-container'); if (!c) return;
-    if (!isAdmin()) { c.innerHTML = ''; return; }
+    if (!isAdminUser()) { c.innerHTML = ''; return; }
     if (!State.players.length) {
       c.innerHTML = '<div class="empty-state"><p>No players yet.</p></div>';
       return;
@@ -2776,7 +2792,7 @@ const Render = {
 
   adminTeams() {
     const c = $('#admin-teams-container'); if (!c) return;
-    if (!isAdmin()) { c.innerHTML = ''; return; }
+    if (!isAdminUser()) { c.innerHTML = ''; return; }
     if (!State.teams.length) {
       c.innerHTML = '<div class="empty-state"><p>No teams yet.</p></div>';
       return;
@@ -5458,7 +5474,7 @@ document.addEventListener('firebase-ready', boot, { once: true });
 Object.assign(window, {
   Modal, Render, State,
   showAuthModal, submitAuth, signOutUser, invitePlayer,
-  showPlayerModal, deletePlayer, deleteUser, showTeamModal, deleteTeam, cancelInvite,
+  showPlayerModal, deletePlayer, deleteUser, showTeamModal, deleteTeam, cancelInvite, toggleAdminFeatures,
   toggleCanScore, showLinkPlayerModal, submitLinkPlayer, selectGamestream,
   showNewGameModal, openGame, selectGame, deselectGame, deleteGame,
   submitPlayer, submitTeam, submitNewGame,
