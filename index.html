@@ -1441,8 +1441,8 @@
   <button class="tab-btn" data-view="games">Games</button>
   <button class="tab-btn" data-view="tournaments">Tournaments</button>
   <button class="tab-btn" data-view="gamestream">Gamestream</button>
-  <button class="tab-btn admin-only-tab" data-view="admin" style="display:none">Admin</button>
   <button class="tab-btn" data-view="rules">Rules</button>
+  <button class="tab-btn admin-only-tab" data-view="admin" style="display:none">Admin</button>
 </nav>
 
 <main>
@@ -1507,6 +1507,20 @@
     <div class="admin-panel-section">
       <h3 class="admin-panel-heading">Users</h3>
       <div id="users-container"></div>
+    </div>
+    <div class="admin-panel-section">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <h3 class="admin-panel-heading" style="margin:0">Players</h3>
+        <button class="btn btn-primary" onclick="showPlayerModal()">+ Add Player</button>
+      </div>
+      <div id="admin-players-container"></div>
+    </div>
+    <div class="admin-panel-section">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <h3 class="admin-panel-heading" style="margin:0">Teams</h3>
+        <button class="btn btn-primary" onclick="showTeamModal()">+ Add Team</button>
+      </div>
+      <div id="admin-teams-container"></div>
     </div>
     <div class="admin-panel-section">
       <h3 class="admin-panel-heading">Data Management</h3>
@@ -2474,6 +2488,18 @@ async function invitePlayer(playerId) {
   toast(`Invite sent to ${email}`, 'success');
 }
 
+async function cancelInvite(playerId) {
+  const player = State.getPlayer(playerId);
+  if (!player) return;
+  if (!confirm(`Cancel invite for ${player.name}?`)) return;
+  player.inviteEmail = null;
+  player.invitePending = false;
+  await Storage.savePlayer(player);
+  Render.players();
+  Render.adminPlayers();
+  toast(`Invite cancelled for ${player.name}`, 'success');
+}
+
 async function handleEmailLinkSignIn() {
   const fs = window._fs;
   const params = new URLSearchParams(window.location.search);
@@ -2573,7 +2599,7 @@ async function toggleCanScore(uid) {
 }
 
 const Render = {
-  all() { this.home(); this.players(); this.teams(); this.games(); this.users(); this.gamestream(); this.tournaments(); },
+  all() { this.home(); this.players(); this.teams(); this.games(); this.users(); this.adminPlayers(); this.adminTeams(); this.gamestream(); this.tournaments(); },
 
   tournaments() {
     const btnAdd = $('#btn-add-tournament');
@@ -2697,16 +2723,78 @@ const Render = {
           <button class="btn-icon" title="${player ? 'Change linked player' : 'Link a player'}" onclick="showLinkPlayerModal('${u.uid}')">✎</button>
         </td>
         <td>
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-            <input type="checkbox" ${u.canScore ? 'checked' : ''} onchange="toggleCanScore('${u.uid}')" />
-            <span style="font-size:13px">${u.canScore ? 'Allowed' : 'Not allowed'}</span>
-          </label>
+          ${u.email === ADMIN_EMAIL
+            ? '<span style="font-size:13px;color:#6b7280">Admin</span>'
+            : `<label style="display:flex;align-items:center;justify-content:flex-end;gap:6px;cursor:pointer">
+                <span style="font-size:13px">${u.canScore ? 'Allowed' : 'Not allowed'}</span>
+                <input type="checkbox" ${u.canScore ? 'checked' : ''} onchange="toggleCanScore('${u.uid}')" />
+              </label>`}
         </td>
         <td><button class="btn-icon" title="Delete user" onclick="deleteUser('${u.uid}')">🗑</button></td>
       </tr>`;
     }).join('');
     c.innerHTML = `<div class="stats-table-wrap"><table class="stats-table">
       <thead><tr><th>Name</th><th>Email/ID</th><th>Player</th><th>Can Score</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+  },
+
+  adminPlayers() {
+    const c = $('#admin-players-container'); if (!c) return;
+    if (!isAdmin()) { c.innerHTML = ''; return; }
+    if (!State.players.length) {
+      c.innerHTML = '<div class="empty-state"><p>No players yet.</p></div>';
+      return;
+    }
+    const sorted = [...State.players].sort((a, b) => a.name.localeCompare(b.name));
+    const rows = sorted.map(p => {
+      const status = p.userId
+        ? '<span class="badge badge-linked">Linked</span>'
+        : p.invitePending
+          ? `<span class="badge badge-invited">Invited</span> <span class="muted small">${escapeHtml(p.inviteEmail || '')}</span>`
+          : '<span class="badge badge-guest">Guest</span>';
+      const inviteBtn = !p.userId
+        ? p.invitePending
+          ? `<button class="btn-icon" title="Cancel invite" onclick="cancelInvite('${p.id}')">✕</button>`
+          : `<button class="btn-icon" title="Invite" onclick="invitePlayer('${p.id}')">✉</button>`
+        : '';
+      return `<tr>
+        <td>${escapeHtml(p.name)}</td>
+        <td>${status}</td>
+        <td style="white-space:nowrap">
+          <button class="btn-icon" title="Edit" onclick="showPlayerModal('${p.id}')">✎</button>
+          ${inviteBtn}
+          <button class="btn-icon" title="Delete" onclick="deletePlayer('${p.id}')">🗑</button>
+        </td>
+      </tr>`;
+    }).join('');
+    c.innerHTML = `<div class="stats-table-wrap"><table class="stats-table">
+      <thead><tr><th>Name</th><th>Status</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+  },
+
+  adminTeams() {
+    const c = $('#admin-teams-container'); if (!c) return;
+    if (!isAdmin()) { c.innerHTML = ''; return; }
+    if (!State.teams.length) {
+      c.innerHTML = '<div class="empty-state"><p>No teams yet.</p></div>';
+      return;
+    }
+    const sorted = [...State.teams].sort((a, b) => a.name.localeCompare(b.name));
+    const rows = sorted.map(t => {
+      const playerCount = (t.playerIds || []).length;
+      return `<tr>
+        <td>${escapeHtml(t.name)}</td>
+        <td><span class="muted small">${playerCount} player${playerCount !== 1 ? 's' : ''}</span></td>
+        <td style="white-space:nowrap">
+          <button class="btn-icon" title="Edit" onclick="showTeamModal('${t.id}')">✎</button>
+          <button class="btn-icon" title="Delete" onclick="deleteTeam('${t.id}')">🗑</button>
+        </td>
+      </tr>`;
+    }).join('');
+    c.innerHTML = `<div class="stats-table-wrap"><table class="stats-table">
+      <thead><tr><th>Name</th><th>Players</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`;
   },
@@ -2864,7 +2952,10 @@ const Render = {
         const canEdit = isAdmin() || (currentUser && sel.userId === currentUser.uid);
         const actions = isAdmin()
           ? `<button class="btn-icon" title="Edit" onclick="showPlayerModal('${sel.id}')">✎</button>
-             ${!sel.userId ? `<button class="btn-icon" title="Invite" onclick="invitePlayer('${sel.id}')">✉</button>` : ''}
+             ${!sel.userId ? sel.invitePending
+               ? `<button class="btn-icon" title="Cancel invite" onclick="cancelInvite('${sel.id}')">✕</button>`
+               : `<button class="btn-icon" title="Invite" onclick="invitePlayer('${sel.id}')">✉</button>`
+             : ''}
              <button class="btn-icon" title="Delete" onclick="deletePlayer('${sel.id}')">🗑</button>`
           : canEdit ? `<button class="btn-icon" title="Edit" onclick="showPlayerModal('${sel.id}')">✎</button>` : '';
 
@@ -5367,7 +5458,7 @@ document.addEventListener('firebase-ready', boot, { once: true });
 Object.assign(window, {
   Modal, Render, State,
   showAuthModal, submitAuth, signOutUser, invitePlayer,
-  showPlayerModal, deletePlayer, deleteUser, showTeamModal, deleteTeam,
+  showPlayerModal, deletePlayer, deleteUser, showTeamModal, deleteTeam, cancelInvite,
   toggleCanScore, showLinkPlayerModal, submitLinkPlayer, selectGamestream,
   showNewGameModal, openGame, selectGame, deselectGame, deleteGame,
   submitPlayer, submitTeam, submitNewGame,
