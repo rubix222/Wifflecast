@@ -583,6 +583,22 @@
     stroke-width: 2;
     pointer-events: none;
   }
+  .field-svg .fielder.drag-source circle {
+    stroke: #facc15;
+    stroke-width: 3.5;
+    r: 21;
+  }
+  .field-instruction {
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: #166534;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 6px;
+    padding: 7px 10px;
+    margin-bottom: 8px;
+  }
   .badge { display:inline-block; font-size:10px; font-weight:700; padding:2px 7px; border-radius:10px; text-transform:uppercase; letter-spacing:0.4px; margin-left:6px; }
   .badge-guest { background:#f3f4f6; color:#6b7280; }
   .badge-invited { background:#fef3c7; color:#92400e; }
@@ -4104,6 +4120,7 @@ function liveGameHTML(g, home, away) {
           </h3>
           <div class="field-and-bases">
             <div class="field-panel">
+              <div id="field-instruction" class="field-instruction" style="display:none"></div>
               <div id="field-container"></div>
             </div>
             <div class="bases-panel">
@@ -4131,17 +4148,7 @@ function liveGameHTML(g, home, away) {
           </div>
         </div>
 
-        <div class="at-bat-card">
-          <h3>Pitch outcome</h3>
-          ${renderPitcherRow(g)}
-          <div class="pitch-buttons">
-            <button data-pitch="ball">Ball</button>
-            <button data-pitch="foul">Foul</button>
-            <button data-pitch="strike_swinging">Strike (swinging)</button>
-            <button data-pitch="strike_looking">Strike (looking)</button>
-            <button data-pitch="bip" class="btn-bip">⚾ Ball in play</button>
-          </div>
-        </div>
+        <div id="bip-panel">${renderBipPanel(g)}</div>
         `}
 
         ${isCompleted ? renderAccolades(g) : ''}
@@ -4277,7 +4284,7 @@ function describeOutcome(e) {
   return s;
 }
 function hitTypeLabel(t) {
-  return ({ GB: 'ground ball', LD: 'line drive', PU: 'pop fly', FB: 'fly ball' })[t] || t;
+  return ({ GB: 'ground ball', LD: 'line drive', FB: 'fly ball' })[t] || t;
 }
 
 function ordinal(n) {
@@ -4382,8 +4389,11 @@ const FIELD = {
 };
 
 let __fieldClickMode = null;
+let __bipStep = null;
+let __bipKind = null;
+let __bipDetail = null;
 
-function drawField(overrideBases = null) {
+function drawField() {
   const g = State.getGame(LiveGameId);
   if (!g) return;
   const container = $('#field-container');
@@ -4399,7 +4409,7 @@ function drawField(overrideBases = null) {
 
   const fielderMarker = (pid, player, pos, cx, cy) => {
     if (!pid || !player) return '';
-    return `<g class="fielder" data-pid="${pid}" data-pos="${pos}" transform="translate(${cx},${cy})" onclick="onFielderClick('${pid}', '${pos}')">
+    return `<g class="fielder" data-pid="${pid}" data-pos="${pos}" transform="translate(${cx},${cy})">
       <circle r="18" />
       <text class="pos">${pos}</text>
       <text class="name bg" y="36">${escapeHtml(player.name)}</text>
@@ -4419,6 +4429,10 @@ function drawField(overrideBases = null) {
 
   const svgEl = $('#field-svg');
   attachSvgLocationHandlers(svgEl);
+
+  if (__bipStep === 'locate' && svgEl) {
+    svgEl.classList.add('location-mode');
+  }
 }
 
 function drawBases(overrideBases = null) {
@@ -4474,32 +4488,69 @@ function svgPoint(svg, evt) {
 }
 
 function attachSvgLocationHandlers(svgEl) {
-  const handle = (e) => {
-    if (!__fieldClickMode) return;
+  const DRAG_THRESHOLD = 8;
+  let pointerStart = null; // { x, y, fielderId, fielderEl }
+
+  const getPoint = (e) => {
+    const pt = svgPoint(svgEl, e);
+    return { x: Math.round(pt.x), y: Math.round(pt.y) };
+  };
+
+  const onStart = (e) => {
     const fielderEl = e.target.closest('.fielder');
-    if (fielderEl) {
-      const pid = fielderEl.dataset.pid;
-      if (pid && __fieldClickMode.onPickFielder) {
-        __fieldClickMode.onPickFielder(pid);
-        e.preventDefault();
-      }
-      const pt = svgPoint(svgEl, e);
-      __fieldClickMode.onClick({ x: Math.round(pt.x), y: Math.round(pt.y) });
-      return;
+    const pt = svgPoint(svgEl, e);
+    pointerStart = { x: pt.x, y: pt.y, fielderId: fielderEl?.dataset.pid || null, fielderEl };
+    if (__fieldClickMode) e.preventDefault();
+  };
+
+  const onMove = (e) => {
+    if (!pointerStart || !__fieldClickMode) return;
+    e.preventDefault();
+    const pt = svgPoint(svgEl, e);
+    const dist = Math.hypot(pt.x - pointerStart.x, pt.y - pointerStart.y);
+    if (dist > DRAG_THRESHOLD) {
+      if (pointerStart.fielderEl) pointerStart.fielderEl.classList.add('drag-source');
+      drawBallMarker({ x: Math.round(pt.x), y: Math.round(pt.y) });
     }
-    e.preventDefault();
-    const pt = svgPoint(svgEl, e);
-    __fieldClickMode.onClick({ x: Math.round(pt.x), y: Math.round(pt.y) });
   };
-  const handleMove = (e) => {
-    if (!__fieldClickMode || !e.changedTouches) return;
-    e.preventDefault();
+
+  const onEnd = (e) => {
+    if (!pointerStart) return;
+    const start = pointerStart;
+    pointerStart = null;
+    if (start.fielderEl) start.fielderEl.classList.remove('drag-source');
+
     const pt = svgPoint(svgEl, e);
-    drawBallMarker({ x: Math.round(pt.x), y: Math.round(pt.y) });
+    const loc = { x: Math.round(pt.x), y: Math.round(pt.y) };
+    const isDrag = Math.hypot(pt.x - start.x, pt.y - start.y) > DRAG_THRESHOLD;
+
+    if (__fieldClickMode) {
+      e.preventDefault();
+      if (__fieldClickMode.needFielder) {
+        // Out / error: must drag from a fielder marker
+        if (start.fielderId && isDrag) {
+          drawBallMarker(loc);
+          __fieldClickMode.onDragEnd(start.fielderId, loc);
+        }
+      } else {
+        // Hit / HR: any tap or drag on the field works
+        drawBallMarker(loc);
+        __fieldClickMode.onDragEnd(null, loc);
+      }
+    } else {
+      // Not in BIP mode — short tap on a fielder opens the swap modal
+      if (!isDrag && start.fielderId) {
+        onFielderClick(start.fielderId, start.fielderEl?.dataset.pos || '');
+      }
+    }
   };
-  svgEl.addEventListener('click', handle);
-  svgEl.addEventListener('touchend', handle, { passive: false });
-  svgEl.addEventListener('touchmove', handleMove, { passive: false });
+
+  svgEl.addEventListener('mousedown', onStart);
+  svgEl.addEventListener('mousemove', onMove);
+  svgEl.addEventListener('mouseup', onEnd);
+  svgEl.addEventListener('touchstart', onStart, { passive: false });
+  svgEl.addEventListener('touchmove', onMove, { passive: false });
+  svgEl.addEventListener('touchend', onEnd, { passive: false });
 }
 
 function onFielderClick(pid, pos) {
@@ -4601,167 +4652,172 @@ async function handlePitch(kind) {
     return;
   }
   if (kind === 'bip') {
-    showBipChoiceModal();
+    bipStart();
     return;
   }
 }
 
-/* ----- Ball in play: choose Out / Hit / Error ----- */
-function showBipChoiceModal() {
-  Modal.show(`
-    <div class="modal-header">
-      <h3>Ball in play</h3>
-      <button class="btn-icon" onclick="Modal.hide(); rerenderLive();">✕</button>
-    </div>
-    <div class="modal-body">
-      <p class="help-text" style="margin-bottom:14px">What was the result?</p>
-      <div class="outcome-grid">
-        <button onclick="showBipOutTypeModal()">Out<span class="sub">batter is out</span></button>
-        <button onclick="showBipHitModal()">Hit<span class="sub">single / double / triple / HR</span></button>
-        <button onclick="showBipErrorModal()">Error<span class="sub">batter reaches on error</span></button>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn" onclick="Modal.hide(); rerenderLive();">Cancel</button>
-    </div>
-  `);
-}
-
-/* ----- Out type ----- */
-function showBipOutTypeModal() {
-  Modal.show(`
-    <div class="modal-header">
-      <h3>Type of out</h3>
-      <button class="btn-icon" onclick="Modal.hide(); rerenderLive();">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="outcome-grid">
-        <button onclick="askLocation('out','GB')">Ground ball<span class="sub">GB</span></button>
-        <button onclick="askLocation('out','LD')">Line drive<span class="sub">LD</span></button>
-        <button onclick="askLocation('out','PU')">Pop fly<span class="sub">PU</span></button>
-        <button onclick="askLocation('out','FB')">Fly ball<span class="sub">FB</span></button>
-      </div>
-    </div>
-  `);
-}
-
-/* ----- Hit type ----- */
-function showBipHitModal() {
-  Modal.show(`
-    <div class="modal-header">
-      <h3>Hit</h3>
-      <button class="btn-icon" onclick="Modal.hide(); rerenderLive();">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="outcome-grid">
-        <button onclick="askLocation('hit','1B')">Single<span class="sub">1B</span></button>
-        <button onclick="askLocation('hit','2B')">Double<span class="sub">2B</span></button>
-        <button onclick="askLocation('hit','3B')">Triple<span class="sub">3B</span></button>
-        <button onclick="askLocation('hr','HR')">Home Run<span class="sub">HR</span></button>
-      </div>
-    </div>
-  `);
-}
-
-/* ----- Error type ----- */
-function showBipErrorModal() {
-  Modal.show(`
-    <div class="modal-header">
-      <h3>Error — batter reaches</h3>
-      <button class="btn-icon" onclick="Modal.hide(); rerenderLive();">✕</button>
-    </div>
-    <div class="modal-body">
-      <p class="help-text" style="margin-bottom:14px">How far did the batter reach?</p>
-      <div class="outcome-grid">
-        <button onclick="askLocation('error','1B')">Reached 1B</button>
-        <button onclick="askLocation('error','2B')">Reached 2B</button>
-        <button onclick="askLocation('error','3B')">Reached 3B</button>
-        <button onclick="askLocation('error','HR')">Inside-the-park HR</button>
-      </div>
-    </div>
-  `);
-}
-
 /* ============================================================
-   LOCATION + FIELDER PICKER
+   INLINE BIP FLOW (replaces all BIP modals)
    ============================================================ */
 let __pendingPlay = null;
 
-function askLocation(kind, detail) {
-  __pendingPlay = { kind, detail, fielderId: null, location: null };
-  const g = State.getGame(LiveGameId);
-  const needFielder = kind === 'out' || kind === 'error';
+function bipStart() {
+  __bipStep = 'choose';
+  __bipKind = null;
+  __bipDetail = null;
+  __pendingPlay = null;
+  __fieldClickMode = null;
+  rerenderBipPanel();
+}
 
-  let fielderSection = '';
-  if (needFielder) {
-    const fieldingPos = fieldingPositions(g);
-    const team = State.getTeam(fieldingTeamId(g));
-    const fielderButtons = team.playerIds.map(pid => {
-      const p = State.getPlayer(pid);
-      const pos = fieldingPos[pid] || 'BENCH';
-      return `<button class="btn" data-fielder="${pid}" style="margin:3px">${escapeHtml(p.name)} <span class="pill" style="margin-left:4px">${pos}</span></button>`;
-    }).join('');
-    fielderSection = `<div id="loc-fielders" class="row-flex" style="margin-bottom:10px">${fielderButtons}</div>`;
+function bipChooseKind(kind) {
+  __bipKind = kind;
+  if (kind === 'hr') {
+    __bipDetail = 'HR';
+    __bipStep = 'locate';
+    bipEnterLocate();
+  } else {
+    __bipStep = 'subtype';
   }
+  rerenderBipPanel();
+}
 
-  const titleByKind = {
-    out:   `Out — ${hitTypeLabel(detail)}`,
-    hit:   ({ '1B': 'Single', '2B': 'Double', '3B': 'Triple' })[detail] || 'Hit',
-    hr:    'Home Run — mark where it left the field',
-    error: `Error — batter reached ${detail}`
-  };
-  const purpose = kind === 'hr'
-    ? 'Touch or click the boundary where the ball left the field.'
-    : kind === 'hit'
-      ? 'Touch or drag to where the ball went.'
-      : kind === 'error'
-        ? '1) Pick the fielder who committed the error. 2) Tap the spot on the field.'
-        : '1) Pick the fielder who made the play. 2) Tap the spot on the field.';
-  const initStatus = needFielder ? 'Pick a fielder, then tap the field.' : 'Tap the field to mark the location.';
+function bipChooseDetail(detail) {
+  __bipDetail = detail;
+  __bipStep = 'locate';
+  bipEnterLocate();
+  rerenderBipPanel();
+}
 
-  Modal.show(`
-    <div class="modal-header">
-      <h3>${titleByKind[kind] || ''}</h3>
-      <button class="btn-icon" onclick="cancelLocation()">✕</button>
-    </div>
-    <div class="modal-body">
-      <p class="help-text" style="margin-bottom:10px">${purpose}</p>
-      ${fielderSection}
-      <div id="loc-field-wrap"></div>
-      <div class="help-text center" id="loc-status" style="margin-top:8px">${initStatus}</div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn" onclick="cancelLocation()">Cancel</button>
-      <button id="loc-confirm" class="btn btn-primary" disabled onclick="confirmLocation()">Confirm</button>
-    </div>
-  `, { wide: true });
-
-  const container = $('#loc-field-wrap');
-  container.innerHTML = `<div id="field-container"></div>`;
-  drawField();
-  const svgEl = $('#field-svg');
-  if (svgEl) svgEl.classList.add('location-mode');
-
+function bipEnterLocate() {
+  const needFielder = __bipKind === 'out' || __bipKind === 'error';
+  __pendingPlay = { kind: __bipKind, detail: __bipDetail, fielderId: null, location: null };
   __fieldClickMode = {
-    onClick(loc) {
+    needFielder,
+    onDragEnd(fielderId, loc) {
+      __pendingPlay.fielderId = fielderId;
       __pendingPlay.location = loc;
-      drawBallMarker(loc);
-      updateLocConfirm();
-    },
-    onPickFielder(pid) {
-      __pendingPlay.fielderId = pid;
-      $$('#loc-fielders button').forEach(b => {
-        b.classList.toggle('btn-primary', b.dataset.fielder === pid);
-      });
-      updateLocConfirm();
+      bipConfirm();
     }
   };
-
-  if (needFielder) {
-    $$('#loc-fielders button[data-fielder]').forEach(btn => {
-      btn.addEventListener('click', () => __fieldClickMode.onPickFielder(btn.dataset.fielder));
-    });
+  const instrEl = $('#field-instruction');
+  if (instrEl) {
+    instrEl.style.display = '';
+    if (needFielder) {
+      instrEl.textContent = __bipKind === 'error'
+        ? 'Drag the fielder who made the error to where it happened'
+        : 'Drag the fielder who made the play to where it happened';
+    } else if (__bipKind === 'hr') {
+      instrEl.textContent = 'Tap where the ball left the field';
+    } else {
+      instrEl.textContent = 'Tap where the ball landed';
+    }
   }
+  drawField();
+}
+
+function rerenderBipPanel() {
+  const g = State.getGame(LiveGameId);
+  const panel = $('#bip-panel');
+  if (panel && g) {
+    panel.innerHTML = renderBipPanel(g);
+    attachPitchHandlers();
+  }
+}
+
+function renderBipPanel(g) {
+  if (!__bipStep) {
+    return `
+      <div class="at-bat-card">
+        <h3>Pitch outcome</h3>
+        ${renderPitcherRow(g)}
+        <div class="pitch-buttons">
+          <button data-pitch="ball">Ball</button>
+          <button data-pitch="foul">Foul</button>
+          <button data-pitch="strike_swinging">Strike (swinging)</button>
+          <button data-pitch="strike_looking">Strike (looking)</button>
+          <button data-pitch="bip" class="btn-bip">⚾ Ball in play</button>
+        </div>
+      </div>`;
+  }
+
+  let body = '';
+  if (__bipStep === 'choose') {
+    body = `
+      <p class="help-text" style="margin-bottom:14px">What was the result?</p>
+      <div class="outcome-grid">
+        <button onclick="bipChooseKind('out')">Out<span class="sub">batter is out</span></button>
+        <button onclick="bipChooseKind('hit')">Hit<span class="sub">1B / 2B / 3B / HR</span></button>
+        <button onclick="bipChooseKind('error')">Error<span class="sub">batter reaches on error</span></button>
+      </div>`;
+  } else if (__bipStep === 'subtype') {
+    if (__bipKind === 'out') {
+      body = `
+        <p class="help-text" style="margin-bottom:14px">Type of out</p>
+        <div class="outcome-grid">
+          <button onclick="bipChooseDetail('GB')">Ground ball<span class="sub">GB</span></button>
+          <button onclick="bipChooseDetail('LD')">Line drive<span class="sub">LD</span></button>
+          <button onclick="bipChooseDetail('FB')">Fly ball<span class="sub">FB</span></button>
+        </div>`;
+    } else if (__bipKind === 'hit') {
+      body = `
+        <p class="help-text" style="margin-bottom:14px">Hit type</p>
+        <div class="outcome-grid">
+          <button onclick="bipChooseDetail('1B')">Single<span class="sub">1B</span></button>
+          <button onclick="bipChooseDetail('2B')">Double<span class="sub">2B</span></button>
+          <button onclick="bipChooseDetail('3B')">Triple<span class="sub">3B</span></button>
+          <button onclick="bipChooseKind('hr')">Home Run<span class="sub">HR</span></button>
+        </div>`;
+    } else if (__bipKind === 'error') {
+      body = `
+        <p class="help-text" style="margin-bottom:14px">How far did the batter reach?</p>
+        <div class="outcome-grid">
+          <button onclick="bipChooseDetail('1B')">Reached 1B</button>
+          <button onclick="bipChooseDetail('2B')">Reached 2B</button>
+          <button onclick="bipChooseDetail('3B')">Reached 3B</button>
+          <button onclick="bipChooseDetail('HR')">Inside-the-park HR</button>
+        </div>`;
+    }
+  } else if (__bipStep === 'locate') {
+    const labels = { out: `Out — ${hitTypeLabel(__bipDetail)}`, hit: ({  '1B':'Single','2B':'Double','3B':'Triple'})[__bipDetail]||'Hit', hr:'Home Run', error:`Error — reached ${__bipDetail}` };
+    const needFielder = __bipKind === 'out' || __bipKind === 'error';
+    body = `
+      <p style="font-weight:600;margin-bottom:4px">${labels[__bipKind] || ''}</p>
+      <p class="help-text">${needFielder ? 'Drag a fielder on the field to where the play happened' : __bipKind === 'hr' ? 'Tap the field where the ball left' : 'Tap the field where the ball landed'}</p>`;
+  }
+
+  return `
+    <div class="at-bat-card">
+      <h3>Ball in play</h3>
+      ${body}
+      <div style="margin-top:14px">
+        <button class="btn btn-sm" onclick="bipCancel()">✕ Cancel</button>
+      </div>
+    </div>`;
+}
+
+async function bipConfirm() {
+  if (!__pendingPlay?.location) return;
+  const needFielder = __pendingPlay.kind === 'out' || __pendingPlay.kind === 'error';
+  if (needFielder && !__pendingPlay.fielderId) return;
+  const { kind, detail, fielderId, location } = __pendingPlay;
+  __pendingPlay = null;
+  __fieldClickMode = null;
+  __bipStep = null; __bipKind = null; __bipDetail = null;
+  const instrEl = $('#field-instruction');
+  if (instrEl) instrEl.style.display = 'none';
+  if (kind === 'out')   await finishOut(detail, fielderId, location);
+  if (kind === 'hit')   await finishHit(detail, fielderId, location);
+  if (kind === 'hr')    await finishHit('HR', null, location);
+  if (kind === 'error') await finishError(detail, fielderId, location);
+}
+
+function bipCancel() {
+  __pendingPlay = null;
+  __fieldClickMode = null;
+  __bipStep = null; __bipKind = null; __bipDetail = null;
+  renderLiveGame(LiveGameId);
 }
 
 function drawBallMarker(loc) {
@@ -4777,45 +4833,6 @@ function drawBallMarker(loc) {
   m.setAttribute('cy', loc.y);
 }
 
-function updateLocConfirm() {
-  if (!__pendingPlay) return;
-  const needFielder = __pendingPlay.kind === 'out' || __pendingPlay.kind === 'error';
-  const ok = __pendingPlay.location && (!needFielder || __pendingPlay.fielderId);
-  $('#loc-confirm').disabled = !ok;
-  const statusEl = $('#loc-status'); if (!statusEl) return;
-  if (ok) {
-    const f = __pendingPlay.fielderId ? State.getPlayer(__pendingPlay.fielderId) : null;
-    statusEl.textContent = (f ? `Fielder: ${f.name} · ` : '') + 'Location set. Tap Confirm.';
-  } else if (needFielder && __pendingPlay.fielderId) {
-    statusEl.textContent = 'Now tap the field where the ball ended up.';
-  } else if (needFielder && __pendingPlay.location) {
-    statusEl.textContent = 'Now pick the fielder.';
-  } else if (!needFielder) {
-    statusEl.textContent = __pendingPlay.location ? 'Location set. Tap Confirm.' : 'Tap the field to mark the location.';
-  }
-}
-
-function cancelLocation() {
-  __pendingPlay = null;
-  __fieldClickMode = null;
-  Modal.hide();
-  renderLiveGame(LiveGameId);
-}
-
-async function confirmLocation() {
-  if (!__pendingPlay || !__pendingPlay.location) return;
-  const needFielder = __pendingPlay.kind === 'out' || __pendingPlay.kind === 'error';
-  if (needFielder && !__pendingPlay.fielderId) return;
-  const gSnap = State.getGame(LiveGameId);
-  if (gSnap) { _undoStack.push(captureSnapshot(gSnap)); _redoStack.length = 0; }
-  const { kind, detail, fielderId, location } = __pendingPlay;
-  __pendingPlay = null;
-  __fieldClickMode = null;
-  if (kind === 'out')   await finishOut(detail, fielderId, location);
-  if (kind === 'hit')   await finishHit(detail, fielderId, location);
-  if (kind === 'hr')    await finishHit('HR', null, location);
-  if (kind === 'error') await finishError(detail, fielderId, location);
-}
 
 /* ============================================================
    PA RESOLUTION
@@ -5490,6 +5507,7 @@ Object.assign(window, {
   Modal, Render, State,
   showAuthModal, submitAuth, signOutUser, invitePlayer,
   showPlayerModal, deletePlayer, deleteUser, showTeamModal, deleteTeam, cancelInvite, toggleAdminFeatures,
+  bipChooseKind, bipChooseDetail, bipCancel,
   toggleCanScore, showLinkPlayerModal, submitLinkPlayer, selectGamestream,
   showNewGameModal, openGame, selectGame, deselectGame, deleteGame,
   submitPlayer, submitTeam, submitNewGame,
