@@ -1742,6 +1742,13 @@ const Storage = {
         if (currentUser) {
           currentUserProfile = State.getUser(currentUser.uid) || currentUserProfile;
         }
+        // Clean up any players linked to users that no longer exist
+        const uids = new Set(State.users.map(u => u.uid));
+        State.players.filter(p => p.userId && !uids.has(p.userId)).forEach(p => {
+          p.userId = null;
+          p.invitePending = false;
+          Storage.savePlayer(p);
+        });
       }, err => console.warn('users listener:', err.message))
     );
   },
@@ -3429,8 +3436,14 @@ async function submitPlayer(e, id) {
 async function deleteUser(uid) {
   if (!isAdmin()) return;
   if (uid === currentUser?.uid) { toast('Cannot delete your own account', 'error'); return; }
-  if (!confirm('Delete this user? Their player profile (if any) will remain.')) return;
+  if (!confirm('Delete this user? Their linked player (if any) will become a guest.')) return;
   try {
+    const linkedPlayer = State.players.find(p => p.userId === uid);
+    if (linkedPlayer) {
+      linkedPlayer.userId = null;
+      linkedPlayer.invitePending = false;
+      await Storage.savePlayer(linkedPlayer);
+    }
     await State.deleteUser(uid);
     toast('User deleted', 'success');
     Render.users();
