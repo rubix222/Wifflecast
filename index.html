@@ -442,8 +442,8 @@
   @media (max-width: 920px) {
     .live-game { grid-template-columns: 1fr; height: auto; max-height: none; overflow-y: auto; }
   }
-  .live-game-left { display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow-y: auto; }
-  .live-game-right { display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow-y: auto; }
+  .live-game-left { display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow: hidden; }
+  .live-game-right { display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow: hidden; }
 
   .scoreboard {
     background: #14532d;
@@ -491,6 +491,17 @@
     display: inline-block;
   }
   .scoreboard .middle .out-dot.on { background: #facc15; }
+  .sb-counts {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255,255,255,0.15);
+    margin-top: 6px;
+  }
+  .sb-counts .count-block .label { color: rgba(255,255,255,0.75); }
+  .sb-counts .count-block .val { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: #fff; }
 
   .field-wrap {
     background: #fff;
@@ -502,8 +513,27 @@
     display: flex;
     flex-direction: column;
   }
+  .field-wrap-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .field-undo-redo { display: flex; gap: 6px; }
+  .btn-icon {
+    background: none;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 15px;
+    cursor: pointer;
+    color: #374151;
+    line-height: 1.4;
+  }
+  .btn-icon:hover:not(:disabled) { background: #f3f4f6; }
+  .btn-icon:disabled { opacity: 0.3; cursor: not-allowed; }
   .field-wrap-title {
-    margin: 0 0 10px;
+    margin: 0;
     font-size: 14px;
     color: #6b7280;
     text-transform: uppercase;
@@ -848,7 +878,7 @@
   }
   .at-bat-row {
     display: grid;
-    grid-template-columns: 36px 1fr;
+    grid-template-columns: 1fr;
     align-items: center;
     gap: 10px;
     padding: 6px 0;
@@ -921,8 +951,8 @@
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     font-size: 13px;
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
-    max-height: 240px;
   }
   .play-log h3 {
     margin: 0 0 8px;
@@ -4098,26 +4128,40 @@ function liveGameHTML(g, home, away) {
           </div>
           <div class="middle">
             <div class="inning" id="sb-inning">${isCompleted ? 'FINAL' : inningStr}</div>
-            <div class="outs" id="sb-outs">
+            ${isCompleted ? `<div class="outs" id="sb-outs">
               Outs
               <span class="out-dots">
                 <span class="out-dot${g.outs >= 1 ? ' on' : ''}"></span>
                 <span class="out-dot${g.outs >= 2 ? ' on' : ''}"></span>
                 <span class="out-dot${g.outs >= 3 ? ' on' : ''}"></span>
               </span>
-            </div>
+            </div>` : ''}
           </div>
           <div class="team-side ${battingSide === 'home' && !isCompleted ? 'batting' : ''}">
             <div class="name">${escapeHtml(home.name)}</div>
             <div class="score" id="sb-score-home">${g.score.home}</div>
           </div>
+          ${!isCompleted ? `
+          <div class="sb-counts">
+            <div class="count-block"><span class="label">B</span><span class="val" id="count-b">${g.balls}</span></div>
+            <div class="count-block"><span class="label">S</span><span class="val" id="count-s">${g.strikes}</span></div>
+            <div class="count-block"><span class="label">F</span><span class="val" id="count-f">${g.fouls || 0}</span></div>
+            <div class="count-block"><span class="label">Outs</span><span class="val" id="count-o">${g.outs}</span></div>
+          </div>` : ''}
         </div>
 
         <div class="field-wrap">
-          <h3 class="field-wrap-title">
-            ${isCompleted ? 'Field &amp; Bases' : escapeHtml(fieldingTeam.name) + ' in the field'}
-            ${isCompleted ? '<span class="field-wrap-hint">Click a play to replay bases</span>' : ''}
-          </h3>
+          <div class="field-wrap-header">
+            <h3 class="field-wrap-title">
+              ${isCompleted ? 'Field &amp; Bases' : escapeHtml(fieldingTeam.name) + ' in the field'}
+              ${isCompleted ? '<span class="field-wrap-hint">Click a play to replay bases</span>' : ''}
+            </h3>
+            ${!isCompleted ? `
+            <div class="field-undo-redo">
+              <button class="btn-icon" onclick="undoPlay()" ${_undoStack.length ? '' : 'disabled'} title="Undo">↩</button>
+              <button class="btn-icon" onclick="redoPlay()" ${_redoStack.length ? '' : 'disabled'} title="Redo">↪</button>
+            </div>` : ''}
+          </div>
           <div class="field-and-bases">
             <div class="field-panel">
               <div id="field-instruction" class="field-instruction" style="display:none"></div>
@@ -4130,24 +4174,24 @@ function liveGameHTML(g, home, away) {
         </div>
 
         ${isCompleted ? '' : !canUserScore() ? '' : `<div id="bip-panel">${renderBipPanel(g)}</div>`}
-
-        <div class="line-score">
-          ${renderLineScore(g, away, home)}
-        </div>
       </div>
 
       <div class="live-game-right">
         ${renderLastScorerPill(g)}
+        <div class="line-score">
+          ${renderLineScore(g, away, home)}
+        </div>
+
+        ${isCompleted ? '' : !canUserScore() ? '' : `
+        <div class="game-controls">
+          <button class="btn btn-warning" onclick="endHalfInning('${g.id}')">End half early</button>
+          <button class="btn btn-danger" onclick="endGameEarly('${g.id}')">End game</button>
+        </div>`}
+
         ${isCompleted ? '' : !canUserScore() ? `<div class="help-text" style="padding:12px;text-align:center">Sign in with scoring privilege to record plays.</div>` : `
         <div class="at-bat-card">
           <h3>At bat</h3>
           ${renderBatterRow(g)}
-          <div class="count-row">
-            <div class="count-block"><span class="label">B</span><span class="val" id="count-b">${g.balls}</span></div>
-            <div class="count-block"><span class="label">S</span><span class="val" id="count-s">${g.strikes}</span></div>
-            <div class="count-block"><span class="label">F</span><span class="val" id="count-f">${g.fouls || 0}</span></div>
-            <div class="count-block"><span class="label">Outs</span><span class="val" id="count-o">${g.outs}</span></div>
-          </div>
         </div>
         `}
 
@@ -4158,14 +4202,6 @@ function liveGameHTML(g, home, away) {
           <h3>Play-by-play</h3>
           <ul id="play-log-list">${renderPlayLog(g)}</ul>
         </div>
-
-        ${isCompleted ? '' : `
-        <div class="game-controls">
-          <button class="btn btn-sm" onclick="undoPlay()" ${_undoStack.length ? '' : 'disabled'}>↩ Undo</button>
-          <button class="btn btn-sm" onclick="redoPlay()" ${_redoStack.length ? '' : 'disabled'}>↪ Redo</button>
-          <button class="btn btn-warning" onclick="endHalfInning('${g.id}')">End half early</button>
-          <button class="btn btn-danger" onclick="endGameEarly('${g.id}')">End game</button>
-        </div>`}
       </div>
     </div>
   `;
@@ -4175,13 +4211,10 @@ function renderPitcherRow(g) {
   const pitcherId = currentPitcherId(g);
   const pitcher = pitcherId ? State.getPlayer(pitcherId) : null;
   return `
-    <div class="at-bat-row" style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #f3f4f6">
-      <div class="role">P</div>
-      <div>
-        <span class="player-num">#${escapeHtml(pitcher?.jerseyNumber || '-')}</span>
-        <span>${escapeHtml(pitcher?.name || '?')}</span>
-        <div class="game-stats">${pitcherId ? pitcherGameStats(g, pitcherId) : ''}</div>
-      </div>
+    <div style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #f3f4f6">
+      <span class="player-num">#${escapeHtml(pitcher?.jerseyNumber || '-')}</span>
+      <span>${escapeHtml(pitcher?.name || '?')}</span>
+      <div class="game-stats">${pitcherId ? pitcherGameStats(g, pitcherId) : ''}</div>
     </div>
   `;
 }
@@ -4221,27 +4254,13 @@ function rerenderLive() {
 
 function renderBatterRow(g) {
   const batterId = currentBatterId(g);
-  const onDeckId = nextBatterId(g);
-  const pitcherId = currentPitcherId(g);
   const batter = State.getPlayer(batterId);
-  const onDeck = State.getPlayer(onDeckId);
-  const pitcher = State.getPlayer(pitcherId);
-  const order = battingOrderArr(g);
-  const idx = (g[battingIdxKey(g)] % order.length) + 1;
   return `
     <div class="at-bat-row">
-      <div class="role">${idx}</div>
       <div>
         <span class="player-num">#${escapeHtml(batter?.jerseyNumber || '-')}</span>
         <span class="player-name">${escapeHtml(batter?.name || '?')}</span>
         <div class="game-stats">${batterId ? batterGameStats(g, batterId) : ''}</div>
-      </div>
-    </div>
-    <div class="at-bat-row">
-      <div class="role">Next</div>
-      <div class="muted">
-        <span class="player-num">#${escapeHtml(onDeck?.jerseyNumber || '-')}</span>
-        ${escapeHtml(onDeck?.name || '?')}
       </div>
     </div>
   `;
