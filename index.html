@@ -57,33 +57,62 @@
   .storage-status.connected { background: rgba(250, 204, 21, 0.25); color: #fef9c3; }
 
   nav.tabs {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
     background: #fff;
-    border-bottom: 1px solid #e5e7eb;
+    border-top: 1px solid #e5e7eb;
     display: flex;
-    padding: 0 16px;
     overflow-x: auto;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
   }
   nav.tabs button {
+    flex: 1;
+    min-width: 60px;
     background: none;
     border: none;
-    padding: 14px 20px;
-    font-size: 15px;
+    padding: 8px 4px 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    font-size: 11px;
     font-weight: 500;
     color: #6b7280;
-    border-bottom: 3px solid transparent;
-    transition: color 0.15s, border-color 0.15s;
+    border-top: 2px solid transparent;
+    transition: color 0.15s;
     white-space: nowrap;
+    cursor: pointer;
   }
+  nav.tabs button .tab-icon { font-size: 20px; line-height: 1.1; }
   nav.tabs button:hover { color: #166534; }
-  nav.tabs button.active {
-    color: #166534;
-    border-bottom-color: #166534;
+  nav.tabs button.active { color: #166534; border-top-color: #166534; }
+  /* Live game full-screen overlay */
+  .live-game-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: none;
+    flex-direction: column;
+    background: #f4f6f8;
+    overflow: hidden;
+  }
+  .live-game-overlay.open { display: flex; }
+  .lg-back-btn {
+    font-size: 18px;
+    padding: 4px 10px;
+    color: #374151;
+    flex-shrink: 0;
   }
 
   main {
     max-width: 1100px;
     margin: 0 auto;
     padding: 24px;
+    padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px));
   }
   .view { display: none; }
   .view.active { display: block; }
@@ -424,7 +453,6 @@
   /* ---------- Games split panel ---------- */
   .games-split { grid-template-columns: 210px 1fr; }
   .games-detail-panel { padding: 0; overflow-y: auto; max-height: 82vh; }
-  #games-detail .live-game { height: 82vh; }
 
   /* ============================================================
      LIVE GAME SCREEN
@@ -433,11 +461,8 @@
     display: flex;
     flex-direction: column;
     background: #f4f6f8;
-    height: 100dvh;
+    height: 100%;
     overflow: hidden;
-  }
-  @media (min-width: 601px) {
-    .live-game { height: 82vh; }
   }
   .lg-topbar {
     display: flex;
@@ -858,7 +883,7 @@
     header { padding: 10px 14px; }
     header h1 { font-size: 18px; }
     .storage-controls { gap: 6px; font-size: 12px; }
-    nav.tabs button { padding: 10px 14px; font-size: 13px; }
+    nav.tabs button { font-size: 10px; }
     .stat-row-lg { gap: 6px; }
     .stat-lg { min-width: 44px; }
     .live-game { padding: 10px; gap: 10px; }
@@ -1640,16 +1665,6 @@
   </div>
 </header>
 
-<nav class="tabs">
-  <button class="tab-btn" data-view="home">Home</button>
-  <button class="tab-btn active" data-view="stats">Stats</button>
-  <button class="tab-btn" data-view="games">Games</button>
-  <button class="tab-btn" data-view="tournaments">Tournaments</button>
-  <button class="tab-btn" data-view="gamestream">Gamestream</button>
-  <button class="tab-btn" data-view="rules">Rules</button>
-  <button class="tab-btn admin-only-tab" data-view="admin" style="display:none">Admin</button>
-</nav>
-
 <main>
   <section id="view-home" class="view">
     <div id="home-container"></div>
@@ -1814,6 +1829,18 @@
   </section>
 </main>
 
+<nav class="tabs">
+  <button class="tab-btn" data-view="home"><span class="tab-icon">🏠</span><span>Home</span></button>
+  <button class="tab-btn active" data-view="stats"><span class="tab-icon">📊</span><span>Stats</span></button>
+  <button class="tab-btn" data-view="games"><span class="tab-icon">⚾</span><span>Games</span></button>
+  <button class="tab-btn" data-view="tournaments"><span class="tab-icon">🏆</span><span>Tournaments</span></button>
+  <button class="tab-btn" data-view="gamestream"><span class="tab-icon">📺</span><span>Gamestream</span></button>
+  <button class="tab-btn" data-view="rules"><span class="tab-icon">📋</span><span>Rules</span></button>
+  <button class="tab-btn admin-only-tab" data-view="admin" style="display:none"><span class="tab-icon">⚙️</span><span>Admin</span></button>
+</nav>
+
+<div id="live-game-overlay" class="live-game-overlay"></div>
+
 <div id="modal-backdrop" class="modal-backdrop">
   <div id="modal" class="modal">
     <div id="modal-content"></div>
@@ -1931,7 +1958,7 @@ const Storage = {
         });
         Render.games();
         Render.home();
-        if (LiveGameId && $('#live-game-root')) rerenderLive();
+        if (LiveGameId) rerenderLive();
         Render.gamestream && Render.gamestream();
       }, err => console.warn('games listener:', err.message)),
 
@@ -4234,13 +4261,24 @@ function renderLiveGame(gameId) {
   if (!g) return;
   const home = State.getTeam(g.homeTeamId);
   const away = State.getTeam(g.awayTeamId);
-  const detail = $('#games-detail');
-  if (detail) {
-    detail.innerHTML = `<div id="live-game-root">${liveGameHTML(g, home, away)}</div>`;
+  const overlay = $('#live-game-overlay');
+  if (overlay) {
+    overlay.innerHTML = liveGameHTML(g, home, away);
+    overlay.classList.add('open');
   }
   drawField();
   drawBases();
   attachPitchHandlers();
+}
+
+function exitLiveGame() {
+  closeLiveMenu();
+  const overlay = $('#live-game-overlay');
+  if (overlay) {
+    overlay.classList.remove('open');
+    overlay.innerHTML = '';
+  }
+  LiveGameId = null;
 }
 
 function renderLastScorerPill(g) {
@@ -4321,12 +4359,13 @@ function liveGameHTML(g, home, away) {
   return `
     <div class="live-game">
       <div class="lg-topbar">
+        <button class="btn-icon lg-back-btn" onclick="exitLiveGame()" title="Back">←</button>
         <div class="lg-title">
           ${escapeHtml(away.name)} @ ${escapeHtml(home.name)}
           <span class="game-card-status status-${g.status}" style="margin-left:6px;font-size:11px">${g.status.replace('_',' ')}</span>
         </div>
         ${isCompleted && isAdmin() ? `
-        <div style="display:flex;gap:6px">
+        <div style="display:flex;gap:6px;flex-shrink:0">
           <button class="btn btn-sm" onclick="showEditScoreModal('${g.id}')">✏️ Edit</button>
           <button class="btn btn-sm btn-warning" onclick="reopenGame('${g.id}')">↺ Reopen</button>
         </div>` : ''}
