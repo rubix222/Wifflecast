@@ -525,15 +525,36 @@
     overflow: hidden;
   }
   .lg-pane[hidden] { display: none; }
-  .lg-batter-strip {
-    padding: 6px 14px;
-    font-size: 13px;
+  .lg-matchup-strip {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 14px;
     background: #f9fafb;
-    border-bottom: 1px solid #f3f4f6;
+    border-bottom: 1px solid #f0f0f0;
     flex-shrink: 0;
-    color: #374151;
   }
-  .lg-batter-strip strong { color: #111827; }
+  .lg-matchup-side { flex: 1; min-width: 0; }
+  .lg-matchup-right { text-align: right; }
+  .lg-matchup-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #9ca3af;
+    font-weight: 600;
+    margin-bottom: 1px;
+  }
+  .lg-matchup-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #111827;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .matchup-num { color: #9ca3af; font-size: 11px; font-weight: 500; }
+  .lg-matchup-stats { font-size: 11px; color: #6b7280; margin-top: 1px; }
   .lg-tab-bar {
     display: flex;
     border-top: 2px solid #e5e7eb;
@@ -4422,7 +4443,7 @@ function liveGameHTML(g, home, away) {
       <div class="lg-tab-body">
         <div class="lg-pane" data-tab="score" ${scorePaneHidden ? 'hidden' : ''}>
           ${renderLastScorerPill(g)}
-          ${!isCompleted && canScore ? `<div class="lg-batter-strip">At bat: <strong>${escapeHtml(batter?.name || '?')}</strong></div>` : ''}
+          ${!isCompleted ? renderMatchupStrip(g) : ''}
           ${!isCompleted && !canScore ? `<div class="help-text" style="padding:10px 14px;font-size:13px;text-align:center">Sign in with scoring privilege to record plays.</div>` : ''}
           <div class="field-wrap">
             <div class="field-wrap-header">
@@ -4499,6 +4520,61 @@ function batterGameStats(g, batterId) {
   if (k)   parts.push(`${k} K`);
   if (rbi) parts.push(`${rbi} RBI`);
   return parts.join(', ');
+}
+
+function batterMatchupStats(g, batterId) {
+  let ab = 0, h = 0, bb = 0, hr = 0, rbi = 0;
+  (g.events || []).forEach(e => {
+    if (e.type !== 'pa_end' || e.batterId !== batterId) return;
+    if (e.outcome === 'BB') { bb++; return; }
+    ab++;
+    if (['1B','2B','3B','HR'].includes(e.outcome)) h++;
+    if (e.outcome === 'HR') hr++;
+    rbi += e.rbi || 0;
+  });
+  const parts = [`${h} for ${ab}`];
+  if (rbi) parts.push(`${rbi} RBI`);
+  if (hr)  parts.push(`${hr} HR`);
+  if (bb)  parts.push(`${bb} BB`);
+  return parts.join(' · ') || '0 for 0';
+}
+
+function pitcherMatchupStats(g, pitcherId) {
+  let pitches = 0, k = 0, bb = 0, er = 0;
+  (g.events || []).forEach(e => {
+    if (e.type !== 'pa_end' || e.pitcherId !== pitcherId) return;
+    pitches += e.pitches || 0;
+    if (e.outcome === 'K')  k++;
+    if (e.outcome === 'BB') bb++;
+    er += e.earnedRuns || 0;
+  });
+  const parts = [`${pitches} pitches`];
+  if (k)  parts.push(`${k} K`);
+  if (bb) parts.push(`${bb} BB`);
+  if (er) parts.push(`${er} ER`);
+  return parts.join(' · ');
+}
+
+function renderMatchupStrip(g) {
+  const batterId = currentBatterId(g);
+  const pitcherId = currentPitcherId(g);
+  const batter  = State.getPlayer(batterId);
+  const pitcher = State.getPlayer(pitcherId);
+  const bn = batter  ? `<span class="matchup-num">#${escapeHtml(batter.jerseyNumber  || '-')}</span> ${escapeHtml(batter.name)}`  : '?';
+  const pn = pitcher ? `<span class="matchup-num">#${escapeHtml(pitcher.jerseyNumber || '-')}</span> ${escapeHtml(pitcher.name)}` : '?';
+  return `
+    <div class="lg-matchup-strip">
+      <div class="lg-matchup-side">
+        <div class="lg-matchup-label">At bat</div>
+        <div class="lg-matchup-name">${bn}</div>
+        <div class="lg-matchup-stats">${batterId ? batterMatchupStats(g, batterId) : '—'}</div>
+      </div>
+      <div class="lg-matchup-side lg-matchup-right">
+        <div class="lg-matchup-label">Pitching</div>
+        <div class="lg-matchup-name">${pn}</div>
+        <div class="lg-matchup-stats">${pitcherId ? pitcherMatchupStats(g, pitcherId) : '—'}</div>
+      </div>
+    </div>`;
 }
 
 function pitcherGameStats(g, pitcherId) {
@@ -5168,6 +5244,7 @@ async function applyPaEnd(g, ev) {
     rbi: 0,
     earnedRuns: 0,
     runsScoredBy: [],
+    pitches: (g.balls || 0) + (g.strikes || 0) + (g.fouls || 0) + (['BB','K'].includes(ev.outcome) ? 0 : 1),
   };
 
   const newBases = { 1: g.bases[1], 2: g.bases[2], 3: g.bases[3] };
