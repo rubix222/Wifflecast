@@ -4760,9 +4760,9 @@ function renderBipPanel(g) {
     body = `
       <p class="help-text" style="margin-bottom:14px">What was the result?</p>
       <div class="outcome-grid">
-        <button onclick="bipChooseKind('out')">Out<span class="sub">batter is out</span></button>
-        <button onclick="bipChooseKind('hit')">Hit<span class="sub">1B / 2B / 3B / HR</span></button>
-        <button onclick="bipChooseKind('error')">Error<span class="sub">batter reaches on error</span></button>
+        <button onclick="bipChooseKind('out')" style="background:#fee2e2;border-color:#fca5a5;color:#991b1b">Out</button>
+        <button onclick="bipChooseKind('hit')" style="background:#dcfce7;border-color:#86efac;color:#166534">Hit</button>
+        <button onclick="bipChooseKind('error')" style="background:#fef9c3;border-color:#fde047;color:#854d0e">Error</button>
       </div>`;
   } else if (__bipStep === 'subtype') {
     if (__bipKind === 'out') {
