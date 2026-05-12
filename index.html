@@ -577,9 +577,30 @@
   .lg-tab-btn.active { color: #166534; border-top-color: #166534; }
   .lg-stats {
     flex: 1;
-    overflow-y: auto;
-    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
+  .lg-stats-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 8px 10px;
+    flex-shrink: 0;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .lg-stats-tab-btn {
+    flex: 1;
+    padding: 6px 4px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: #fff;
+    color: #6b7280;
+    cursor: pointer;
+  }
+  .lg-stats-tab-btn.active { background: #166534; color: #fff; border-color: #166534; }
+  .lg-stats-scroll { flex: 1; overflow-y: auto; }
   .lg-stats table {
     width: 100%;
     border-collapse: collapse;
@@ -4376,41 +4397,109 @@ function closeLiveMenu() {
   if (m) m.hidden = true;
 }
 
+let _liveStatsTab = 'hitting';
+
+function switchLiveStatsTab(tab) {
+  _liveStatsTab = tab;
+  $$('.lg-stats-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  const g = State.getGame(LiveGameId); if (!g) return;
+  const content = $('#lg-stats-content');
+  if (content) content.innerHTML = renderLiveStatsTable(g, State.getTeam(g.awayTeamId), State.getTeam(g.homeTeamId));
+}
+
 function renderLiveStats(g, away, home) {
+  const tabs = ['hitting','pitching','fielding'];
+  const tabBar = tabs.map(t =>
+    `<button class="lg-stats-tab-btn${_liveStatsTab === t ? ' active' : ''}" data-tab="${t}" onclick="switchLiveStatsTab('${t}')">${t[0].toUpperCase()+t.slice(1)}</button>`
+  ).join('');
+  return `<div class="lg-stats-tabs">${tabBar}</div>
+    <div id="lg-stats-content" class="lg-stats-scroll">${renderLiveStatsTable(g, away, home)}</div>`;
+}
+
+function renderLiveStatsTable(g, away, home) {
+  if (_liveStatsTab === 'pitching') return renderPitchingStats(g, away, home);
+  if (_liveStatsTab === 'fielding') return renderFieldingStats(g, away, home);
+  return renderHittingStats(g, away, home);
+}
+
+function renderHittingStats(g, away, home) {
   const renderTeam = (team, orderKey) => {
     const order = g[orderKey] || [];
-    if (!order.length) return `<tr><td colspan="5" class="muted" style="padding:8px;text-align:center">No lineup set</td></tr>`;
+    if (!order.length) return `<tr><td colspan="7" class="muted" style="padding:8px;text-align:center">No lineup set</td></tr>`;
     return order.map(pid => {
       const p = State.getPlayer(pid);
-      let ab = 0, h = 0, bb = 0, k = 0, rbi = 0;
+      let ab=0, h=0, dbl=0, hr=0, bb=0, k=0, rbi=0;
       (g.events || []).forEach(e => {
         if (e.type !== 'pa_end' || e.batterId !== pid) return;
         if (e.outcome === 'BB') { bb++; return; }
         ab++;
         if (['1B','2B','3B','HR'].includes(e.outcome)) h++;
+        if (e.outcome === '2B') dbl++;
+        if (e.outcome === 'HR') hr++;
         if (e.outcome === 'K') k++;
         rbi += e.rbi || 0;
       });
-      return `<tr>
-        <td>${escapeHtml(p?.name || '?')}</td>
-        <td>${h}-${ab}</td>
-        <td>${bb || 0}</td>
-        <td>${k || 0}</td>
-        <td>${rbi || 0}</td>
-      </tr>`;
+      return `<tr><td>${escapeHtml(p?.name||'?')}</td><td>${h}-${ab}</td><td>${dbl}</td><td>${hr}</td><td>${bb}</td><td>${k}</td><td>${rbi}</td></tr>`;
     }).join('');
   };
+  const hdr = (name, cols) => `<tr class="stats-team-hdr"><th colspan="${cols}">${escapeHtml(name)}</th></tr>
+    <tr class="stats-col-hdr"><th>Player</th><th>H-AB</th><th>2B</th><th>HR</th><th>BB</th><th>K</th><th>RBI</th></tr>`;
   return `<table>
-    <thead>
-      <tr class="stats-team-hdr"><th colspan="5">${escapeHtml(away.name)}</th></tr>
-      <tr class="stats-col-hdr"><th>Player</th><th>H-AB</th><th>BB</th><th>K</th><th>RBI</th></tr>
-    </thead>
-    <tbody>${renderTeam(away, 'awayBattingOrder')}</tbody>
-    <thead>
-      <tr class="stats-team-hdr"><th colspan="5">${escapeHtml(home.name)}</th></tr>
-      <tr class="stats-col-hdr"><th>Player</th><th>H-AB</th><th>BB</th><th>K</th><th>RBI</th></tr>
-    </thead>
-    <tbody>${renderTeam(home, 'homeBattingOrder')}</tbody>
+    <thead>${hdr(away.name, 7)}</thead><tbody>${renderTeam(away,'awayBattingOrder')}</tbody>
+    <thead>${hdr(home.name, 7)}</thead><tbody>${renderTeam(home,'homeBattingOrder')}</tbody>
+  </table>`;
+}
+
+function renderPitchingStats(g, away, home) {
+  // home team pitches during top half (away bats); away team pitches during bottom half (home bats)
+  const renderTeam = (team, positions, pitchingHalf) => {
+    const pitcherIds = (team.playerIds || []).filter(pid => (positions||{})[pid] === 'P');
+    if (!pitcherIds.length) return `<tr><td colspan="7" class="muted" style="padding:8px;text-align:center">No pitcher assigned</td></tr>`;
+    return pitcherIds.map(pid => {
+      const p = State.getPlayer(pid);
+      let outs=0, h=0, bb=0, k=0, r=0, pitches=0;
+      (g.events || []).forEach(e => {
+        if (e.type !== 'pa_end' || e.half !== pitchingHalf) return;
+        if (e.outcome === 'OUT' || e.outcome === 'K') outs++;
+        if (['1B','2B','3B','HR'].includes(e.outcome)) h++;
+        if (e.outcome === 'BB') bb++;
+        if (e.outcome === 'K') k++;
+        r += e.rbi || 0;
+        pitches += e.pitches || 0;
+      });
+      const ip = `${Math.floor(outs/3)}${outs%3 ? '.'+outs%3 : ''}`;
+      return `<tr><td>${escapeHtml(p?.name||'?')}</td><td>${ip}</td><td>${h}</td><td>${bb}</td><td>${k}</td><td>${r}</td><td>${pitches}</td></tr>`;
+    }).join('');
+  };
+  const hdr = (name, cols) => `<tr class="stats-team-hdr"><th colspan="${cols}">${escapeHtml(name)}</th></tr>
+    <tr class="stats-col-hdr"><th>Player</th><th>IP</th><th>H</th><th>BB</th><th>K</th><th>R</th><th>Pitches</th></tr>`;
+  return `<table>
+    <thead>${hdr(home.name+' Pitching', 7)}</thead><tbody>${renderTeam(home, g.homePositions, 'top')}</tbody>
+    <thead>${hdr(away.name+' Pitching', 7)}</thead><tbody>${renderTeam(away, g.awayPositions, 'bottom')}</tbody>
+  </table>`;
+}
+
+function renderFieldingStats(g, away, home) {
+  const renderTeam = (team, positions, fieldingHalf) => {
+    const ids = team.playerIds || [];
+    if (!ids.length) return `<tr><td colspan="4" class="muted" style="padding:8px;text-align:center">No players</td></tr>`;
+    return ids.map(pid => {
+      const p = State.getPlayer(pid);
+      const pos = (positions||{})[pid] || '—';
+      let po=0, err=0;
+      (g.events || []).forEach(e => {
+        if (e.type !== 'pa_end' || e.half !== fieldingHalf) return;
+        if (e.fielderId === pid && e.outcome === 'OUT') po++;
+        if (e.errorById === pid) err++;
+      });
+      return `<tr><td>${escapeHtml(p?.name||'?')}</td><td>${pos}</td><td>${po}</td><td>${err}</td></tr>`;
+    }).join('');
+  };
+  const hdr = (name, cols) => `<tr class="stats-team-hdr"><th colspan="${cols}">${escapeHtml(name)}</th></tr>
+    <tr class="stats-col-hdr"><th>Player</th><th>Pos</th><th>PO</th><th>E</th></tr>`;
+  return `<table>
+    <thead>${hdr(home.name+' Fielding', 4)}</thead><tbody>${renderTeam(home, g.homePositions, 'top')}</tbody>
+    <thead>${hdr(away.name+' Fielding', 4)}</thead><tbody>${renderTeam(away, g.awayPositions, 'bottom')}</tbody>
   </table>`;
 }
 
@@ -5901,6 +5990,7 @@ Object.assign(window, {
   generateTournamentGames, generateChampionshipGame, deleteTournamentUI,
   selectPlay, clearPlaySelection,
   onFielderClick, swapFielder,
+  switchLiveStatsTab,
   renderLiveGame, rerenderLive,
   showBipOutTypeModal, showBipHitModal, showBipErrorModal,
   askLocation, cancelLocation, confirmLocation, finishHit,
