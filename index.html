@@ -4282,6 +4282,7 @@ async function startGame(gameId) {
    LIVE GAME SCREEN
    ============================================================ */
 let LiveGameId = null;
+let _lastLiveGameId = null;
 let _selectedPlayTs = null;
 const _undoStack = [];
 const _redoStack = [];
@@ -4321,10 +4322,11 @@ async function redoPlay() {
 }
 
 function renderLiveGame(gameId) {
-  if (gameId !== LiveGameId) {
+  if (gameId !== _lastLiveGameId) {
     _undoStack.length = 0;
     _redoStack.length = 0;
   }
+  _lastLiveGameId = gameId;
   LiveGameId = gameId;
   _selectedPlayTs = null;
   const g = State.getGame(gameId);
