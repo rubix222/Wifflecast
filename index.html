@@ -4919,6 +4919,7 @@ function attachSvgLocationHandlers(svgEl) {
     } else {
       // Not in BIP mode — short tap on a fielder opens the swap modal
       if (!isDrag && start.fielderId) {
+        e.preventDefault(); // suppress synthetic click that would immediately close the modal
         onFielderClick(start.fielderId, start.fielderEl?.dataset.pos || '');
       }
     }
