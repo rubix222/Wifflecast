@@ -618,7 +618,7 @@
   }
   .pitch-buttons-compact button {
     flex: 1;
-    padding: 10px 4px;
+    padding: 8px 4px;
     border-radius: 8px;
     border: 1px solid #d1d5db;
     background: #fff;
@@ -626,9 +626,13 @@
     font-size: 12px;
     text-align: center;
     cursor: pointer;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    line-height: 1.2;
+  }
+  .pitch-buttons-compact button small {
+    display: block;
+    font-size: 10px;
+    font-weight: 400;
+    opacity: 0.75;
   }
   .pitch-buttons-compact button:hover { background: #f9fafb; }
   .pitch-buttons-compact .btn-bip {
@@ -5164,10 +5168,10 @@ function renderBipPanel(g) {
   return `
     <div class="pitch-buttons-compact">
       <button data-pitch="ball">Ball</button>
+      <button data-pitch="strike_swinging">Strike<small>Swing</small></button>
+      <button data-pitch="strike_looking">Strike<small>Look</small></button>
       <button data-pitch="foul">Foul</button>
-      <button data-pitch="strike_swinging">Strike ↙</button>
-      <button data-pitch="strike_looking">Strike ◻</button>
-      <button data-pitch="bip" class="btn-bip">⚾ BIP</button>
+      <button data-pitch="bip" class="btn-bip">Ball<small>in Play</small></button>
     </div>`;
 }
 
