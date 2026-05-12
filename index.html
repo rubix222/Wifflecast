@@ -765,7 +765,7 @@
   .field-svg .base { fill: #f9fafb; stroke: #1f2937; stroke-width: 1; }
   .field-svg .base.occupied { fill: #facc15; stroke: #92400e; }
   .field-svg .mound { fill: #b07a44; }
-  .field-svg .dirt-arc { fill: none; stroke: #a0714a; stroke-width: 2; }
+  .field-svg .dirt-arc { fill: none; stroke: rgba(255,255,255,0.65); stroke-width: 2; }
   .field-svg .fielder { cursor: pointer; }
   .field-svg .fielder.dragging { opacity: 0.5; }
   .field-svg .fielder circle {
@@ -4738,9 +4738,9 @@ function clearPlaySelection(g) {
    ============================================================ */
 const FIELD = {
   HOME:    { x: 200, y: 390 },
-  FIRST:   { x: 280, y: 310 },
+  FIRST:   { x: 246, y: 310 },
   SECOND:  { x: 200, y: 230 },
-  THIRD:   { x: 120, y: 310 },
+  THIRD:   { x: 154, y: 310 },
   MOUND:   { x: 200, y: 265 },
   CF_HOME: { x: 200, y: 155 },
 };
@@ -4798,7 +4798,7 @@ function drawField(overrideBases = null) {
       <path class="grass" d="M 200 390 L 59 145 A 283 283 0 0 1 341 145 Z"/>
       <polygon class="dirt" points="${FIELD.HOME.x},${FIELD.HOME.y} ${FIELD.FIRST.x},${FIELD.FIRST.y} ${FIELD.SECOND.x},${FIELD.SECOND.y} ${FIELD.THIRD.x},${FIELD.THIRD.y}" />
       <path class="double-line" d="M 105 226 A 190 190 0 0 1 295 226" />
-      <path class="dirt-arc" d="M 158 283 A 48 18 0 0 1 242 283" />
+      <path class="dirt-arc" d="M 144 292 A 58 15 0 0 1 256 292" />
       ${sq(FIELD.HOME.x,   FIELD.HOME.y,   false)}
       ${sq(FIELD.FIRST.x,  FIELD.FIRST.y,  !!(bases && bases[1]))}
       ${sq(FIELD.SECOND.x, FIELD.SECOND.y, !!(bases && bases[2]))}
