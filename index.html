@@ -725,6 +725,8 @@
     margin-bottom: 10px;
   }
   .field-undo-redo { display: flex; gap: 6px; }
+  .field-undo-btn { position: absolute; bottom: 6px; left: 6px; z-index: 5; }
+  .field-redo-btn { position: absolute; bottom: 6px; right: 6px; z-index: 5; }
   .btn-icon {
     background: none;
     border: 1px solid #d1d5db;
@@ -4446,21 +4448,14 @@ function liveGameHTML(g, home, away) {
           ${!isCompleted ? renderMatchupStrip(g) : ''}
           ${!isCompleted && !canScore ? `<div class="help-text" style="padding:10px 14px;font-size:13px;text-align:center">Sign in with scoring privilege to record plays.</div>` : ''}
           <div class="field-wrap">
-            <div class="field-wrap-header">
-              <h3 class="field-wrap-title">
-                ${isCompleted ? 'Field &amp; Bases' : ''}
-                ${isCompleted ? '<span class="field-wrap-hint">Click a play to replay bases</span>' : ''}
-              </h3>
-              ${!isCompleted ? `
-              <div class="field-undo-redo">
-                <button class="btn-icon" onclick="undoPlay()" ${_undoStack.length ? '' : 'disabled'} title="Undo">↩</button>
-                <button class="btn-icon" onclick="redoPlay()" ${_redoStack.length ? '' : 'disabled'} title="Redo">↪</button>
-              </div>` : ''}
-            </div>
+            ${isCompleted ? `<div class="field-wrap-header"><h3 class="field-wrap-title">Field &amp; Bases <span class="field-wrap-hint">Click a play to replay bases</span></h3></div>` : ''}
             <div class="field-and-bases">
               <div class="field-panel">
                 <div id="field-instruction" class="field-instruction" style="display:none"></div>
                 <div id="field-container"></div>
+                ${!isCompleted ? `
+                <button class="btn-icon field-undo-btn" onclick="undoPlay()" ${_undoStack.length ? '' : 'disabled'} title="Undo">↩</button>
+                <button class="btn-icon field-redo-btn" onclick="redoPlay()" ${_redoStack.length ? '' : 'disabled'} title="Redo">↪</button>` : ''}
               </div>
             </div>
           </div>
