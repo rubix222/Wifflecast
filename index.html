@@ -601,6 +601,17 @@
   }
   .lg-stats-tab-btn.active { background: #166534; color: #fff; border-color: #166534; }
   .lg-stats-scroll { flex: 1; overflow-y: auto; }
+  .stats-key {
+    padding: 10px 12px 16px;
+    font-size: 11px;
+    color: #6b7280;
+    border-top: 1px solid #e5e7eb;
+    margin-top: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+  }
+  .stats-key span strong { color: #374151; }
   .lg-stats table {
     width: 100%;
     border-collapse: collapse;
@@ -734,14 +745,11 @@
   .sb-counts .count-block .val { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: #fff; }
 
   .field-wrap {
-    background: #fff;
-    border-radius: 10px;
-    padding: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     flex: 1;
     min-height: 0;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
   }
   .field-wrap-header {
     display: flex;
@@ -4442,16 +4450,23 @@ function renderHittingStats(g, away, home) {
       return `<tr><td>${escapeHtml(p?.name||'?')}</td><td>${h}-${ab}</td><td>${dbl}</td><td>${hr}</td><td>${bb}</td><td>${k}</td><td>${rbi}</td></tr>`;
     }).join('');
   };
-  const hdr = (name, cols) => `<tr class="stats-team-hdr"><th colspan="${cols}">${escapeHtml(name)}</th></tr>
+  const hdr = name => `<tr class="stats-team-hdr"><th colspan="7">${escapeHtml(name)}</th></tr>
     <tr class="stats-col-hdr"><th>Player</th><th>H-AB</th><th>2B</th><th>HR</th><th>BB</th><th>K</th><th>RBI</th></tr>`;
   return `<table>
-    <thead>${hdr(away.name, 7)}</thead><tbody>${renderTeam(away,'awayBattingOrder')}</tbody>
-    <thead>${hdr(home.name, 7)}</thead><tbody>${renderTeam(home,'homeBattingOrder')}</tbody>
-  </table>`;
+    <thead>${hdr(away.name)}</thead><tbody>${renderTeam(away,'awayBattingOrder')}</tbody>
+    <thead>${hdr(home.name)}</thead><tbody>${renderTeam(home,'homeBattingOrder')}</tbody>
+  </table>
+  <div class="stats-key">
+    <span><strong>H-AB</strong> Hits-At Bats</span>
+    <span><strong>2B</strong> Doubles</span>
+    <span><strong>HR</strong> Home Runs</span>
+    <span><strong>BB</strong> Walks</span>
+    <span><strong>K</strong> Strikeouts</span>
+    <span><strong>RBI</strong> Runs Batted In</span>
+  </div>`;
 }
 
 function renderPitchingStats(g, away, home) {
-  // home team pitches during top half (away bats); away team pitches during bottom half (home bats)
   const renderTeam = (team, positions, pitchingHalf) => {
     const pitcherIds = (team.playerIds || []).filter(pid => (positions||{})[pid] === 'P');
     if (!pitcherIds.length) return `<tr><td colspan="7" class="muted" style="padding:8px;text-align:center">No pitcher assigned</td></tr>`;
@@ -4471,36 +4486,47 @@ function renderPitchingStats(g, away, home) {
       return `<tr><td>${escapeHtml(p?.name||'?')}</td><td>${ip}</td><td>${h}</td><td>${bb}</td><td>${k}</td><td>${r}</td><td>${pitches}</td></tr>`;
     }).join('');
   };
-  const hdr = (name, cols) => `<tr class="stats-team-hdr"><th colspan="${cols}">${escapeHtml(name)}</th></tr>
+  const hdr = name => `<tr class="stats-team-hdr"><th colspan="7">${escapeHtml(name)}</th></tr>
     <tr class="stats-col-hdr"><th>Player</th><th>IP</th><th>H</th><th>BB</th><th>K</th><th>R</th><th>Pitches</th></tr>`;
   return `<table>
-    <thead>${hdr(home.name+' Pitching', 7)}</thead><tbody>${renderTeam(home, g.homePositions, 'top')}</tbody>
-    <thead>${hdr(away.name+' Pitching', 7)}</thead><tbody>${renderTeam(away, g.awayPositions, 'bottom')}</tbody>
-  </table>`;
+    <thead>${hdr(home.name)}</thead><tbody>${renderTeam(home, g.homePositions, 'top')}</tbody>
+    <thead>${hdr(away.name)}</thead><tbody>${renderTeam(away, g.awayPositions, 'bottom')}</tbody>
+  </table>
+  <div class="stats-key">
+    <span><strong>IP</strong> Innings Pitched</span>
+    <span><strong>H</strong> Hits Allowed</span>
+    <span><strong>BB</strong> Walks</span>
+    <span><strong>K</strong> Strikeouts</span>
+    <span><strong>R</strong> Runs Allowed</span>
+    <span><strong>Pitches</strong> Pitch Count</span>
+  </div>`;
 }
 
 function renderFieldingStats(g, away, home) {
   const renderTeam = (team, positions, fieldingHalf) => {
     const ids = team.playerIds || [];
-    if (!ids.length) return `<tr><td colspan="4" class="muted" style="padding:8px;text-align:center">No players</td></tr>`;
+    if (!ids.length) return `<tr><td colspan="3" class="muted" style="padding:8px;text-align:center">No players</td></tr>`;
     return ids.map(pid => {
       const p = State.getPlayer(pid);
-      const pos = (positions||{})[pid] || '—';
       let po=0, err=0;
       (g.events || []).forEach(e => {
         if (e.type !== 'pa_end' || e.half !== fieldingHalf) return;
         if (e.fielderId === pid && e.outcome === 'OUT') po++;
         if (e.errorById === pid) err++;
       });
-      return `<tr><td>${escapeHtml(p?.name||'?')}</td><td>${pos}</td><td>${po}</td><td>${err}</td></tr>`;
+      return `<tr><td>${escapeHtml(p?.name||'?')}</td><td>${po}</td><td>${err}</td></tr>`;
     }).join('');
   };
-  const hdr = (name, cols) => `<tr class="stats-team-hdr"><th colspan="${cols}">${escapeHtml(name)}</th></tr>
-    <tr class="stats-col-hdr"><th>Player</th><th>Pos</th><th>PO</th><th>E</th></tr>`;
+  const hdr = name => `<tr class="stats-team-hdr"><th colspan="3">${escapeHtml(name)}</th></tr>
+    <tr class="stats-col-hdr"><th>Player</th><th>PO</th><th>E</th></tr>`;
   return `<table>
-    <thead>${hdr(home.name+' Fielding', 4)}</thead><tbody>${renderTeam(home, g.homePositions, 'top')}</tbody>
-    <thead>${hdr(away.name+' Fielding', 4)}</thead><tbody>${renderTeam(away, g.awayPositions, 'bottom')}</tbody>
-  </table>`;
+    <thead>${hdr(home.name)}</thead><tbody>${renderTeam(home, g.homePositions, 'top')}</tbody>
+    <thead>${hdr(away.name)}</thead><tbody>${renderTeam(away, g.awayPositions, 'bottom')}</tbody>
+  </table>
+  <div class="stats-key">
+    <span><strong>PO</strong> Putouts</span>
+    <span><strong>E</strong> Errors</span>
+  </div>`;
 }
 
 function liveGameHTML(g, home, away) {
