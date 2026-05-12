@@ -2440,6 +2440,32 @@ function walkAdvance(bases, batterRunner) {
   return advanceRunners(bases, 1, batterRunner);
 }
 
+// Hit: all runners advance the same number of bases as the batter
+function hitAdvance(bases, advanceBases, batterRunner) {
+  const newBases = { 1: null, 2: null, 3: null };
+  const runnerIdsScored = [];
+
+  if (advanceBases >= 4) {
+    for (let b = 3; b >= 1; b--) {
+      if (bases[b]) runnerIdsScored.push(bases[b].id);
+    }
+    runnerIdsScored.push(batterRunner.id);
+    return { newBases, runnerIdsScored };
+  }
+
+  for (let b = 3; b >= 1; b--) {
+    if (!bases[b]) continue;
+    const dest = b + advanceBases;
+    if (dest > 3) {
+      runnerIdsScored.push(bases[b].id);
+    } else {
+      newBases[dest] = bases[b];
+    }
+  }
+  newBases[advanceBases] = batterRunner;
+  return { newBases, runnerIdsScored };
+}
+
 const battingTeamId = (g) => g.currentHalf === 'top' ? g.awayTeamId : g.homeTeamId;
 const fieldingTeamId = (g) => g.currentHalf === 'top' ? g.homeTeamId : g.awayTeamId;
 const battingOrderArr = (g) => g.currentHalf === 'top' ? g.awayBattingOrder : g.homeBattingOrder;
@@ -4663,7 +4689,7 @@ function replayToEvent(g, targetPaIdx) {
     } else if (e.outcome === 'K' || e.outcome === 'OUT') {
       outs++;
     } else if (['1B','2B','3B','HR'].includes(e.outcome)) {
-      const res = advanceRunners(bases, ({ '1B':1,'2B':2,'3B':3,'HR':4 })[e.outcome], br);
+      const res = hitAdvance(bases, ({ '1B':1,'2B':2,'3B':3,'HR':4 })[e.outcome], br);
       bases = res.newBases; runsCount = res.runnerIdsScored.length;
     } else if (e.outcome === 'ERR_REACH') {
       const res = advanceRunners(bases, ({ '1B':1,'2B':2,'3B':3,'HR':4 })[e.errBase] || 1, br);
@@ -5241,7 +5267,7 @@ async function applyPaEnd(g, ev) {
   } else if (['1B','2B','3B','HR'].includes(ev.outcome)) {
     const target = ({ '1B': 1, '2B': 2, '3B': 3, 'HR': 4 })[ev.outcome];
     const r = makeRunner(g, batterId);
-    const res = advanceRunners(newBases, target, r);
+    const res = hitAdvance(newBases, target, r);
     Object.assign(newBases, res.newBases);
     runs = res.runnerIdsScored;
   } else if (ev.outcome === 'ERR_REACH') {
