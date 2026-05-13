@@ -796,10 +796,8 @@
   }
   .field-svg .dirt        { fill: #bf8c46; }
   .field-svg .mound-circle{ fill: #b07838; }
-  .field-svg .double-line { stroke: rgba(255,255,255,0.55); stroke-width: 1.5; fill: none; }
-  .field-svg .dirt-arc    { fill: none; stroke: rgba(255,255,255,0.45); stroke-width: 1.5; }
-  .field-svg .inner-arc   { fill: none; stroke: rgba(255,255,255,0.5);  stroke-width: 1.5; }
-  .field-svg .foul-line   { stroke: rgba(255,255,255,0.5); stroke-width: 1.5; fill: none; }
+  .field-svg .double-line { stroke: rgba(255,255,255,0.4); stroke-width: 1.5; fill: none; }
+  .field-svg .foul-line   { stroke: rgba(255,255,255,0.85); stroke-width: 2; fill: none; }
   .field-svg .home-plate  { fill: #f0f0e4; stroke: #bbb; stroke-width: 1; }
   .field-svg .base { fill: #f0f0e4; stroke: #ccc; stroke-width: 1; }
   .field-svg .base.occupied { fill: #facc15; stroke: #92400e; }
@@ -4961,18 +4959,20 @@ function drawField(overrideBases = null) {
   const svg = `
     <svg viewBox="0 0 400 400" class="field-svg" id="field-svg">
       <defs>
-        <pattern id="gf" x="0" y="0" width="22" height="400" patternUnits="userSpaceOnUse">
-          <rect x="0"  y="0" width="11" height="400" fill="#3c8035"/>
-          <rect x="11" y="0" width="11" height="400" fill="#4a9b42"/>
+        <!-- Fair territory: diagonal 45° mowing stripes (classic baseball field look) -->
+        <pattern id="gf" x="0" y="0" width="28" height="28" patternUnits="userSpaceOnUse" patternTransform="rotate(45 200 200)">
+          <rect x="0"  y="0" width="14" height="28" fill="#38782e"/>
+          <rect x="14" y="0" width="14" height="28" fill="#489840"/>
         </pattern>
-        <pattern id="go" x="0" y="0" width="22" height="400" patternUnits="userSpaceOnUse">
-          <rect x="0"  y="0" width="11" height="400" fill="#225420"/>
-          <rect x="11" y="0" width="11" height="400" fill="#2b6828"/>
+        <!-- Foul territory: very dark near-black -->
+        <pattern id="go" x="0" y="0" width="28" height="28" patternUnits="userSpaceOnUse" patternTransform="rotate(45 200 200)">
+          <rect x="0"  y="0" width="14" height="28" fill="#0b160b"/>
+          <rect x="14" y="0" width="14" height="28" fill="#0f1e0f"/>
         </pattern>
       </defs>
-      <!-- Foul territory (striped dark green background) -->
+      <!-- Foul territory (very dark background) -->
       <rect x="0" y="0" width="400" height="400" fill="url(#go)"/>
-      <!-- Fair territory cone (lighter striped green) -->
+      <!-- Fair territory cone (diagonal mowing stripes) -->
       <path d="M 200 390 L 59 145 A 283 283 0 0 1 341 145 Z" fill="url(#gf)"/>
       <!-- Infield dirt ellipse -->
       <ellipse class="dirt" cx="200" cy="304" rx="82" ry="92"/>
@@ -4980,8 +4980,6 @@ function drawField(overrideBases = null) {
       <circle class="mound-circle" cx="${FIELD.MOUND.x}" cy="${FIELD.MOUND.y}" r="17"/>
       <!-- Outfield boundary arc -->
       <path class="double-line" d="M 105 226 A 190 190 0 0 1 295 226"/>
-      <!-- Inner arc (halfway between 1st/3rd and home plate) -->
-      <path class="inner-arc" d="M 178 353 A 43 43 0 0 1 222 353"/>
       <!-- Foul lines -->
       <line class="foul-line" x1="200" y1="390" x2="59"  y2="145"/>
       <line class="foul-line" x1="200" y1="390" x2="341" y2="145"/>
