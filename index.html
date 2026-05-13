@@ -4891,13 +4891,17 @@ function clearPlaySelection(g) {
 /* ============================================================
    FIELD DIAMOND (SVG)
    ============================================================ */
+// True 45° baseball diamond: home at bottom, foul lines at 45°,
+// first/third on those lines, second directly above home.
+// Side length = 57√2 ≈ 80.6 px.  Diamond centre = (200, 318).
+// Mound at 60.5/127.3 of home→second (MLB proportions) = y 321.
 const FIELD = {
-  HOME:    { x: 200, y: 390 },
-  FIRST:   { x: 250, y: 304 },
-  SECOND:  { x: 200, y: 218 },
-  THIRD:   { x: 150, y: 304 },
-  MOUND:   { x: 200, y: 290 },
-  CF_HOME: { x: 200, y: 130 },
+  HOME:    { x: 200, y: 375 },
+  FIRST:   { x: 257, y: 318 },
+  SECOND:  { x: 200, y: 261 },
+  THIRD:   { x: 143, y: 318 },
+  MOUND:   { x: 200, y: 321 },
+  CF_HOME: { x: 200, y: 105 },
 };
 
 let __fieldClickMode = null;
@@ -4959,32 +4963,33 @@ function drawField(overrideBases = null) {
   const svg = `
     <svg viewBox="0 0 400 400" class="field-svg" id="field-svg">
       <defs>
-        <!-- Fair territory: diagonal 45° mowing stripes (classic baseball field look) -->
+        <!-- Fair territory: diagonal 45° mowing stripes -->
         <pattern id="gf" x="0" y="0" width="28" height="28" patternUnits="userSpaceOnUse" patternTransform="rotate(45 200 200)">
           <rect x="0"  y="0" width="14" height="28" fill="#38782e"/>
           <rect x="14" y="0" width="14" height="28" fill="#489840"/>
         </pattern>
-        <!-- Foul territory: very dark near-black -->
+        <!-- Foul territory: near-black -->
         <pattern id="go" x="0" y="0" width="28" height="28" patternUnits="userSpaceOnUse" patternTransform="rotate(45 200 200)">
           <rect x="0"  y="0" width="14" height="28" fill="#0b160b"/>
           <rect x="14" y="0" width="14" height="28" fill="#0f1e0f"/>
         </pattern>
       </defs>
-      <!-- Foul territory (very dark background) -->
+      <!-- Foul territory background -->
       <rect x="0" y="0" width="400" height="400" fill="url(#go)"/>
-      <!-- Fair territory cone (diagonal mowing stripes) -->
-      <path d="M 200 390 L 59 145 A 283 283 0 0 1 341 145 Z" fill="url(#gf)"/>
-      <!-- Infield dirt ellipse -->
-      <ellipse class="dirt" cx="200" cy="304" rx="82" ry="92"/>
+      <!-- Fair territory: true 45° foul lines → SVG edges, arc connects them
+           (0,175) and (400,175) are both exactly 200√2≈283 from home (200,375) -->
+      <path d="M 200 375 L 0 175 A 283 283 0 0 1 400 175 Z" fill="url(#gf)"/>
+      <!-- Infield dirt — circle centred on diamond midpoint -->
+      <ellipse class="dirt" cx="200" cy="318" rx="90" ry="75"/>
       <!-- Pitcher's mound -->
-      <circle class="mound-circle" cx="${FIELD.MOUND.x}" cy="${FIELD.MOUND.y}" r="17"/>
-      <!-- Outfield boundary arc -->
-      <path class="double-line" d="M 105 226 A 190 190 0 0 1 295 226"/>
-      <!-- Foul lines -->
-      <line class="foul-line" x1="200" y1="390" x2="59"  y2="145"/>
-      <line class="foul-line" x1="200" y1="390" x2="341" y2="145"/>
-      <!-- Home plate (pentagon) -->
-      <polygon class="home-plate" points="200,380 212,385 212,395 188,395 188,385"/>
+      <circle class="mound-circle" cx="${FIELD.MOUND.x}" cy="${FIELD.MOUND.y}" r="16"/>
+      <!-- Outfield arc (centred on home, r=230; endpoints at 45° on the foul lines) -->
+      <path class="double-line" d="M 37 212 A 230 230 0 0 1 363 212"/>
+      <!-- Foul lines (white, full length to SVG edge) -->
+      <line class="foul-line" x1="200" y1="375" x2="0"   y2="175"/>
+      <line class="foul-line" x1="200" y1="375" x2="400" y2="175"/>
+      <!-- Home plate pentagon (point toward mound) -->
+      <polygon class="home-plate" points="200,368 212,373 212,382 188,382 188,373"/>
       <!-- Bases -->
       ${sq(FIELD.FIRST.x,  FIELD.FIRST.y,  !!(bases && bases[1]))}
       ${sq(FIELD.SECOND.x, FIELD.SECOND.y, !!(bases && bases[2]))}
