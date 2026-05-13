@@ -4880,9 +4880,9 @@ function clearPlaySelection(g) {
    ============================================================ */
 const FIELD = {
   HOME:    { x: 200, y: 390 },
-  FIRST:   { x: 258, y: 290 },
-  SECOND:  { x: 200, y: 190 },
-  THIRD:   { x: 142, y: 290 },
+  FIRST:   { x: 250, y: 304 },
+  SECOND:  { x: 200, y: 218 },
+  THIRD:   { x: 150, y: 304 },
   MOUND:   { x: 200, y: 290 },
   CF_HOME: { x: 200, y: 130 },
 };
@@ -4925,16 +4925,6 @@ function drawField(overrideBases = null) {
     return `<polygon class="${cls}" points="${cx},${cy-s} ${cx+s},${cy} ${cx},${cy+s} ${cx-s},${cy}" />`;
   };
 
-  const tag = (runner, cx, cy, dx, dy) => {
-    if (!runner) return '';
-    const label = runner.name;
-    const w = Math.max(46, label.length * 6.5);
-    return `<g class="runner-tag" transform="translate(${Math.round(cx + dx - w/2)}, ${cy + dy})">
-      <rect x="0" y="0" width="${w}" height="18" rx="3" />
-      <text x="${w/2}" y="13">${escapeHtml(label)}</text>
-    </g>`;
-  };
-
   const svg = `
     <svg viewBox="0 0 400 400" class="field-svg" id="field-svg">
       <path class="grass" d="M 200 390 L 59 145 A 283 283 0 0 1 341 145 Z"/>
@@ -4945,9 +4935,6 @@ function drawField(overrideBases = null) {
       ${sq(FIELD.FIRST.x,  FIELD.FIRST.y,  !!(bases && bases[1]))}
       ${sq(FIELD.SECOND.x, FIELD.SECOND.y, !!(bases && bases[2]))}
       ${sq(FIELD.THIRD.x,  FIELD.THIRD.y,  !!(bases && bases[3]))}
-      ${tag(bases && bases[1], FIELD.FIRST.x,  FIELD.FIRST.y,  18,  -12)}
-      ${tag(bases && bases[2], FIELD.SECOND.x, FIELD.SECOND.y,  0,  -28)}
-      ${tag(bases && bases[3], FIELD.THIRD.x,  FIELD.THIRD.y, -18, -12)}
       ${isCompleted ? '' : fielderMarker(pitcherId, pitcher, 'P',  FIELD.MOUND.x,   FIELD.MOUND.y)}
       ${isCompleted ? '' : fielderMarker(cfId,      cf,      'CF', FIELD.CF_HOME.x, FIELD.CF_HOME.y)}
     </svg>
