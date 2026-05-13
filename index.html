@@ -758,8 +758,9 @@
     margin-bottom: 10px;
   }
   .field-undo-redo { display: flex; gap: 6px; }
-  .field-undo-btn { position: absolute; bottom: 6px; left: 6px; z-index: 5; }
-  .field-redo-btn { position: absolute; bottom: 6px; right: 6px; z-index: 5; }
+  .field-undo-btn { position: absolute; bottom: 6px; left: 6px; z-index: 5; background: rgba(0,0,0,0.75); color: #fff; border-color: rgba(255,255,255,0.3); }
+  .field-redo-btn { position: absolute; bottom: 6px; right: 6px; z-index: 5; background: rgba(0,0,0,0.75); color: #fff; border-color: rgba(255,255,255,0.3); }
+  .field-undo-btn:hover:not(:disabled), .field-redo-btn:hover:not(:disabled) { background: rgba(0,0,0,0.9); }
   .btn-icon {
     background: none;
     border: 1px solid #d1d5db;
