@@ -804,30 +804,19 @@
   .field-svg .ball-marker-track { fill: none; }
   .field-svg .fielder { cursor: pointer; }
   .field-svg .fielder.dragging { opacity: 0.5; }
-  .field-svg .glove-body {
-    fill: #c8843a;
-    stroke: rgba(255,255,255,0.55);
-    stroke-width: 1.5;
-    stroke-linejoin: round;
+  .field-svg .fielder image {
+    pointer-events: none;
   }
-  .field-svg .glove-web {
-    fill: #9a5c22;
-    stroke: rgba(255,255,255,0.3);
-    stroke-width: 1;
+  .field-svg .fielder:hover image {
+    filter: drop-shadow(0 0 5px #facc15) brightness(1.15);
   }
-  .field-svg .glove-pocket {
-    fill: #7a3c0e;
-    stroke: rgba(255,255,255,0.2);
-    stroke-width: 1;
-  }
-  .field-svg .fielder:hover .glove-body,
-  .field-svg .fielder:hover .glove-web {
-    stroke: #facc15;
-    stroke-width: 2;
+  .field-svg .fielder .pos-badge {
+    fill: rgba(0,0,0,0.65);
+    rx: 5;
   }
   .field-svg .fielder text.pos {
     fill: #fff;
-    font-size: 11px;
+    font-size: 9px;
     font-weight: 800;
     pointer-events: none;
     text-anchor: middle;
@@ -4927,29 +4916,13 @@ function drawField(overrideBases = null) {
 
   const fielderMarker = (pid, player, pos, cx, cy) => {
     if (!pid || !player) return '';
-    // Baseball glove silhouette (palm-side view, thumb on left):
-    //   - 4 finger bumps arc across the top
-    //   - concave notch upper-left leads into thumb lobe
-    //   - thumb hooks out to the left and curves back
-    //   - rounded palm/body at bottom
+    const sz = 34, h = sz / 2;
     return `<g class="fielder" data-pid="${pid}" data-pos="${pos}" transform="translate(${cx},${cy})">
-      <path class="glove-body" d="
-        M 12,-5
-        C 13,-12 10,-17  7,-17
-        C  4,-19  2,-19  0,-19
-        C -2,-19 -4,-18 -5,-16
-        C -7,-18 -9,-18 -10,-16
-        C -8,-13 -9,-11 -12,-8
-        C -16,-9 -21,-7 -21,-1
-        C -21, 5 -16, 8 -12, 7
-        C -12,11 -10,16  -4,17
-        C  2,18  10,14  13, 8
-        C 16, 2  14,-2  12,-5 Z"/>
-      <path class="glove-web" d="M -5,-16 C -3,-20 5,-20 8,-15 C 5,-11 -3,-11 -5,-16 Z"/>
-      <ellipse class="glove-pocket" cx="2" cy="5" rx="7" ry="6"/>
-      <text class="pos" x="2" y="5">${pos}</text>
-      <text class="name bg" y="30">${escapeHtml(player.name)}</text>
-      <text class="name" y="30">${escapeHtml(player.name)}</text>
+      <image href="glove.png" x="${-h}" y="${-h}" width="${sz}" height="${sz}"/>
+      <rect class="pos-badge" x="-11" y="${h + 2}" width="22" height="13" rx="5" ry="5"/>
+      <text class="pos" x="0" y="${h + 9}">${pos}</text>
+      <text class="name bg" y="${h + 24}">${escapeHtml(player.name)}</text>
+      <text class="name" y="${h + 24}">${escapeHtml(player.name)}</text>
     </g>`;
   };
 
