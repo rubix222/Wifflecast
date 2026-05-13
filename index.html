@@ -800,7 +800,7 @@
   .field-svg .foul-line   { stroke: rgba(255,255,255,0.85); stroke-width: 2; fill: none; }
   .field-svg .home-plate  { fill: #f0f0e4; stroke: #bbb; stroke-width: 1; }
   .field-svg .base { fill: #f0f0e4; stroke: #ccc; stroke-width: 1; }
-  .field-svg .base.occupied { fill: #facc15; stroke: #92400e; }
+  .field-svg .base.occupied { fill: #facc15; stroke: #1a1a1a; stroke-width: 1.5; }
   .field-svg .ball-marker-track { fill: none; }
   .field-svg .fielder { cursor: pointer; }
   .field-svg .fielder.dragging { opacity: 0.5; }
@@ -4948,12 +4948,12 @@ function drawField(overrideBases = null) {
     }
   };
 
-  // s sized to match Field.svg base diamonds when scaled to 400×400
-  const s = 13;
+  // Match Field.svg base proportions: ~4.6 wide × ~6.9 tall in 400×400 space
+  const sx = 6, sy = 9;
   const sq = (cx, cy, occ) => {
     // Field.svg already draws unoccupied bases; only overlay when occupied
     if (!occ) return '';
-    return `<polygon class="base occupied" points="${cx},${cy-s} ${cx+s},${cy} ${cx},${cy+s} ${cx-s},${cy}" />`;
+    return `<polygon class="base occupied" points="${cx},${cy-sy} ${cx+sx},${cy} ${cx},${cy+sy} ${cx-sx},${cy}" />`;
   };
 
   const svg = `
