@@ -803,22 +803,31 @@
   .field-svg .dirt-arc { fill: none; stroke: rgba(255,255,255,0.65); stroke-width: 2; }
   .field-svg .fielder { cursor: pointer; }
   .field-svg .fielder.dragging { opacity: 0.5; }
-  .field-svg .fielder circle {
-    fill: #1e3a8a;
+  .field-svg .glove-body {
+    fill: #b87333;
     stroke: #fff;
-    stroke-width: 2.5;
-    transition: r 0.1s, stroke-width 0.1s;
+    stroke-width: 2;
   }
-  .field-svg .fielder:hover circle {
+  .field-svg .glove-thumb {
+    fill: #b87333;
+    stroke: #fff;
+    stroke-width: 1.5;
+  }
+  .field-svg .glove-pocket {
+    fill: #8b5320;
+  }
+  .field-svg .fielder:hover .glove-body,
+  .field-svg .fielder:hover .glove-thumb {
     stroke: #facc15;
     stroke-width: 3;
   }
   .field-svg .fielder text.pos {
     fill: #fff;
-    font-size: 13px;
+    font-size: 11px;
     font-weight: 800;
     pointer-events: none;
     text-anchor: middle;
+    dominant-baseline: central;
   }
   .field-svg .fielder text.name {
     fill: #1f2937;
@@ -4912,8 +4921,10 @@ function drawField(overrideBases = null) {
   const fielderMarker = (pid, player, pos, cx, cy) => {
     if (!pid || !player) return '';
     return `<g class="fielder" data-pid="${pid}" data-pos="${pos}" transform="translate(${cx},${cy})">
-      <circle r="18" />
-      <text class="pos">${pos}</text>
+      <ellipse class="glove-body"  cx="1"   cy="0"  rx="13" ry="14"/>
+      <ellipse class="glove-thumb" cx="-11" cy="-9" rx="5"  ry="8" transform="rotate(-25,-11,-9)"/>
+      <ellipse class="glove-pocket" cx="2"  cy="-1" rx="6"  ry="5"/>
+      <text class="pos" x="2" y="-1">${pos}</text>
       <text class="name bg" y="36">${escapeHtml(player.name)}</text>
       <text class="name" y="36">${escapeHtml(player.name)}</text>
     </g>`;
