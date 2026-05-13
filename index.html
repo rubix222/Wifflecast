@@ -4926,22 +4926,27 @@ function drawField(overrideBases = null) {
 
   const fielderMarker = (pid, player, pos, cx, cy) => {
     if (!pid || !player) return '';
-    // Full glove silhouette: fingers arc at top, thumb lobe to upper-left, rounded mitt body
+    // Baseball glove silhouette (palm-side view, thumb on left):
+    //   - 4 finger bumps arc across the top
+    //   - concave notch upper-left leads into thumb lobe
+    //   - thumb hooks out to the left and curves back
+    //   - rounded palm/body at bottom
     return `<g class="fielder" data-pid="${pid}" data-pos="${pos}" transform="translate(${cx},${cy})">
       <path class="glove-body" d="
-        M 9,-11
-        C 7,-16 2,-17 -1,-17
-        C -4,-17 -7,-16 -7,-12
-        C -9,-10 -11,-9 -12,-7
-        C -16,-9 -22,-8 -22,-2
-        C -22,4  -16,7  -12,5
-        C -13,9  -13,13 -9,15
-        C -5,17  5,17   9,15
-        C 13,12  14,4   13,-2
-        C 13,-7  11,-10 9,-11 Z"/>
-      <path class="glove-web" d="M -7,-12 C -4,-17 5,-17 8,-12 C 4,-8 -3,-8 -7,-12 Z"/>
-      <ellipse class="glove-pocket" cx="2" cy="4" rx="6" ry="6"/>
-      <text class="pos" x="2" y="4">${pos}</text>
+        M 12,-5
+        C 13,-12 10,-17  7,-17
+        C  4,-19  2,-19  0,-19
+        C -2,-19 -4,-18 -5,-16
+        C -7,-18 -9,-18 -10,-16
+        C -8,-13 -9,-11 -12,-8
+        C -16,-9 -21,-7 -21,-1
+        C -21, 5 -16, 8 -12, 7
+        C -12,11 -10,16  -4,17
+        C  2,18  10,14  13, 8
+        C 16, 2  14,-2  12,-5 Z"/>
+      <path class="glove-web" d="M -5,-16 C -3,-20 5,-20 8,-15 C 5,-11 -3,-11 -5,-16 Z"/>
+      <ellipse class="glove-pocket" cx="2" cy="5" rx="7" ry="6"/>
+      <text class="pos" x="2" y="5">${pos}</text>
       <text class="name bg" y="30">${escapeHtml(player.name)}</text>
       <text class="name" y="30">${escapeHtml(player.name)}</text>
     </g>`;
@@ -4975,8 +4980,6 @@ function drawField(overrideBases = null) {
       <circle class="mound-circle" cx="${FIELD.MOUND.x}" cy="${FIELD.MOUND.y}" r="17"/>
       <!-- Outfield boundary arc -->
       <path class="double-line" d="M 105 226 A 190 190 0 0 1 295 226"/>
-      <!-- Infield edge arc -->
-      <path class="dirt-arc" d="M 100 217 A 200 200 0 0 1 300 217"/>
       <!-- Inner arc (halfway between 1st/3rd and home plate) -->
       <path class="inner-arc" d="M 178 353 A 43 43 0 0 1 222 353"/>
       <!-- Foul lines -->
