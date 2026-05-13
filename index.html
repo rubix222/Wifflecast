@@ -4747,12 +4747,12 @@ function renderBatterRow(g) {
 }
 
 function renderPlayLog(g) {
-  const events = (g.events || []).filter(e => e.type === 'pa_end').slice().reverse();
+  const events = (g.events || []).filter(e => e.type === 'pa_end');
   if (!events.length) return '<li class="muted small">No plays yet.</li>';
   const isCompleted = g.status === 'completed';
   const parts = [];
   let lastKey = null;
-  events.slice(0, 60).forEach(e => {
+  events.slice(-60).forEach(e => {
     const key = e.inning + '-' + e.half;
     if (key !== lastKey) {
       parts.push(`<li class="play-inning-break">${e.half === 'top' ? 'Top' : 'Bottom'} ${ordinal(e.inning)}</li>`);
@@ -4762,7 +4762,7 @@ function renderPlayLog(g) {
     const desc = describeOutcome(e);
     const handler = isCompleted ? `data-ts="${e.ts}" onclick="selectPlay(${e.ts})"` : '';
     const scorerTag = isAdmin() && e.scoredByName ? ` <span class="play-scorer" title="Scored by ${escapeHtml(e.scoredByName)}">✎${escapeHtml(e.scoredByName)}</span>` : '';
-    parts.push(`<li class="play-entry${isCompleted ? ' clickable' : ''}" ${handler}><span class="play-meta">${e.half === 'top' ? 'T' : 'B'}${e.inning}</span> ${escapeHtml(batter?.name || '?')} — ${desc}${scorerTag}</li>`);
+    parts.push(`<li class="play-entry${isCompleted ? ' clickable' : ''}" ${handler}>${escapeHtml(batter?.name || '?')} — ${desc}${scorerTag}</li>`);
   });
   return parts.join('');
 }
@@ -4880,11 +4880,11 @@ function clearPlaySelection(g) {
    ============================================================ */
 const FIELD = {
   HOME:    { x: 200, y: 390 },
-  FIRST:   { x: 246, y: 310 },
-  SECOND:  { x: 200, y: 230 },
-  THIRD:   { x: 154, y: 310 },
-  MOUND:   { x: 200, y: 265 },
-  CF_HOME: { x: 200, y: 155 },
+  FIRST:   { x: 258, y: 290 },
+  SECOND:  { x: 200, y: 190 },
+  THIRD:   { x: 142, y: 290 },
+  MOUND:   { x: 200, y: 290 },
+  CF_HOME: { x: 200, y: 130 },
 };
 
 let __fieldClickMode = null;
@@ -4940,7 +4940,7 @@ function drawField(overrideBases = null) {
       <path class="grass" d="M 200 390 L 59 145 A 283 283 0 0 1 341 145 Z"/>
       <polygon class="dirt" points="${FIELD.HOME.x},${FIELD.HOME.y} ${FIELD.FIRST.x},${FIELD.FIRST.y} ${FIELD.SECOND.x},${FIELD.SECOND.y} ${FIELD.THIRD.x},${FIELD.THIRD.y}" />
       <path class="double-line" d="M 105 226 A 190 190 0 0 1 295 226" />
-      <path class="dirt-arc" d="M 168 334 A 65 65 0 0 1 232 334" />
+      <path class="dirt-arc" d="M 100 217 A 200 200 0 0 1 300 217" />
       ${sq(FIELD.HOME.x,   FIELD.HOME.y,   false)}
       ${sq(FIELD.FIRST.x,  FIELD.FIRST.y,  !!(bases && bases[1]))}
       ${sq(FIELD.SECOND.x, FIELD.SECOND.y, !!(bases && bases[2]))}
