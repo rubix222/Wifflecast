@@ -804,6 +804,17 @@
   .field-svg .ball-marker-track { fill: none; }
   .field-svg .fielder { cursor: pointer; }
   .field-svg .fielder.dragging { opacity: 0.5; }
+  /* --- fielder marker: circle mode (default) --- */
+  .field-svg .fielder .fielder-circle {
+    fill: rgba(15,15,15,0.72);
+    stroke: rgba(255,255,255,0.85);
+    stroke-width: 1.5;
+  }
+  .field-svg .fielder:hover .fielder-circle {
+    stroke: #facc15;
+    stroke-width: 2.5;
+  }
+  /* --- fielder marker: glove mode (location-entry) --- */
   .field-svg .fielder image {
     pointer-events: none;
   }
@@ -812,11 +823,11 @@
   }
   .field-svg .fielder .pos-badge {
     fill: rgba(0,0,0,0.65);
-    rx: 5;
   }
+  /* shared pos text (circle center or badge) */
   .field-svg .fielder text.pos {
     fill: #fff;
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 800;
     pointer-events: none;
     text-anchor: middle;
@@ -4916,14 +4927,25 @@ function drawField(overrideBases = null) {
 
   const fielderMarker = (pid, player, pos, cx, cy) => {
     if (!pid || !player) return '';
-    const sz = 34, h = sz / 2;
-    return `<g class="fielder" data-pid="${pid}" data-pos="${pos}" transform="translate(${cx},${cy})">
-      <image href="glove.png" x="${-h}" y="${-h}" width="${sz}" height="${sz}"/>
-      <rect class="pos-badge" x="-11" y="${h + 2}" width="22" height="13" rx="5" ry="5"/>
-      <text class="pos" x="0" y="${h + 9}">${pos}</text>
-      <text class="name bg" y="${h + 24}">${escapeHtml(player.name)}</text>
-      <text class="name" y="${h + 24}">${escapeHtml(player.name)}</text>
-    </g>`;
+    if (__fieldClickMode) {
+      // Location-entry mode: glove image so the user can drag it to the play location
+      const sz = 34, h = sz / 2;
+      return `<g class="fielder" data-pid="${pid}" data-pos="${pos}" transform="translate(${cx},${cy})">
+        <image href="glove.png" x="${-h}" y="${-h}" width="${sz}" height="${sz}"/>
+        <rect class="pos-badge" x="-12" y="${h + 2}" width="24" height="14" rx="5" ry="5"/>
+        <text class="pos" x="0" y="${h + 10}">${pos}</text>
+        <text class="name bg" y="${h + 26}">${escapeHtml(player.name)}</text>
+        <text class="name" y="${h + 26}">${escapeHtml(player.name)}</text>
+      </g>`;
+    } else {
+      // Normal mode: simple circle + position label + name
+      return `<g class="fielder" data-pid="${pid}" data-pos="${pos}" transform="translate(${cx},${cy})">
+        <circle class="fielder-circle" cx="0" cy="0" r="16"/>
+        <text class="pos" x="0" y="0">${pos}</text>
+        <text class="name bg" y="26">${escapeHtml(player.name)}</text>
+        <text class="name" y="26">${escapeHtml(player.name)}</text>
+      </g>`;
+    }
   };
 
   // s sized to match Field.svg base diamonds when scaled to 400×400
