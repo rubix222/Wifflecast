@@ -4867,13 +4867,14 @@ function clearPlaySelection(g) {
 // Coordinates map Field.svg (1733×1911) → 400×400 display (×400/1733, ×400/1911).
 // Key Field.svg anchors: foul-line origin (866,1452), bases at their path centres,
 // pitcher's rubber rect centre (866,1116).
+// Coordinates map Field.svg (1510×1696) → 400×400 display (×400/1510, ×400/1696).
 const FIELD = {
-  HOME:    { x: 200, y: 304 },   // foul-line origin (866,1452)
-  FIRST:   { x: 254, y: 235 },   // (1100,1125)
-  SECOND:  { x: 200, y: 154 },   // (866,735)
-  THIRD:   { x: 147, y: 235 },   // (635,1125)
-  MOUND:   { x: 200, y: 225 },   // pitcher's rubber centre (866,1116)
-  CF_HOME: { x: 200, y:  82 },   // deep centre field
+  HOME:    { x: 200, y: 331 },   // foul-line origin / batter-box top (753,1402)
+  FIRST:   { x: 262, y: 254 },   // 1st base centre (987,1076)
+  SECOND:  { x: 200, y: 162 },   // 2nd base centre (753,686)
+  THIRD:   { x: 138, y: 254 },   // 3rd base centre (522,1076)
+  MOUND:   { x: 200, y: 244 },   // pitcher's rubber centre (754,1067) −8 half-radius
+  CF_HOME: { x: 200, y: 101 },   // deep centre field (143 px above mound raw, −8)
 };
 
 let __fieldClickMode = null;
