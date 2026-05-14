@@ -4925,10 +4925,16 @@ function drawField(overrideBases = null) {
 
   // Match Field.svg base proportions: ~4.6 wide × ~6.9 tall in 400×400 space
   const sx = 6, sy = 9;
-  const sq = (cx, cy, occ) => {
-    // Field.svg already draws unoccupied bases; only overlay when occupied
-    if (!occ) return '';
-    return `<polygon class="base occupied" points="${cx},${cy-sy} ${cx+sx},${cy} ${cx},${cy+sy} ${cx-sx},${cy}" />`;
+  const sq = (cx, cy, runner) => {
+    if (!runner) return '';
+    const ini = playerInitials(runner.playerId);
+    const tagW = Math.max(18, ini.length * 6 + 8);
+    return `
+      <polygon class="base occupied" points="${cx},${cy-sy} ${cx+sx},${cy} ${cx},${cy+sy} ${cx-sx},${cy}" />
+      <g class="runner-tag" transform="translate(${cx},${cy - sy - 9})">
+        <rect x="${-tagW/2}" y="-7" width="${tagW}" height="13" rx="3"/>
+        <text x="0" y="3">${ini}</text>
+      </g>`
   };
 
   // Instruction overlay rendered inside the SVG — never affects DOM layout
@@ -4954,9 +4960,9 @@ function drawField(overrideBases = null) {
            foul lines, arcs, bases, home plate, batter's boxes, pitcher's rubber) -->
       <image href="Field.svg" x="0" y="0" width="400" height="400" preserveAspectRatio="none"/>
       <!-- Occupied base highlights (yellow overlay, aligned to Field.svg base centres) -->
-      ${sq(FIELD.FIRST.x,  FIELD.FIRST.y,  !!(bases && bases[1]))}
-      ${sq(FIELD.SECOND.x, FIELD.SECOND.y, !!(bases && bases[2]))}
-      ${sq(FIELD.THIRD.x,  FIELD.THIRD.y,  !!(bases && bases[3]))}
+      ${sq(FIELD.FIRST.x,  FIELD.FIRST.y,  bases && bases[1])}
+      ${sq(FIELD.SECOND.x, FIELD.SECOND.y, bases && bases[2])}
+      ${sq(FIELD.THIRD.x,  FIELD.THIRD.y,  bases && bases[3])}
       <!-- Fielder markers -->
       ${isCompleted ? '' : fielderMarker(pitcherId, pitcher, 'P',  FIELD.MOUND.x,   FIELD.MOUND.y)}
       ${isCompleted ? '' : fielderMarker(cfId,      cf,      'CF', FIELD.CF_HOME.x, FIELD.CF_HOME.y)}
