@@ -1791,6 +1791,11 @@
       </div>
       <p class="help-text" style="margin-top:10px">Export saves all players, teams, games, and tournaments to a JSON file. Import replaces all current data.</p>
     </div>
+    <div class="admin-panel-section">
+      <h3 class="admin-panel-heading">Email Settings</h3>
+      <p class="help-text" style="margin-bottom:10px">Configure EmailJS to automatically send game recaps to linked players when a game finishes.</p>
+      <button class="btn" onclick="showEmailSetupModal()">⚙️ Configure EmailJS</button>
+    </div>
   </section>
 
   <section id="view-rules" class="view">
@@ -4688,7 +4693,6 @@ function liveGameHTML(g, home, away) {
         </div>
 
         <div class="lg-pane" data-tab="plays" ${playsPaneHidden ? 'hidden' : ''}>
-          ${isCompleted ? `<div style="padding:8px 10px"><button class="btn btn-sm btn-primary" onclick="showRecapModal('${g.id}')">📋 Share Recap</button></div>` : ''}
           <div class="play-log" style="flex:1;overflow-y:auto;border-radius:0;box-shadow:none;background:#fff">
             <ul id="play-log-list">${renderPlayLog(g)}</ul>
           </div>
@@ -5717,6 +5721,7 @@ async function endHalfInningInternal(g) {
 
 async function finishGame(g, _reason) {
   await State.updateGame(g.id, { status: 'completed', isOver: true });
+  autoSendRecapEmails(g.id);
   Render.games();
 }
 
@@ -5733,6 +5738,7 @@ async function endGameEarly(gameId) {
   if (!confirm('End the game now? Final scores will be locked.')) return;
   const g = State.getGame(gameId); if (!g) return;
   await State.updateGame(gameId, { status: 'completed', isOver: true });
+  autoSendRecapEmails(gameId);
   renderLiveGame(gameId);
   Render.games();
 }
@@ -6034,6 +6040,40 @@ async function sendRecapEmails(gameId) {
   toast(sent + ' recap email' + (sent !== 1 ? 's' : '') + ' sent' + (failed ? ', ' + failed + ' failed' : ''), sent ? 'success' : 'error');
 }
 
+/* Auto-send recap to all users linked to players in the game when a game finishes */
+async function autoSendRecapEmails(gameId) {
+  const cfg = getEmailConfig();
+  if (!cfg) return; // EmailJS not configured — skip silently
+  const g = State.getGame(gameId); if (!g) return;
+  const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
+  const allPids = new Set([...(home?.playerIds || []), ...(away?.playerIds || [])]);
+  // Only email users who have a linked player in this game
+  const recipients = State.users
+    .filter(u => u.playerId && allPids.has(u.playerId) && u.email)
+    .map(u => ({ email: u.email, name: u.name || u.email }));
+  if (!recipients.length) return;
+  try { emailjs.init(cfg.publicKey); } catch (e) { return; }
+  const recap = buildRecapText(g);
+  const subject = away.name + ' @ ' + home.name + ' — WiffleCast Recap';
+  let sent = 0, failed = 0;
+  for (const r of recipients) {
+    try {
+      await emailjs.send(cfg.serviceId, cfg.templateId, {
+        to_email: r.email,
+        to_name: r.name,
+        subject,
+        message: recap,
+      });
+      sent++;
+    } catch (e) {
+      console.warn('Recap email failed for', r.email, e);
+      failed++;
+    }
+  }
+  if (sent) toast(sent + ' recap email' + (sent !== 1 ? 's' : '') + ' sent', 'success');
+  if (failed) console.warn('autoSendRecapEmails: ' + failed + ' failed');
+}
+
 function showRecapModal(gameId) {
   const g = State.getGame(gameId); if (!g) return;
   const text = buildRecapText(g);
@@ -6232,7 +6272,7 @@ Object.assign(window, {
   startGame, setPosition, moveBatter,
   endHalfInning, endGameEarly,
   showEditScoreModal, reopenGame, _esAdj, _esSave,
-  showRecapModal, _copyRecap, _shareRecap, sendRecapEmails, showEmailSetupModal, _saveEmailSetup, _toggleEmailSetup,
+  showRecapModal, _copyRecap, _shareRecap, sendRecapEmails, autoSendRecapEmails, showEmailSetupModal, _saveEmailSetup, _toggleEmailSetup,
   showNewTournamentModal, submitNewTournament, selectTournament,
   generateTournamentGames, generateChampionshipGame, deleteTournamentUI,
   selectPlay, clearPlaySelection,
