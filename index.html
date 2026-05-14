@@ -4152,6 +4152,23 @@ async function submitNewTournament() {
   if (!name) { toast('Enter an event name', 'error'); return; }
   if (teamIds.length < 2) { toast('Select at least 2 teams', 'error'); return; }
   if (format === 'playoff' && teamIds.length < 3) { toast('Playoff format needs at least 3 teams', 'error'); return; }
+  // Ensure no two selected teams share a player
+  const selectedTeams = teamIds.map(id => State.getTeam(id)).filter(Boolean);
+  const conflicts = [];
+  for (let i = 0; i < selectedTeams.length; i++) {
+    for (let j = i + 1; j < selectedTeams.length; j++) {
+      const a = selectedTeams[i], b = selectedTeams[j];
+      const shared = (a.playerIds || []).filter(pid => (b.playerIds || []).includes(pid));
+      if (shared.length) {
+        const names = shared.map(pid => State.getPlayer(pid)?.name || pid).join(', ');
+        conflicts.push(`${escapeHtml(a.name)} & ${escapeHtml(b.name)} share: ${names}`);
+      }
+    }
+  }
+  if (conflicts.length) {
+    toast('Teams share players — ' + conflicts.join('; '), 'error');
+    return;
+  }
   try {
     const t = await State.addTournament({ name, teamIds, format });
     Modal.hide();
