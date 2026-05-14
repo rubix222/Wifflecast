@@ -2367,6 +2367,7 @@ const State = {
       isOver: false,
       ...(data.tournamentId   ? { tournamentId: data.tournamentId }     : {}),
       ...(data.isChampionship ? { isChampionship: true }               : {}),
+      ...(data.deRound        ? { deRound: data.deRound }              : {}),
     };
     this.games.push(g);
     await Storage.saveGame(g);
@@ -4476,6 +4477,7 @@ async function submitNewTournament() {
     Render.tournaments();
     switchTab('tournaments');
     toast('Event created!', 'success');
+    await generateTournamentGames(t.id);
   } catch (err) {
     toast('Failed to create event: ' + (err.message || err), 'error');
   }
@@ -4620,6 +4622,31 @@ async function generateChampionshipGame(tournId) {
   Render.all();
   renderTournamentDetail(tournId);
   toast('Championship game created!', 'success');
+}
+
+// Called automatically after a tournament game completes.
+// Silently checks conditions and triggers the next round or championship.
+async function autoGenerateTournamentRound(tournId) {
+  const t = State.getTournament(tournId); if (!t) return;
+
+  if (t.format === 'double_elim') {
+    const deGames = State.games.filter(g => g.tournamentId === tournId && !g.isChampionship);
+    if (!deGames.length) return;
+    const maxRound = Math.max(...deGames.map(g => g.deRound || 1));
+    const curRoundGames = deGames.filter(g => (g.deRound || 1) === maxRound);
+    if (!curRoundGames.every(g => g.status === 'completed')) return;
+    const champExists = State.games.some(g => g.tournamentId === tournId && g.isChampionship);
+    if (champExists) return;
+    await generateTournamentGames(tournId);
+
+  } else if (t.format === 'playoff') {
+    const nonChamp = State.games.filter(g => g.tournamentId === tournId && !g.isChampionship);
+    const totalPairs = t.teamIds.length * (t.teamIds.length - 1) / 2;
+    if (nonChamp.filter(g => g.status === 'completed').length < totalPairs) return;
+    const champExists = State.games.some(g => g.tournamentId === tournId && g.isChampionship);
+    if (champExists) return;
+    await generateChampionshipGame(tournId);
+  }
 }
 
 function showTournamentModal(id) {
@@ -6392,7 +6419,10 @@ async function finishGame(g, _reason) {
   await State.updateGame(g.id, { status: 'completed', isOver: true });
   autoSendRecapEmails(g.id);
   Render.games();
-  if (g.tournamentId) Render.tournaments();
+  if (g.tournamentId) {
+    Render.tournaments();
+    await autoGenerateTournamentRound(g.tournamentId);
+  }
 }
 
 async function endHalfInning(gameId) {
@@ -6411,7 +6441,10 @@ async function endGameEarly(gameId) {
   autoSendRecapEmails(gameId);
   renderLiveGame(gameId);
   Render.games();
-  if (g.tournamentId) Render.tournaments();
+  if (g.tournamentId) {
+    Render.tournaments();
+    await autoGenerateTournamentRound(g.tournamentId);
+  }
 }
 
 /* ============================================================
@@ -6946,7 +6979,7 @@ Object.assign(window, {
   showEditScoreModal, reopenGame, _esAdj, _esSave,
   showRecapModal, _copyRecap, _shareRecap, sendRecapEmails, autoSendRecapEmails, showEmailSetupModal, _saveEmailSetup, _toggleEmailSetup,
   showNewTournamentModal, submitNewTournament, showTournamentModal, submitTournament, selectTournament, tournamentBack,
-  generateTournamentGames, generateChampionshipGame, deleteTournamentUI,
+  generateTournamentGames, generateChampionshipGame, autoGenerateTournamentRound, deleteTournamentUI,
   selectPlay, clearPlaySelection,
   onFielderClick, swapFielder,
   switchLiveStatsTab,
