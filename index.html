@@ -1480,6 +1480,7 @@
   }
   .tourn-leader td { background: #f0fdf4; }
   .tourn-finalist td { background: #fefce8; }
+  .tourn-eliminated td { background: #f9fafb; color: #9ca3af; }
   .tourn-cutoff-row td { padding: 0; border: none; background: none; }
   .tourn-cutoff-label {
     display: block;
@@ -2238,6 +2239,30 @@ const State = {
       });
       return { team, W, L, T, RF, RA, pts: W*2+T, rd: RF-RA };
     }).filter(Boolean).sort((a, b) => b.pts - a.pts || a.RA - b.RA || b.rd - a.rd);
+  },
+
+  computeDoubleElimStandings(tournamentId) {
+    const tourn = this.getTournament(tournamentId); if (!tourn) return [];
+    const games = this.games.filter(g => g.tournamentId === tournamentId && !g.isChampionship);
+    const completedGames = games.filter(g => g.status === 'completed');
+    return tourn.teamIds.map(teamId => {
+      const team = this.getTeam(teamId); if (!team) return null;
+      let W=0, L=0, RF=0, RA=0;
+      completedGames.forEach(g => {
+        if (g.homeTeamId !== teamId && g.awayTeamId !== teamId) return;
+        const isHome = g.homeTeamId === teamId;
+        const my = isHome ? g.score.home : g.score.away;
+        const opp = isHome ? g.score.away : g.score.home;
+        RF += my; RA += opp;
+        if (my > opp) W++; else if (my < opp) L++;
+      });
+      const gamesPlayed = W + L;
+      const eliminated = L >= 2;
+      return { team, W, L, RF, RA, gamesPlayed, eliminated };
+    }).filter(Boolean).sort((a, b) => {
+      if (a.eliminated !== b.eliminated) return a.eliminated ? 1 : -1;
+      return b.W - a.W || a.L - b.L;
+    });
   },
 
   // ---- User CRUD ----
@@ -4166,100 +4191,186 @@ function tournamentBack() {
   Render.tournaments();
 }
 
+function buildChampSection(id, champGame, finalists, useGenerateFn) {
+  if (!champGame) {
+    const canGenerate = isAdmin() && finalists.length === 2;
+    const genFn = useGenerateFn ? `generateTournamentGames('${id}')` : `generateChampionshipGame('${id}')`;
+    return `<div class="champ-bracket champ-pending">
+      <div class="champ-bracket-label">🏆 Championship</div>
+      <div class="champ-finalists">
+        <div class="champ-finalist">${escapeHtml(finalists[0]?.name || '?')}</div>
+        <div class="champ-vs">vs</div>
+        <div class="champ-finalist">${escapeHtml(finalists[1]?.name || '?')}</div>
+      </div>
+      ${canGenerate ? `<button class="btn btn-primary" style="margin-top:12px" onclick="${genFn}">⚙ Create Championship Game</button>` : ''}
+    </div>`;
+  }
+  const chHome = State.getTeam(champGame.homeTeamId), chAway = State.getTeam(champGame.awayTeamId);
+  const isComplete = champGame.status === 'completed';
+  let winnerName = '';
+  if (isComplete) {
+    const w = champGame.score.away > champGame.score.home ? chAway : champGame.score.home > champGame.score.away ? chHome : null;
+    winnerName = w ? w.name : 'Tie';
+  }
+  return `<div class="champ-bracket${isComplete ? ' champ-complete' : ''}">
+    <div class="champ-bracket-label">🏆 Championship</div>
+    ${isComplete && winnerName ? `<div class="champ-winner">🎉 ${escapeHtml(winnerName)} wins the tournament!</div>` : ''}
+    <div class="champ-finalists" style="cursor:pointer" onclick="openGame('${champGame.id}')">
+      <div class="champ-finalist${isComplete && champGame.score.away >= champGame.score.home ? ' champ-finalist-winner' : ''}">${escapeHtml(chAway?.name||'?')}</div>
+      <div class="champ-score">${isComplete ? `${champGame.score.away}–${champGame.score.home}` : champGame.status.replace('_',' ')}</div>
+      <div class="champ-finalist${isComplete && champGame.score.home >= champGame.score.away ? ' champ-finalist-winner' : ''}">${escapeHtml(chHome?.name||'?')}</div>
+    </div>
+  </div>`;
+}
+
+function buildGameListItem(g) {
+  const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
+  const sub = g.status === 'completed' ? `${g.score.away}–${g.score.home} · Final`
+            : g.status === 'in_progress' ? 'In Progress'
+            : 'Not Started';
+  const rowActions = g.status === 'setup' && canUserScore()
+    ? `<div style="margin-top:4px" onclick="event.stopPropagation()"><button class="btn btn-sm btn-primary" onclick="showSetupModal('${g.id}')">▶ Start Scoring</button></div>`
+    : g.status === 'in_progress'
+    ? `<div style="margin-top:4px;display:flex;gap:6px" onclick="event.stopPropagation()">
+         <button class="btn btn-sm" onclick="renderLiveGame('${g.id}',true)">👁 Watch</button>
+         ${canUserScore() ? `<button class="btn btn-sm btn-primary" onclick="openGameForScoring('${g.id}')">▶ Resume</button>` : ''}
+       </div>`
+    : '';
+  return `<div class="player-list-item" style="cursor:pointer" onclick="openGame('${g.id}')">
+    <div class="pli-name">${escapeHtml(away?.name||'?')} @ ${escapeHtml(home?.name||'?')}</div>
+    <div class="pli-sub">${sub}</div>
+    ${rowActions}
+  </div>`;
+}
+
 function renderTournamentDetail(id) {
   const detail = $('#tournaments-detail'); if (!detail) return;
   const t = State.getTournament(id);
   if (!t) { detail.innerHTML = '<div class="player-detail-empty"><span>Tournament not found</span></div>'; return; }
 
+  const isDE      = t.format === 'double_elim';
   const isPlayoff = t.format === 'playoff';
-  const standings  = State.computeTournamentStandings(id);
-  const allGames   = State.games.filter(g => g.tournamentId === id).sort((a, b) => b.createdAt - a.createdAt);
-  const rrGames    = allGames.filter(g => !g.isChampionship);
-  const champGame  = allGames.find(g => g.isChampionship);
+  const allGames  = State.games.filter(g => g.tournamentId === id).sort((a, b) => (a.deRound||0) - (b.deRound||0) || a.createdAt - b.createdAt);
+  const champGame = allGames.find(g => g.isChampionship);
+  const nonChamp  = allGames.filter(g => !g.isChampionship);
 
-  // How many round-robin pairs are still ungenerated
-  const existingRR = rrGames.map(g => `${g.homeTeamId}|${g.awayTeamId}`);
-  let rrPairsLeft = 0;
-  for (let i=0; i<t.teamIds.length; i++)
-    for (let j=i+1; j<t.teamIds.length; j++) {
-      const a = t.teamIds[i], b = t.teamIds[j];
-      if (!existingRR.includes(`${a}|${b}`) && !existingRR.includes(`${b}|${a}`)) rrPairsLeft++;
+  let standingsHtml = '', champSection = '', gamesHtml = '', adminBtn = '';
+
+  // ── Double Elimination ──────────────────────────────────────────────────────
+  if (isDE) {
+    const standings = State.computeDoubleElimStandings(id);
+    const maxRound  = nonChamp.length ? Math.max(...nonChamp.map(g => g.deRound || 1)) : 0;
+    const curRoundDone = maxRound === 0 || nonChamp.filter(g => (g.deRound||1) === maxRound).every(g => g.status === 'completed');
+    const activeCount  = standings.filter(s => !s.eliminated).length;
+
+    // Standings table
+    const deRows = standings.map((row, i) => {
+      const badge = row.eliminated ? `<span style="font-size:11px;color:#dc2626;font-weight:600;margin-left:4px">OUT</span>` : '';
+      return `<tr class="${i === 0 && !row.eliminated ? 'tourn-leader' : ''}${row.eliminated ? ' tourn-eliminated' : ''}">
+        <td>${row.eliminated ? '✗' : i+1}</td>
+        <td><strong>${escapeHtml(row.team.name)}</strong>${badge}</td>
+        <td>${row.W}</td><td>${row.L}</td><td>${row.gamesPlayed}</td>
+      </tr>`;
+    }).join('');
+    standingsHtml = `<div class="tourn-standings-scroll">
+      <table class="stats-table tourn-standings-table" style="width:100%">
+        <thead><tr><th>#</th><th>Team</th><th>W</th><th>L</th><th>GP</th></tr></thead>
+        <tbody>${deRows}</tbody>
+      </table>
+    </div>`;
+
+    // Championship section (when 2 active teams remain or champ exists)
+    if (champGame) {
+      champSection = buildChampSection(id, champGame, []);
+    } else if (curRoundDone && activeCount === 2 && maxRound > 0) {
+      const finalists = standings.filter(s => !s.eliminated).map(s => s.team);
+      champSection = buildChampSection(id, null, finalists, true);
     }
 
-  const totalRRPairs = t.teamIds.length * (t.teamIds.length - 1) / 2;
-  const rrComplete   = rrGames.filter(g => g.status === 'completed').length === totalRRPairs;
-
-  // Standings rows — mark top-2 cutoff for playoff format
-  const standingsRows = standings.map((row, i) => {
-    const isFinalist = isPlayoff && i < 2;
-    return `<tr class="${i === 0 ? 'tourn-leader' : ''}${isFinalist ? ' tourn-finalist' : ''}">
-      <td>${isFinalist ? (i === 0 ? '🥇' : '🥈') : i+1}</td>
-      <td><strong>${escapeHtml(row.team.name)}</strong></td>
-      <td>${row.W}</td><td>${row.L}</td><td>${row.T}</td>
-      <td>${row.pts}</td><td>${row.RF}</td><td>${row.RA}</td>
-      <td>${row.rd >= 0 ? '+' : ''}${row.rd}</td>
-    </tr>${isPlayoff && i === 1 && standings.length > 2 ? '<tr class="tourn-cutoff-row"><td colspan="9"><span class="tourn-cutoff-label">── advance to finals ──</span></td></tr>' : ''}`;
-  }).join('');
-
-  // Championship bracket block (playoff only)
-  let champSection = '';
-  if (isPlayoff) {
-    if (!rrComplete) {
-      champSection = `<div class="champ-bracket champ-pending">
-        <div class="champ-bracket-label">🏆 Championship</div>
-        <div class="help-text">Complete all round-robin games to determine the finalists.</div>
+    // Admin button (only show generate for next round; championship creation is in the champ section)
+    if (isAdmin()) {
+      const showGenBtn = curRoundDone && !champGame && activeCount > 2;
+      const nextRound  = maxRound + 1;
+      adminBtn = `<div class="tourn-admin-actions">
+        ${showGenBtn ? `<button class="btn btn-sm btn-primary" onclick="generateTournamentGames('${id}')">⚙ Generate Round ${nextRound}</button>` : ''}
+        <button class="btn btn-sm btn-danger" onclick="deleteTournamentUI('${id}')">Delete</button>
       </div>`;
-    } else if (!champGame) {
-      const top2 = standings.slice(0, 2);
-      const canGenerate = isAdmin() && top2.length === 2;
-      champSection = `<div class="champ-bracket champ-pending">
-        <div class="champ-bracket-label">🏆 Championship</div>
-        <div class="champ-finalists">
-          <div class="champ-finalist">${escapeHtml(top2[0]?.team.name || '?')}</div>
-          <div class="champ-vs">vs</div>
-          <div class="champ-finalist">${escapeHtml(top2[1]?.team.name || '?')}</div>
-        </div>
-        ${canGenerate ? `<button class="btn btn-primary" style="margin-top:12px" onclick="generateChampionshipGame('${id}')">⚙ Create Championship Game</button>` : ''}
-      </div>`;
+    }
+
+    // Games grouped by round
+    if (nonChamp.length) {
+      const rounds = [...new Set(nonChamp.map(g => g.deRound || 1))].sort((a,b) => a-b);
+      gamesHtml = rounds.map(r => {
+        const rGames = nonChamp.filter(g => (g.deRound||1) === r);
+        return `<div class="tourn-section-title" style="margin-top:10px">Round ${r}</div>
+          <div class="tourn-games-scroll">${rGames.map(buildGameListItem).join('')}</div>`;
+      }).join('');
     } else {
-      const chHome = State.getTeam(champGame.homeTeamId), chAway = State.getTeam(champGame.awayTeamId);
-      const isComplete = champGame.status === 'completed';
-      let winnerName = '';
-      if (isComplete) {
-        const w = champGame.score.away > champGame.score.home ? chAway : champGame.score.home > champGame.score.away ? chHome : null;
-        winnerName = w ? w.name : 'Tie';
+      gamesHtml = `<div class="help-text" style="padding:8px">No games yet. ${isAdmin() ? 'Generate Round 1 to start.' : ''}</div>`;
+    }
+
+  // ── Round Robin / Playoff ───────────────────────────────────────────────────
+  } else {
+    const standings  = State.computeTournamentStandings(id);
+    const existingRR = nonChamp.map(g => `${g.homeTeamId}|${g.awayTeamId}`);
+    let rrPairsLeft  = 0;
+    for (let i=0; i<t.teamIds.length; i++)
+      for (let j=i+1; j<t.teamIds.length; j++) {
+        const a = t.teamIds[i], b = t.teamIds[j];
+        if (!existingRR.includes(`${a}|${b}`) && !existingRR.includes(`${b}|${a}`)) rrPairsLeft++;
       }
-      champSection = `<div class="champ-bracket${isComplete ? ' champ-complete' : ''}">
-        <div class="champ-bracket-label">🏆 Championship</div>
-        ${isComplete && winnerName ? `<div class="champ-winner">🎉 ${escapeHtml(winnerName)} wins the tournament!</div>` : ''}
-        <div class="champ-finalists" style="cursor:pointer" onclick="openGame('${champGame.id}')">
-          <div class="champ-finalist${isComplete && champGame.score.away >= champGame.score.home ? ' champ-finalist-winner' : ''}">${escapeHtml(chAway?.name||'?')}</div>
-          <div class="champ-score">${isComplete ? `${champGame.score.away}–${champGame.score.home}` : champGame.status.replace('_',' ')}</div>
-          <div class="champ-finalist${isComplete && champGame.score.home >= champGame.score.away ? ' champ-finalist-winner' : ''}">${escapeHtml(chHome?.name||'?')}</div>
-        </div>
+    const totalRRPairs = t.teamIds.length * (t.teamIds.length - 1) / 2;
+    const rrComplete   = nonChamp.filter(g => g.status === 'completed').length === totalRRPairs;
+
+    // Standings
+    const rrRows = standings.map((row, i) => {
+      const isFinalist = isPlayoff && i < 2;
+      return `<tr class="${i === 0 ? 'tourn-leader' : ''}${isFinalist ? ' tourn-finalist' : ''}">
+        <td>${isFinalist ? (i === 0 ? '🥇' : '🥈') : i+1}</td>
+        <td><strong>${escapeHtml(row.team.name)}</strong></td>
+        <td>${row.W}</td><td>${row.L}</td><td>${row.T}</td>
+        <td>${row.pts}</td><td>${row.RF}</td><td>${row.RA}</td>
+        <td>${row.rd >= 0 ? '+' : ''}${row.rd}</td>
+      </tr>${isPlayoff && i === 1 && standings.length > 2 ? '<tr class="tourn-cutoff-row"><td colspan="9"><span class="tourn-cutoff-label">── advance to finals ──</span></td></tr>' : ''}`;
+    }).join('');
+    standingsHtml = standings.length
+      ? `<div class="tourn-standings-scroll">
+          <table class="stats-table tourn-standings-table" style="width:100%">
+            <thead><tr><th>#</th><th>Team</th><th>W</th><th>L</th><th>T</th><th>Pts</th><th>RF</th><th>RA</th><th>+/-</th></tr></thead>
+            <tbody>${rrRows}</tbody>
+          </table>
+        </div>`
+      : '<div class="help-text" style="margin-bottom:16px">No games played yet.</div>';
+
+    // Championship section (playoff only)
+    if (isPlayoff) {
+      if (!rrComplete) {
+        champSection = `<div class="champ-bracket champ-pending">
+          <div class="champ-bracket-label">🏆 Championship</div>
+          <div class="help-text">Complete all round-robin games to determine the finalists.</div>
+        </div>`;
+      } else {
+        const finalists = standings.slice(0, 2).map(s => s.team);
+        champSection = buildChampSection(id, champGame || null, finalists);
+      }
+    }
+
+    // Admin button
+    if (isAdmin()) {
+      adminBtn = `<div class="tourn-admin-actions">
+        ${rrPairsLeft > 0 ? `<button class="btn btn-sm btn-primary" onclick="generateTournamentGames('${id}')">⚙ Generate ${rrPairsLeft} game${rrPairsLeft>1?'s':''}</button>` : ''}
+        <button class="btn btn-sm btn-danger" onclick="deleteTournamentUI('${id}')">Delete</button>
       </div>`;
     }
+
+    // Games list
+    gamesHtml = `<div class="tourn-games-scroll">${nonChamp.length
+      ? [...nonChamp].reverse().map(buildGameListItem).join('')
+      : '<div class="help-text" style="padding:8px">No round-robin games yet.</div>'
+    }</div>`;
   }
 
-  const rrGameRows = rrGames.length ? rrGames.map(g => {
-    const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
-    const sub = g.status === 'completed' ? `${g.score.away}–${g.score.home} · Final`
-              : g.status === 'in_progress' ? 'In Progress'
-              : 'Not Started';
-    const rowActions = g.status === 'setup' && canUserScore()
-      ? `<div style="margin-top:4px" onclick="event.stopPropagation()"><button class="btn btn-sm btn-primary" onclick="showSetupModal('${g.id}')">▶ Start Scoring</button></div>`
-      : g.status === 'in_progress'
-      ? `<div style="margin-top:4px;display:flex;gap:6px" onclick="event.stopPropagation()">
-           <button class="btn btn-sm" onclick="renderLiveGame('${g.id}',true)">👁 Watch</button>
-           ${canUserScore() ? `<button class="btn btn-sm btn-primary" onclick="openGameForScoring('${g.id}')">▶ Resume</button>` : ''}
-         </div>`
-      : '';
-    return `<div class="player-list-item" style="cursor:pointer" onclick="openGame('${g.id}')">
-      <div class="pli-name">${escapeHtml(away?.name||'?')} @ ${escapeHtml(home?.name||'?')}</div>
-      <div class="pli-sub">${sub}</div>
-      ${rowActions}
-    </div>`;
-  }).join('') : '<div class="help-text" style="padding:8px">No round-robin games yet.</div>';
+  const formatLabel = isDE ? 'Double Elimination' : 'Round Robin';
 
   const split = $('#tournaments-split');
   if (split) split.classList.add('tourn-has-detail');
@@ -4270,27 +4381,18 @@ function renderTournamentDetail(id) {
       <div class="tourn-header-row">
         <div>
           <h3 style="margin:0 0 2px">${escapeHtml(t.name)}</h3>
-          <span class="tourn-format-badge">${isPlayoff ? 'Round Robin + Finals' : 'Round Robin'}</span>
+          <span class="tourn-format-badge">${formatLabel}</span>
         </div>
-        ${isAdmin() ? `<div class="tourn-admin-actions">
-          ${rrPairsLeft > 0 ? `<button class="btn btn-sm btn-primary" onclick="generateTournamentGames('${id}')">⚙ Generate ${rrPairsLeft} game${rrPairsLeft>1?'s':''}</button>` : ''}
-          <button class="btn btn-sm btn-danger" onclick="deleteTournamentUI('${id}')">Delete</button>
-        </div>` : ''}
+        ${adminBtn}
       </div>
 
       ${champSection}
 
       <div class="tourn-section-title" style="margin-top:14px">Standings</div>
-      ${standings.length ? `
-      <div class="tourn-standings-scroll">
-        <table class="stats-table tourn-standings-table" style="width:100%">
-          <thead><tr><th>#</th><th>Team</th><th>W</th><th>L</th><th>T</th><th>Pts</th><th>RF</th><th>RA</th><th>+/-</th></tr></thead>
-          <tbody>${standingsRows}</tbody>
-        </table>
-      </div>` : '<div class="help-text" style="margin-bottom:16px">No games played yet.</div>'}
+      ${standingsHtml}
 
       <div class="tourn-section-title">Games</div>
-      <div class="tourn-games-scroll">${rrGameRows}</div>
+      ${gamesHtml}
     </div>`;
 }
 
@@ -4313,16 +4415,16 @@ function showNewTournamentModal() {
         <label>Format</label>
         <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
           <label class="tourn-team-opt">
-            <input type="radio" name="tourn-format" value="round_robin" checked>
+            <input type="radio" name="tourn-format" value="double_elim" checked>
             <div>
-              <strong>Round Robin</strong>
-              <div class="help-text">All teams play each other. Final standings determine the winner.</div>
+              <strong>Double Elimination</strong>
+              <div class="help-text">Teams are eliminated after 2 losses. Games are played in rounds. Last 2 teams meet in a championship.</div>
             </div>
           </label>
           <label class="tourn-team-opt">
             <input type="radio" name="tourn-format" value="playoff">
             <div>
-              <strong>Round Robin + Finals</strong>
+              <strong>Round Robin</strong>
               <div class="help-text">All teams play each other. Top 2 records advance to a championship game. Tiebreaker: fewest runs allowed.</div>
             </div>
           </label>
@@ -4341,11 +4443,12 @@ function showNewTournamentModal() {
 
 async function submitNewTournament() {
   const name    = $('#tourn-name')?.value.trim();
-  const format  = $('input[name="tourn-format"]:checked')?.value || 'round_robin';
+  const format  = $('input[name="tourn-format"]:checked')?.value || 'double_elim';
   const teamIds = $$('input[name="tourn-team"]:checked').map(cb => cb.value);
   if (!name) { toast('Enter an event name', 'error'); return; }
   if (teamIds.length < 2) { toast('Select at least 2 teams', 'error'); return; }
-  if (format === 'playoff' && teamIds.length < 3) { toast('Playoff format needs at least 3 teams', 'error'); return; }
+  if (format === 'double_elim' && teamIds.length < 3) { toast('Double Elimination needs at least 3 teams', 'error'); return; }
+  if (format === 'playoff' && teamIds.length < 3) { toast('Round Robin format needs at least 3 teams', 'error'); return; }
   // Ensure no two selected teams share a player
   const selectedTeams = teamIds.map(id => State.getTeam(id)).filter(Boolean);
   const conflicts = [];
@@ -4375,8 +4478,115 @@ async function submitNewTournament() {
   }
 }
 
+function generateDEPairings(activeTeams, existingPairSet) {
+  // Shuffle teams
+  const teams = [...activeTeams];
+  for (let i = teams.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [teams[i], teams[j]] = [teams[j], teams[i]];
+  }
+
+  let byeTeam = null;
+  let pool = [...teams];
+
+  if (pool.length % 2 !== 0) {
+    // Bye: prefer team with most games played (not behind)
+    const maxGP = Math.max(...pool.map(t => t.gamesPlayed));
+    const byeCandidates = pool.filter(t => t.gamesPlayed === maxGP);
+    byeTeam = byeCandidates[Math.floor(Math.random() * byeCandidates.length)];
+    pool = pool.filter(t => t.id !== byeTeam.id);
+  }
+
+  // Greedy pairing — prefer no rematch, fall back to any available
+  const pairs = [];
+  const usedIdx = new Set();
+
+  for (let i = 0; i < pool.length; i++) {
+    if (usedIdx.has(i)) continue;
+    const a = pool[i];
+    let foundJ = -1;
+    // First pass: no rematch
+    for (let j = i + 1; j < pool.length; j++) {
+      if (usedIdx.has(j)) continue;
+      const b = pool[j];
+      if (!existingPairSet.has(`${a.id}|${b.id}`) && !existingPairSet.has(`${b.id}|${a.id}`)) {
+        foundJ = j; break;
+      }
+    }
+    // Second pass: any available (relaxed)
+    if (foundJ < 0) {
+      for (let j = i + 1; j < pool.length; j++) {
+        if (!usedIdx.has(j)) { foundJ = j; break; }
+      }
+    }
+    if (foundJ >= 0) {
+      pairs.push([a.id, pool[foundJ].id]);
+      usedIdx.add(i);
+      usedIdx.add(foundJ);
+    }
+  }
+  return { pairs, byeTeam };
+}
+
 async function generateTournamentGames(tournId) {
   const t = State.getTournament(tournId); if (!t) return;
+
+  if (t.format === 'double_elim') {
+    const deGames = State.games.filter(g => g.tournamentId === tournId && !g.isChampionship);
+    const maxRound = deGames.length ? Math.max(...deGames.map(g => g.deRound || 1)) : 0;
+
+    // Must finish current round before generating the next
+    if (maxRound > 0) {
+      const curRoundGames = deGames.filter(g => (g.deRound || 1) === maxRound);
+      if (!curRoundGames.every(g => g.status === 'completed')) {
+        toast('Finish all games in the current round first', 'error'); return;
+      }
+    }
+
+    // Compute losses from completed games
+    const losses = {}, wins = {};
+    t.teamIds.forEach(id => { losses[id] = 0; wins[id] = 0; });
+    deGames.filter(g => g.status === 'completed').forEach(g => {
+      const homeWon = g.score.home > g.score.away;
+      if (homeWon) { wins[g.homeTeamId]++; losses[g.awayTeamId]++; }
+      else if (g.score.away > g.score.home) { wins[g.awayTeamId]++; losses[g.homeTeamId]++; }
+    });
+
+    const activeTeams = t.teamIds
+      .filter(id => (losses[id] || 0) < 2)
+      .map(id => ({ id, gamesPlayed: (wins[id]||0) + (losses[id]||0), losses: losses[id]||0 }));
+
+    if (activeTeams.length < 2) { toast('Not enough active teams', 'error'); return; }
+
+    // Exactly 2 active teams → championship
+    if (activeTeams.length === 2) {
+      const champGame = State.games.find(g => g.tournamentId === tournId && g.isChampionship);
+      if (champGame) { toast('Championship game already exists', 'error'); return; }
+      const [a, b] = activeTeams;
+      await State.addGame({ homeTeamId: a.id, awayTeamId: b.id, numInnings: 6, tournamentId: tournId, isChampionship: true, allowSharedPlayers: true });
+      Render.all();
+      renderTournamentDetail(tournId);
+      toast('Championship game created!', 'success');
+      return;
+    }
+
+    const nextRound = maxRound + 1;
+    const existingPairSet = new Set(deGames.map(g => `${g.homeTeamId}|${g.awayTeamId}`));
+    const { pairs, byeTeam } = generateDEPairings(activeTeams, existingPairSet);
+
+    if (!pairs.length) { toast('Could not generate matchups', 'error'); return; }
+
+    await Promise.all(pairs.map(([homeId, awayId]) =>
+      State.addGame({ homeTeamId: homeId, awayTeamId: awayId, numInnings: 6, tournamentId: tournId, deRound: nextRound, allowSharedPlayers: true })
+    ));
+    Render.all();
+    renderTournamentDetail(tournId);
+    const byeMsg = byeTeam ? ` · ${State.getTeam(byeTeam.id)?.name || 'one team'} has a bye` : '';
+    toast(`Round ${nextRound}: ${pairs.length} game${pairs.length>1?'s':''} generated${byeMsg}`, 'success');
+    return;
+  }
+
+  // Round Robin / Playoff: generate all unplayed pairs at once
   const existing = State.games.filter(g => g.tournamentId === tournId && !g.isChampionship)
     .map(g => `${g.homeTeamId}|${g.awayTeamId}`);
   const pairs = [];
