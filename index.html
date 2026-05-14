@@ -3298,6 +3298,7 @@ const Render = {
         <td class="muted small">${escapeHtml(teamNames)}</td>
         <td class="muted small" style="text-align:center">${gameCount}</td>
         <td style="white-space:nowrap">
+          <button class="btn-icon" title="Edit" onclick="showTournamentModal('${t.id}')">✎</button>
           <button class="btn-icon" title="Open" onclick="selectTournament('${t.id}');switchTab('tournaments')">↗</button>
           <button class="btn-icon" title="Delete" onclick="deleteTournamentUI('${t.id}')">🗑</button>
         </td>
@@ -4293,7 +4294,8 @@ function renderTournamentDetail(id) {
       const nextRound  = maxRound + 1;
       adminBtn = `<div class="tourn-admin-actions">
         ${showGenBtn ? `<button class="btn btn-sm btn-primary" onclick="generateTournamentGames('${id}')">⚙ Generate Round ${nextRound}</button>` : ''}
-        <button class="btn btn-sm btn-danger" onclick="deleteTournamentUI('${id}')">Delete</button>
+        <button class="btn-icon" title="Edit" onclick="showTournamentModal('${id}')">✎</button>
+        <button class="btn-icon" title="Delete" onclick="deleteTournamentUI('${id}')">🗑</button>
       </div>`;
     }
 
@@ -4359,7 +4361,8 @@ function renderTournamentDetail(id) {
     if (isAdmin()) {
       adminBtn = `<div class="tourn-admin-actions">
         ${rrPairsLeft > 0 ? `<button class="btn btn-sm btn-primary" onclick="generateTournamentGames('${id}')">⚙ Generate ${rrPairsLeft} game${rrPairsLeft>1?'s':''}</button>` : ''}
-        <button class="btn btn-sm btn-danger" onclick="deleteTournamentUI('${id}')">Delete</button>
+        <button class="btn-icon" title="Edit" onclick="showTournamentModal('${id}')">✎</button>
+        <button class="btn-icon" title="Delete" onclick="deleteTournamentUI('${id}')">🗑</button>
       </div>`;
     }
 
@@ -4619,14 +4622,51 @@ async function generateChampionshipGame(tournId) {
   toast('Championship game created!', 'success');
 }
 
+function showTournamentModal(id) {
+  const t = State.getTournament(id); if (!t) return;
+  Modal.show(`
+    <div class="modal-header">
+      <h3>Edit event</h3>
+      <button class="btn-icon" onclick="Modal.hide()">✕</button>
+    </div>
+    <form onsubmit="submitTournament(event,'${id}')">
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="tourn-edit-name">Event name</label>
+          <input id="tourn-edit-name" required autofocus value="${escapeHtml(t.name)}" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" onclick="Modal.hide()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>`);
+}
+async function submitTournament(e, id) {
+  e.preventDefault();
+  const name = $('#tourn-edit-name')?.value.trim();
+  if (!name) { toast('Enter an event name', 'error'); return; }
+  await State.updateTournament(id, { name });
+  Modal.hide();
+  Render.all();
+  if (selectedTournamentId === id) renderTournamentDetail(id);
+  toast('Event updated', 'success');
+}
+
 async function deleteTournamentUI(id) {
-  if (!confirm('Delete this tournament? Games will not be deleted.')) return;
+  const t = State.getTournament(id); if (!t) return;
+  const unstartedGames = State.games.filter(g => g.tournamentId === id && g.status === 'setup');
+  const msg = unstartedGames.length
+    ? `Delete "${t.name}"? ${unstartedGames.length} unstarted game${unstartedGames.length > 1 ? 's' : ''} will be removed. Finished games are kept.`
+    : `Delete "${t.name}"? All finished games will be kept.`;
+  if (!confirm(msg)) return;
+  await Promise.all(unstartedGames.map(g => State.deleteGame(g.id)));
   selectedTournamentId = null;
   await State.deleteTournament(id);
-  Render.tournaments();
+  Render.all();
   const detail = $('#tournaments-detail');
-  if (detail) detail.innerHTML = '<div class="player-detail-empty"><span>← Select a tournament</span></div>';
-  toast('Tournament deleted');
+  if (detail) detail.innerHTML = '<div class="player-detail-empty"><span>← Select an event</span></div>';
+  toast('Event deleted');
 }
 
 /* ============================================================
@@ -6905,7 +6945,7 @@ Object.assign(window, {
   endHalfInning, endGameEarly,
   showEditScoreModal, reopenGame, _esAdj, _esSave,
   showRecapModal, _copyRecap, _shareRecap, sendRecapEmails, autoSendRecapEmails, showEmailSetupModal, _saveEmailSetup, _toggleEmailSetup,
-  showNewTournamentModal, submitNewTournament, selectTournament, tournamentBack,
+  showNewTournamentModal, submitNewTournament, showTournamentModal, submitTournament, selectTournament, tournamentBack,
   generateTournamentGames, generateChampionshipGame, deleteTournamentUI,
   selectPlay, clearPlaySelection,
   onFielderClick, swapFielder,
