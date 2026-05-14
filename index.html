@@ -5020,10 +5020,10 @@ function attachSvgLocationHandlers(svgEl) {
     const dist = Math.hypot(pt.x - pointerStart.x, pt.y - pointerStart.y);
     if (dist > DRAG_THRESHOLD) {
       if (pointerStart.fielderEl) {
-        // Move the fielder circle itself
+        // Move the fielder element
         pointerStart.fielderEl.setAttribute('transform', `translate(${Math.round(pt.x)},${Math.round(pt.y)})`);
-      } else {
-        // Hit / HR with no fielder: show ball marker
+      } else if (!__fieldClickMode.needFielder) {
+        // Hit / HR only: show ball marker while dragging
         drawBallMarker({ x: Math.round(pt.x), y: Math.round(pt.y) });
       }
     }
