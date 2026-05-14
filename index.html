@@ -5319,9 +5319,119 @@ function drawBallMarker(loc) {
 /* ============================================================
    PA RESOLUTION
    ============================================================ */
+let __pendingOutArgs = null;
+
+function playerInitials(playerId) {
+  const p = State.getPlayer(playerId);
+  if (!p || !p.name) return '?';
+  return p.name.trim().split(/\s+/).map(w => w[0]).join('').toUpperCase();
+}
+
+// Returns the base number of the lead runner in the force chain (requires runner on 1st)
+function leadForcedBase(bases) {
+  if (!bases[1]) return null;
+  if (bases[2] && bases[3]) return 3;
+  if (bases[2]) return 2;
+  return 1;
+}
+
 async function finishOut(hitType, fielderId, location) {
   const g = State.getGame(LiveGameId);
+
+  // Double play opportunity: ground ball, runner on 1st, fewer than 2 outs
+  if (hitType === 'GB' && g.outs < 2 && g.bases[1]) {
+    __pendingOutArgs = { hitType, fielderId, location };
+    showDoublePlayPrompt(g);
+    return;
+  }
+
+  // Sacrifice fly / tag-up: fly ball, runner on 3rd, fewer than 2 outs
+  if (hitType === 'FB' && g.outs < 2 && g.bases[3]) {
+    __pendingOutArgs = { hitType, fielderId, location };
+    showTagUpPrompt(g);
+    return;
+  }
+
   await applyPaEnd(g, { outcome: 'OUT', hitType, fielderId, location });
+}
+
+function showDoublePlayPrompt(g) {
+  const dpBase = leadForcedBase(g.bases);
+  const runner  = dpBase ? g.bases[dpBase] : null;
+  const ri = runner ? playerInitials(runner.playerId) : '?';
+  Modal.show(`
+    <div class="modal-header"><h3>Double Play?</h3></div>
+    <div class="modal-body" style="padding:16px">
+      <p style="margin:0 0 8px;font-size:15px">Was a double play attempted?</p>
+      <p style="margin:0;font-size:13px;color:#6b7280">Lead runner: <strong>${ri}</strong></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="applyDoublePlay(false,false)">No</button>
+      <button class="btn btn-primary" onclick="showDoublePlayResult()">Yes — attempted</button>
+    </div>`);
+}
+
+function showDoublePlayResult() {
+  Modal.show(`
+    <div class="modal-header"><h3>Double Play Result</h3></div>
+    <div class="modal-body" style="padding:16px">
+      <p style="margin:0;font-size:15px">Was the double play successful?</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="applyDoublePlay(true,false)">No — runner safe</button>
+      <button class="btn btn-primary" onclick="applyDoublePlay(true,true)">Yes — two outs</button>
+    </div>`);
+}
+
+async function applyDoublePlay(attempted, successful) {
+  const args = __pendingOutArgs;
+  __pendingOutArgs = null;
+  Modal.hide();
+  const g = State.getGame(LiveGameId);
+  const dpBase = (attempted && successful) ? leadForcedBase(g.bases) : null;
+  await applyPaEnd(g, { outcome: 'OUT', hitType: args.hitType, fielderId: args.fielderId, location: args.location, doublePlayBase: dpBase });
+}
+
+function showTagUpPrompt(g) {
+  const runner = g.bases[3];
+  const ri = runner ? playerInitials(runner.playerId) : '?';
+  Modal.show(`
+    <div class="modal-header"><h3>Tag Up?</h3></div>
+    <div class="modal-body" style="padding:16px">
+      <p style="margin:0 0 8px;font-size:15px">Did the runner on 3rd tag up?</p>
+      <p style="margin:0;font-size:13px;color:#6b7280">Runner: <strong>${ri}</strong></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="applyTagUp(false,false)">No — stayed</button>
+      <button class="btn btn-primary" onclick="showTagUpResult()">Yes — tagged up</button>
+    </div>`);
+}
+
+function showTagUpResult() {
+  Modal.show(`
+    <div class="modal-header"><h3>Tag Up Result</h3></div>
+    <div class="modal-body" style="padding:16px">
+      <p style="margin:0;font-size:15px">Did the runner score?</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="applyTagUp(true,false)">No — thrown out</button>
+      <button class="btn btn-primary" onclick="applyTagUp(true,true)">Yes — scored!</button>
+    </div>`);
+}
+
+async function applyTagUp(tagged, scored) {
+  const args = __pendingOutArgs;
+  __pendingOutArgs = null;
+  Modal.hide();
+  const g = State.getGame(LiveGameId);
+  await applyPaEnd(g, {
+    outcome: 'OUT',
+    hitType: args.hitType,
+    fielderId: args.fielderId,
+    location: args.location,
+    sacFlyScored: tagged && scored,
+    sacFlyOut:    tagged && !scored,
+  });
 }
 
 async function finishHit(hitDetail, fielderId, location) {
@@ -5355,6 +5465,9 @@ async function applyPaEnd(g, ev) {
     errorById: ev.errorById || null,
     fielderId: ev.fielderId || null,
     location: ev.location || null,
+    doublePlay: !!ev.doublePlayBase,
+    sacFly: !!(ev.sacFlyScored || ev.sacFlyOut),
+    sacFlyOut: !!ev.sacFlyOut,
     rbi: 0,
     earnedRuns: 0,
     runsScoredBy: [],
@@ -5384,6 +5497,23 @@ async function applyPaEnd(g, ev) {
     const res = advanceRunners(newBases, target, r);
     Object.assign(newBases, res.newBases);
     runs = res.runnerIdsScored;
+  }
+
+  // Double play: remove lead forced runner, add extra out
+  if (ev.doublePlayBase) {
+    newBases[ev.doublePlayBase] = null;
+    outsToAdd += 1;
+  }
+
+  // Sac fly tag-up: runner on 3rd scored or was thrown out
+  if (ev.sacFlyScored) {
+    const r3 = newBases[3];
+    if (r3) runs.push(r3.id);
+    newBases[3] = null;
+  }
+  if (ev.sacFlyOut) {
+    newBases[3] = null;
+    outsToAdd += 1;
   }
 
   // Map runner ids back to player ids for R stat
@@ -5991,6 +6121,8 @@ Object.assign(window, {
   showAuthModal, submitAuth, signOutUser, invitePlayer,
   showPlayerModal, deletePlayer, deleteUser, showTeamModal, deleteTeam, cancelInvite, toggleAdminFeatures,
   bipChooseKind, bipChooseDetail, bipCancel,
+  showDoublePlayResult, applyDoublePlay,
+  showTagUpResult, applyTagUp,
   toggleCanScore, showLinkPlayerModal, submitLinkPlayer, selectGamestream,
   showNewGameModal, openGame, selectGame, deselectGame, deleteGame,
   submitPlayer, submitTeam, submitNewGame,
