@@ -5020,11 +5020,11 @@ function attachSvgLocationHandlers(svgEl) {
     const pt = svgPoint(svgEl, e);
     const dist = Math.hypot(pt.x - pointerStart.x, pt.y - pointerStart.y);
     if (dist > DRAG_THRESHOLD) {
-      if (pointerStart.fielderEl) {
-        // Move the fielder element
+      if (pointerStart.fielderEl && __fieldClickMode.needFielder) {
+        // Out / error: drag the fielder element to the play location
         pointerStart.fielderEl.setAttribute('transform', `translate(${Math.round(pt.x)},${Math.round(pt.y)})`);
       } else if (!__fieldClickMode.needFielder) {
-        // Hit / HR only: show ball marker while dragging
+        // Hit / HR: show ball marker while dragging (fielders stay put)
         drawBallMarker({ x: Math.round(pt.x), y: Math.round(pt.y) });
       }
     }
