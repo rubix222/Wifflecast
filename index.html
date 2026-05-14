@@ -872,22 +872,6 @@
     stroke-width: 3.5;
     r: 21;
   }
-  .field-instruction {
-    position: absolute;
-    top: 8px;
-    left: 8px;
-    right: 8px;
-    z-index: 10;
-    text-align: center;
-    font-size: 13px;
-    font-weight: 600;
-    color: #166534;
-    background: rgba(240,253,244,0.92);
-    border: 1px solid #bbf7d0;
-    border-radius: 6px;
-    padding: 7px 10px;
-    pointer-events: none;
-  }
   .badge { display:inline-block; font-size:10px; font-weight:700; padding:2px 7px; border-radius:10px; text-transform:uppercase; letter-spacing:0.4px; margin-left:6px; }
   .badge-guest { background:#f3f4f6; color:#6b7280; }
   .badge-invited { background:#fef3c7; color:#92400e; }
@@ -4612,7 +4596,6 @@ function liveGameHTML(g, home, away) {
             ${isCompleted ? `<div class="field-wrap-header"><h3 class="field-wrap-title">Field &amp; Bases <span class="field-wrap-hint">Click a play to replay bases</span></h3></div>` : ''}
             <div class="field-and-bases">
               <div class="field-panel">
-                <div id="field-instruction" class="field-instruction" style="display:none"></div>
                 <div id="field-container"></div>
                 ${!isCompleted ? `
                 <button class="btn-icon field-undo-btn" onclick="undoPlay()" ${_undoStack.length ? '' : 'disabled'} title="Undo">↩</button>
@@ -4928,15 +4911,15 @@ function drawField(overrideBases = null) {
 
   const fielderMarker = (pid, player, pos, cx, cy) => {
     if (!pid || !player) return '';
-    if (__fieldClickMode) {
-      // Location-entry mode: glove image so the user can drag it to the play location
-      const sz = 34, h = sz / 2;
+    const gloveMode = __fieldClickMode && __fieldClickMode.needFielder;
+    if (gloveMode) {
+      // Out/error drag mode: glove image inside the dark circle, replacing pos text
+      const sz = 24, h = sz / 2;
       return `<g class="fielder" data-pid="${pid}" data-pos="${pos}" transform="translate(${cx},${cy})">
-        <image href="glove.png" x="${-h}" y="${-h}" width="${sz}" height="${sz}"/>
-        <rect class="pos-badge" x="-12" y="${h + 2}" width="24" height="14" rx="5" ry="5"/>
-        <text class="pos" x="0" y="${h + 10}">${pos}</text>
-        <text class="name bg" y="${h + 26}">${escapeHtml(player.name)}</text>
-        <text class="name" y="${h + 26}">${escapeHtml(player.name)}</text>
+        <circle class="fielder-circle" cx="0" cy="0" r="16"/>
+        <image href="glove.png" x="${-h}" y="${-h}" width="${sz}" height="${sz}" style="pointer-events:none"/>
+        <text class="name bg" y="26">${escapeHtml(player.name)}</text>
+        <text class="name" y="26">${escapeHtml(player.name)}</text>
       </g>`;
     } else {
       // Normal mode: simple circle + position label + name
@@ -4957,6 +4940,17 @@ function drawField(overrideBases = null) {
     return `<polygon class="base occupied" points="${cx},${cy-sy} ${cx+sx},${cy} ${cx},${cy+sy} ${cx-sx},${cy}" />`;
   };
 
+  // Instruction overlay text rendered inside the SVG so it never affects layout
+  const instrText = __bipStep === 'locate'
+    ? (__bipKind === 'out'   ? 'Drag fielder to where the play happened'
+     : __bipKind === 'error' ? 'Drag fielder to where the error happened'
+     : __bipKind === 'hr'    ? 'Tap where the ball left the field'
+     :                         'Tap where the ball landed')
+    : '';
+  const instrOverlay = instrText ? `
+    <rect x="8" y="8" width="384" height="32" rx="6" fill="rgba(240,253,244,0.95)" stroke="#bbf7d0" stroke-width="1"/>
+    <text x="200" y="28" text-anchor="middle" font-size="13" font-weight="600" fill="#166534" pointer-events="none">${instrText}</text>` : '';
+
   const svg = `
     <svg viewBox="0 0 400 400" class="field-svg" id="field-svg">
       <!-- White background visible outside/below the field cone -->
@@ -4971,6 +4965,8 @@ function drawField(overrideBases = null) {
       <!-- Fielder markers -->
       ${isCompleted ? '' : fielderMarker(pitcherId, pitcher, 'P',  FIELD.MOUND.x,   FIELD.MOUND.y)}
       ${isCompleted ? '' : fielderMarker(cfId,      cf,      'CF', FIELD.CF_HOME.x, FIELD.CF_HOME.y)}
+      <!-- Locate-mode instruction banner overlaid at top of field -->
+      ${instrOverlay}
     </svg>
   `;
   container.innerHTML = svg;
@@ -5266,19 +5262,6 @@ function bipEnterLocate() {
       bipConfirm();
     }
   };
-  const instrEl = $('#field-instruction');
-  if (instrEl) {
-    instrEl.style.display = '';
-    if (needFielder) {
-      instrEl.textContent = __bipKind === 'error'
-        ? 'Drag the fielder who made the error to where it happened'
-        : 'Drag the fielder who made the play to where it happened';
-    } else if (__bipKind === 'hr') {
-      instrEl.textContent = 'Tap where the ball left the field';
-    } else {
-      instrEl.textContent = 'Tap where the ball landed';
-    }
-  }
   drawField();
 }
 
@@ -5321,8 +5304,6 @@ async function bipConfirm() {
   __pendingPlay = null;
   __fieldClickMode = null;
   __bipStep = null; __bipKind = null; __bipDetail = null;
-  const instrEl = $('#field-instruction');
-  if (instrEl) instrEl.style.display = 'none';
   if (kind === 'out')   await finishOut(detail, fielderId, location);
   if (kind === 'hit')   await finishHit(detail, fielderId, location);
   if (kind === 'hr')    await finishHit('HR', null, location);
