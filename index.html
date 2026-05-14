@@ -6115,7 +6115,8 @@ function computeGameAccolades(g) {
     if (s.err>0 && s.err===mErr) c.push({ label:'Tough Day',       emoji:'😬', detail:`${s.err} E` });
     const accolade = c[0] || (s.hits>0
       ? { label:'Solid Contact', emoji:'⭐', detail:`${s.hits} H` }
-      : { label:'Game Played',   emoji:'🤝', detail:'' });
+      : null);
+    if (!accolade) return null;
     return { player, ...accolade };
   }).filter(Boolean);
 }
@@ -6196,7 +6197,7 @@ function buildRecapText(g) {
   }
 
   // Accolades
-  const accolades = computeGameAccolades(g).filter(a => a.label !== 'Game Played');
+  const accolades = computeGameAccolades(g);
   if (accolades.length) {
     lines.push('AWARDS');
     accolades.forEach(a => lines.push(`  ${a.emoji} ${a.label}: ${a.player.name} (${a.detail})`));
