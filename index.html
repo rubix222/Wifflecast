@@ -927,10 +927,6 @@
     .scoreboard .score { font-size: 32px; }
     .player-detail-panel { max-height: none; }
     .games-detail-panel { max-height: none; }
-    /* Events page — single-panel mobile navigation */
-    .tourn-back-btn { display: flex; }
-    #tournaments-split.tourn-has-detail .player-list-panel { display: none; }
-    #tournaments-split.tourn-has-detail .player-detail-panel { padding: 0; min-height: 0; }
     .tourn-detail-body { padding: 10px; }
     .tourn-standings-table th, .tourn-standings-table td { padding: 4px 5px; font-size: 11px; }
     /* Fix: narrow # column, left-align Team column */
@@ -1417,7 +1413,7 @@
   /* ---------- Tournaments ---------- */
   /* Mobile back-navigation button (hidden on desktop) */
   .tourn-back-btn {
-    display: none;
+    display: flex;
     align-items: center;
     gap: 6px;
     width: 100%;
@@ -1431,8 +1427,14 @@
     font-weight: 600;
     cursor: pointer;
     text-align: left;
+    position: sticky;
+    top: 0;
+    z-index: 10;
   }
   .tourn-back-btn:hover { background: #f0fdf4; }
+  /* Hide list panel and go full-width when an event is open (all screen sizes) */
+  #tournaments-split.tourn-has-detail .player-list-panel { display: none; }
+  #tournaments-split.tourn-has-detail .player-detail-panel { padding: 0; min-height: 0; }
   .tourn-detail-body { padding: 16px; max-width: 100%; }
 
   /* Event header row: name left, admin actions right */
