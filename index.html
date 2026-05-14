@@ -1112,7 +1112,7 @@
 
   .field-and-bases { display: flex; gap: 6px; align-items: stretch; flex: 1; min-height: 0; overflow: hidden; }
   .field-panel { flex: 1; min-width: 0; min-height: 0; position: relative; display: flex; flex-direction: column; overflow: hidden; }
-  #field-container { flex: 1; min-height: 0; overflow: hidden; position: relative; }
+  #field-container { flex: 1; min-height: 0; overflow: hidden; }
   #field-container svg { width: 100%; height: 100%; display: block; }
   .bases-panel { flex: 0 0 100px; display: flex; align-items: center; }
   .bases-svg { width: 100%; height: auto; display: block; user-select: none; }
@@ -4613,11 +4613,10 @@ function liveGameHTML(g, home, away) {
             <div class="field-and-bases">
               <div class="field-panel">
                 <div id="field-instruction" class="field-instruction" style="display:none"></div>
-                <div id="field-container">
-                  ${!isCompleted ? `
-                  <button class="btn-icon field-undo-btn" onclick="undoPlay()" ${_undoStack.length ? '' : 'disabled'} title="Undo">↩</button>
-                  <button class="btn-icon field-redo-btn" onclick="redoPlay()" ${_redoStack.length ? '' : 'disabled'} title="Redo">↪</button>` : ''}
-                </div>
+                <div id="field-container"></div>
+                ${!isCompleted ? `
+                <button class="btn-icon field-undo-btn" onclick="undoPlay()" ${_undoStack.length ? '' : 'disabled'} title="Undo">↩</button>
+                <button class="btn-icon field-redo-btn" onclick="redoPlay()" ${_redoStack.length ? '' : 'disabled'} title="Redo">↪</button>` : ''}
               </div>
             </div>
           </div>
