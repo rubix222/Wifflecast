@@ -3728,12 +3728,19 @@ const Render = {
       const home = State.getTeam(g.homeTeamId);
       const away = State.getTeam(g.awayTeamId);
       const date = new Date(g.createdAt).toLocaleDateString();
-      const showScore = g.status !== 'setup';
-      const isLive = g.status === 'in_progress';
+      const isSetup = g.status === 'setup';
+      const isLive  = g.status === 'in_progress';
+      const showScore = !isSetup;
       const inningStr = isLive
         ? `${g.currentHalf === 'top' ? 'Top' : 'Bot'} ${g.currentInning}`
         : (g.status === 'completed' ? 'Final' : '');
       const active = g.id === selectedGameId ? 'selected' : '';
+
+      // Event badge (tournament-linked games)
+      const eventName = g.tournamentId ? State.getTournament(g.tournamentId)?.name : null;
+      const eventBadge = eventName
+        ? `<div style="font-size:11px;color:#0369a1;margin-top:2px">📋 ${escapeHtml(eventName)}</div>`
+        : '';
 
       // Scoring lock info for live games
       const lockHolder = isLive && g.scoringLockedBy ? State.getUser(g.scoringLockedBy) : null;
@@ -3743,6 +3750,12 @@ const Render = {
         ? `<div style="font-size:11px;color:#059669;margin-top:3px">🟢 ${escapeHtml(scorerName)} is scoring</div>`
         : '';
 
+      // Setup game actions (scorers only)
+      const setupActions = isSetup && canUserScore() ? `
+        <div style="display:flex;gap:6px;margin-top:6px" onclick="event.stopPropagation()">
+          <button class="btn btn-sm btn-primary" onclick="showSetupModal('${g.id}')">▶ Start Scoring</button>
+        </div>` : '';
+
       // Watch / Score buttons for live games
       const liveActions = isLive ? `
         <div style="display:flex;gap:6px;margin-top:6px" onclick="event.stopPropagation()">
@@ -3750,15 +3763,23 @@ const Render = {
           ${canUserScore() ? `<button class="btn btn-sm btn-primary" onclick="openGameForScoring('${g.id}')">✏️ Score</button>` : ''}
         </div>` : '';
 
+      // Status label
+      const statusLabel = isSetup ? 'Not Started'
+        : isLive ? `In Progress${inningStr ? ' · ' + inningStr : ''}`
+        : g.status === 'completed' ? 'Final'
+        : g.status.replace('_', ' ');
+
       return `<div class="player-list-item game-list-item ${active}" onclick="selectGame('${g.id}')">
         <div style="width:100%">
           <div style="display:flex;justify-content:space-between;align-items:center">
-            <span class="game-card-status status-${g.status}" style="font-size:11px">${g.status.replace('_',' ')}${inningStr ? ' · '+inningStr : ''}</span>
+            <span class="game-card-status status-${g.status}" style="font-size:11px">${statusLabel}</span>
             <span style="font-size:11px;color:#9ca3af">${date}</span>
           </div>
           <div style="font-weight:600;font-size:13px;margin-top:3px">${escapeHtml(away?.name||'?')} @ ${escapeHtml(home?.name||'?')}</div>
           ${showScore ? `<div style="font-size:12px;color:#6b7280">${g.score.away} — ${g.score.home}</div>` : ''}
+          ${eventBadge}
           ${scoringLine}
+          ${setupActions}
           ${liveActions}
           ${isAdmin() ? `<button class="btn-icon" style="float:right;margin-top:-18px" title="Delete" onclick="event.stopPropagation();deleteGame('${g.id}')">🗑</button>` : ''}
         </div>
@@ -3997,8 +4018,27 @@ function openGame(id) {
   Render.games();
   const g = State.getGame(id);
   if (!g) return;
-  if (g.status === 'setup') renderGameSetup(g);
-  else                      renderLiveGame(g.id);
+  if (g.status === 'setup') {
+    if (canUserScore()) {
+      showSetupModal(id);
+    } else {
+      const detail = $('#games-detail'); if (!detail) return;
+      const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
+      const eventName = g.tournamentId ? State.getTournament(g.tournamentId)?.name : null;
+      detail.innerHTML = `
+        <div class="inline-game-header">
+          <h3>${escapeHtml(away?.name||'?')} @ ${escapeHtml(home?.name||'?')}</h3>
+          ${eventName ? `<div style="font-size:12px;color:#0369a1;margin-top:4px">📋 ${escapeHtml(eventName)}</div>` : ''}
+        </div>
+        <div style="padding:24px;text-align:center;color:#6b7280">
+          <div style="font-size:32px;margin-bottom:8px">⏳</div>
+          <div style="font-size:15px;font-weight:600;margin-bottom:4px">Not Started</div>
+          <div style="font-size:13px">This game hasn't been set up yet.</div>
+        </div>`;
+    }
+  } else {
+    renderLiveGame(g.id);
+  }
 }
 
 /* ============================================================
@@ -4098,10 +4138,21 @@ function renderTournamentDetail(id) {
 
   const rrGameRows = rrGames.length ? rrGames.map(g => {
     const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
-    const score = g.status === 'completed' ? `${g.score.away}–${g.score.home}` : g.status.replace('_',' ');
+    const sub = g.status === 'completed' ? `${g.score.away}–${g.score.home} · Final`
+              : g.status === 'in_progress' ? 'In Progress'
+              : 'Not Started';
+    const rowActions = g.status === 'setup' && canUserScore()
+      ? `<div style="margin-top:4px" onclick="event.stopPropagation()"><button class="btn btn-sm btn-primary" onclick="showSetupModal('${g.id}')">▶ Start Scoring</button></div>`
+      : g.status === 'in_progress'
+      ? `<div style="margin-top:4px;display:flex;gap:6px" onclick="event.stopPropagation()">
+           <button class="btn btn-sm" onclick="renderLiveGame('${g.id}',true)">👁 Watch</button>
+           ${canUserScore() ? `<button class="btn btn-sm btn-primary" onclick="openGameForScoring('${g.id}')">✏️ Score</button>` : ''}
+         </div>`
+      : '';
     return `<div class="player-list-item" style="cursor:pointer" onclick="openGame('${g.id}')">
       <div class="pli-name">${escapeHtml(away?.name||'?')} @ ${escapeHtml(home?.name||'?')}</div>
-      <div class="pli-sub">${score}</div>
+      <div class="pli-sub">${sub}</div>
+      ${rowActions}
     </div>`;
   }).join('') : '<div class="help-text" style="padding:8px">No round-robin games yet.</div>';
 
@@ -4301,6 +4352,42 @@ function renderGameSetup(g) {
   renderLineup(g, 'home');
 }
 
+function showSetupModal(gameId) {
+  const g = State.getGame(gameId); if (!g) return;
+  const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
+  if (!home || !away) { toast('Game has missing teams', 'error'); return; }
+  const eventName = g.tournamentId ? State.getTournament(g.tournamentId)?.name : null;
+  Modal.show(`
+    <div class="modal-header">
+      <div>
+        <h2 style="margin:0">${escapeHtml(away.name)} @ ${escapeHtml(home.name)}</h2>
+        ${eventName ? `<div style="font-size:12px;color:#0369a1;margin-top:2px">📋 ${escapeHtml(eventName)}</div>` : ''}
+      </div>
+      <button class="btn-icon" onclick="Modal.hide()">✕</button>
+    </div>
+    <div class="modal-body" style="padding:12px 16px 0">
+      <p class="help-text" style="margin-bottom:14px">
+        Set the batting order and assign starting positions. Batting order is fixed once the game starts.
+      </p>
+      <div class="game-setup-grid">
+        <div class="lineup-team-block">
+          <h4>${escapeHtml(away.name)} <span class="team-tag away">Away</span></h4>
+          <ul class="lineup-list" id="lineup-away" data-team="away" data-game="${g.id}"></ul>
+        </div>
+        <div class="lineup-team-block">
+          <h4>${escapeHtml(home.name)} <span class="team-tag">Home</span></h4>
+          <ul class="lineup-list" id="lineup-home" data-team="home" data-game="${g.id}"></ul>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="Modal.hide()">Cancel</button>
+      <button class="btn btn-primary" onclick="startGame('${g.id}')">Start Game →</button>
+    </div>`, { wide: true });
+  renderLineup(g, 'away');
+  renderLineup(g, 'home');
+}
+
 function renderLineup(g, side) {
   const team = side === 'home' ? State.getTeam(g.homeTeamId) : State.getTeam(g.awayTeamId);
   const order = side === 'home' ? g.homeBattingOrder : g.awayBattingOrder;
@@ -4406,6 +4493,7 @@ async function startGame(gameId) {
   if (!checkPositions(home, g.homePositions, home.name)) return;
   if (!checkPositions(away, g.awayPositions, away.name)) return;
   await State.updateGame(gameId, { status: 'in_progress' });
+  Modal.hide();
   Render.games();
   renderLiveGame(gameId);
 }
@@ -4734,8 +4822,10 @@ function liveGameHTML(g, home, away) {
       <div class="lg-topbar">
         <button class="btn-icon lg-back-btn" onclick="exitLiveGame()" title="Back">←</button>
         <div class="lg-title">
-          ${escapeHtml(away.name)} @ ${escapeHtml(home.name)}
-          <span class="game-card-status status-${g.status}" style="margin-left:6px;font-size:11px">${g.status.replace('_',' ')}</span>
+          <div>${escapeHtml(away.name)} @ ${escapeHtml(home.name)}
+            <span class="game-card-status status-${g.status}" style="margin-left:6px;font-size:11px">${isCompleted ? 'Final' : g.status.replace('_',' ')}</span>
+          </div>
+          ${g.tournamentId ? `<div style="font-size:11px;color:#0369a1;font-weight:500;margin-top:1px">📋 ${escapeHtml(State.getTournament(g.tournamentId)?.name || '')}</div>` : ''}
         </div>
         ${isCompleted && isAdmin() ? `
         <div style="display:flex;gap:6px;flex-shrink:0">
@@ -6369,7 +6459,7 @@ Object.assign(window, {
   showDoublePlayResult, applyDoublePlay,
   showTagUpResult, applyTagUp,
   toggleCanScore, showLinkPlayerModal, submitLinkPlayer,
-  showNewGameModal, openGame, selectGame, deselectGame, deleteGame, openGameForScoring,
+  showNewGameModal, openGame, selectGame, deselectGame, deleteGame, openGameForScoring, showSetupModal,
   submitPlayer, submitTeam, submitNewGame,
   startGame, setPosition, moveBatter,
   endHalfInning, endGameEarly,
