@@ -925,6 +925,12 @@
     .scoreboard .score { font-size: 32px; }
     .player-detail-panel { max-height: none; }
     .games-detail-panel { max-height: none; }
+    /* Events page — single-panel mobile navigation */
+    .tourn-back-btn { display: flex; }
+    #tournaments-split.tourn-has-detail .player-list-panel { display: none; }
+    #tournaments-split.tourn-has-detail .player-detail-panel { padding: 0; min-height: 0; }
+    .tourn-detail-body { padding: 12px; }
+    .tourn-standings-table th, .tourn-standings-table td { padding: 4px 5px; font-size: 11px; }
   }
   @media (max-width: 480px) {
     header { padding: 10px 14px; }
@@ -1361,6 +1367,26 @@
   .gs-feed-desc { color: #6b7280; }
 
   /* ---------- Tournaments ---------- */
+  /* Mobile back-navigation button (hidden on desktop) */
+  .tourn-back-btn {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 12px 16px;
+    border: none;
+    border-bottom: 1px solid #e5e7eb;
+    border-radius: 10px 10px 0 0;
+    background: #f9fafb;
+    color: #166534;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+  }
+  .tourn-back-btn:hover { background: #f0fdf4; }
+  .tourn-detail-body { padding: 16px; }
+
   .tourn-section-title {
     font-size: 12px;
     font-weight: 700;
@@ -2941,11 +2967,16 @@ const Render = {
       const games = State.games.filter(g => g.tournamentId === t.id);
       const done  = games.filter(g => g.status === 'completed').length;
       return `<div class="player-list-item${selectedTournamentId === t.id ? ' selected' : ''}" onclick="selectTournament('${t.id}')">
-        <div class="player-name">${escapeHtml(t.name)}</div>
-        <div class="player-meta">${t.teamIds.length} teams · ${done}/${games.length} games played</div>
+        <div class="pli-name">${escapeHtml(t.name)}</div>
+        <div class="pli-sub">${t.teamIds.length} teams · ${done}/${games.length} games played</div>
       </div>`;
     }).join('');
-    if (selectedTournamentId) renderTournamentDetail(selectedTournamentId);
+    const split = $('#tournaments-split');
+    if (selectedTournamentId) {
+      renderTournamentDetail(selectedTournamentId);
+    } else if (split) {
+      split.classList.remove('tourn-has-detail');
+    }
   },
 
   home() {
@@ -3942,6 +3973,16 @@ function selectTournament(id) {
   Render.tournaments();
 }
 
+function tournamentBack() {
+  selectedTournamentId = null;
+  const split = $('#tournaments-split');
+  if (split) split.classList.remove('tourn-has-detail');
+  const detail = $('#tournaments-detail');
+  if (detail) detail.innerHTML = '<div class="player-detail-empty"><span>← Select an event</span></div>';
+  // Re-render list to clear selected highlight
+  Render.tournaments();
+}
+
 function renderTournamentDetail(id) {
   const detail = $('#tournaments-detail'); if (!detail) return;
   const t = State.getTournament(id);
@@ -4021,13 +4062,17 @@ function renderTournamentDetail(id) {
     const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
     const score = g.status === 'completed' ? `${g.score.away}–${g.score.home}` : g.status.replace('_',' ');
     return `<div class="player-list-item" style="cursor:pointer" onclick="openGame('${g.id}')">
-      <div class="player-name">${escapeHtml(away?.name||'?')} @ ${escapeHtml(home?.name||'?')}</div>
-      <div class="player-meta">${score}</div>
+      <div class="pli-name">${escapeHtml(away?.name||'?')} @ ${escapeHtml(home?.name||'?')}</div>
+      <div class="pli-sub">${score}</div>
     </div>`;
   }).join('') : '<div class="help-text" style="padding:8px">No round-robin games yet.</div>';
 
+  const split = $('#tournaments-split');
+  if (split) split.classList.add('tourn-has-detail');
+
   detail.innerHTML = `
-    <div style="padding:16px">
+    <button class="tourn-back-btn" onclick="tournamentBack()">‹ Events</button>
+    <div class="tourn-detail-body">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:8px">
         <div>
           <h3 style="margin:0 0 2px">${escapeHtml(t.name)}</h3>
@@ -4044,7 +4089,7 @@ function renderTournamentDetail(id) {
       <div class="tourn-section-title" style="margin-top:14px">Round Robin Standings</div>
       ${standings.length ? `
       <div style="overflow-x:auto;margin-bottom:16px">
-        <table class="stats-table" style="width:100%">
+        <table class="stats-table tourn-standings-table" style="width:100%">
           <thead><tr><th>#</th><th>Team</th><th>W</th><th>L</th><th>T</th><th>Pts</th><th>RF</th><th>RA</th><th>+/-</th></tr></thead>
           <tbody>${standingsRows}</tbody>
         </table>
@@ -6275,7 +6320,7 @@ Object.assign(window, {
   endHalfInning, endGameEarly,
   showEditScoreModal, reopenGame, _esAdj, _esSave,
   showRecapModal, _copyRecap, _shareRecap, sendRecapEmails, autoSendRecapEmails, showEmailSetupModal, _saveEmailSetup, _toggleEmailSetup,
-  showNewTournamentModal, submitNewTournament, selectTournament,
+  showNewTournamentModal, submitNewTournament, selectTournament, tournamentBack,
   generateTournamentGames, generateChampionshipGame, deleteTournamentUI,
   selectPlay, clearPlaySelection,
   onFielderClick, swapFielder,
