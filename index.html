@@ -674,17 +674,6 @@
     flex: 1.4;
   }
   .pitch-buttons-compact .btn-bip:hover { background: #14532d; }
-  .locate-bar {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 12px;
-    background: #fff;
-    border-top: 1px solid #e5e7eb;
-    flex-shrink: 0;
-  }
-  .locate-bar .locate-label { font-weight: 700; font-size: 13px; color: #111827; }
-  .locate-bar .locate-hint { flex: 1; font-size: 12px; color: #6b7280; }
 
   .scoreboard {
     background: #14532d;
@@ -4940,7 +4929,7 @@ function drawField(overrideBases = null) {
     return `<polygon class="base occupied" points="${cx},${cy-sy} ${cx+sx},${cy} ${cx},${cy+sy} ${cx-sx},${cy}" />`;
   };
 
-  // Instruction overlay text rendered inside the SVG so it never affects layout
+  // Instruction overlay rendered inside the SVG — never affects DOM layout
   const instrText = __bipStep === 'locate'
     ? (__bipKind === 'out'   ? 'Drag fielder to where the play happened'
      : __bipKind === 'error' ? 'Drag fielder to where the error happened'
@@ -4948,8 +4937,12 @@ function drawField(overrideBases = null) {
      :                         'Tap where the ball landed')
     : '';
   const instrOverlay = instrText ? `
-    <rect x="8" y="8" width="384" height="32" rx="6" fill="rgba(240,253,244,0.95)" stroke="#bbf7d0" stroke-width="1"/>
-    <text x="200" y="28" text-anchor="middle" font-size="13" font-weight="600" fill="#166534" pointer-events="none">${instrText}</text>` : '';
+    <rect x="8" y="8" width="340" height="32" rx="6" fill="rgba(240,253,244,0.95)" stroke="#bbf7d0" stroke-width="1"/>
+    <text x="182" y="28" text-anchor="middle" font-size="13" font-weight="600" fill="#166534" pointer-events="none">${instrText}</text>
+    <g onclick="bipCancel()" style="cursor:pointer">
+      <rect x="352" y="8" width="40" height="32" rx="6" fill="rgba(254,226,226,0.95)" stroke="#fca5a5" stroke-width="1"/>
+      <text x="372" y="28" text-anchor="middle" font-size="14" font-weight="700" fill="#dc2626" pointer-events="none">✕</text>
+    </g>` : '';
 
   const svg = `
     <svg viewBox="0 0 400 400" class="field-svg" id="field-svg">
@@ -5275,19 +5268,11 @@ function rerenderBipPanel() {
 }
 
 function renderBipPanel(g) {
-  if (__bipStep === 'locate') {
-    const labels = { out: `Out — ${hitTypeLabel(__bipDetail)}`, hit: ({'1B':'Single','2B':'Double'})[__bipDetail]||'Hit', hr:'Home Run', error:`Error — ${({'1B':'Single','2B':'Double','HR':'Home Run'})[__bipDetail]||__bipDetail}` };
-    const needFielder = __bipKind === 'out' || __bipKind === 'error';
-    const hint = needFielder ? 'Drag fielder to where the play happened' : __bipKind === 'hr' ? 'Tap where the ball left the field' : 'Tap where the ball landed';
-    return `
-      <div class="locate-bar">
-        <span class="locate-label">${labels[__bipKind] || 'Ball in play'}</span>
-        <span class="locate-hint">${hint}</span>
-        <button class="btn btn-sm" onclick="bipCancel()">✕</button>
-      </div>`;
-  }
+  // In locate mode keep pitch buttons visible but dimmed so #bip-panel height
+  // never changes — instruction + cancel live in the SVG overlay instead.
+  const locating = __bipStep === 'locate';
   return `
-    <div class="pitch-buttons-compact">
+    <div class="pitch-buttons-compact"${locating ? ' style="opacity:0.3;pointer-events:none"' : ''}>
       <button data-pitch="ball">Ball</button>
       <button data-pitch="strike_swinging">Strike<small>Swing</small></button>
       <button data-pitch="strike_looking">Strike<small>Look</small></button>
