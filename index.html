@@ -931,8 +931,15 @@
     .tourn-back-btn { display: flex; }
     #tournaments-split.tourn-has-detail .player-list-panel { display: none; }
     #tournaments-split.tourn-has-detail .player-detail-panel { padding: 0; min-height: 0; }
-    .tourn-detail-body { padding: 12px; }
+    .tourn-detail-body { padding: 10px; }
     .tourn-standings-table th, .tourn-standings-table td { padding: 4px 5px; font-size: 11px; }
+    /* Stack header: name on top, buttons below full-width */
+    .tourn-header-row { flex-direction: column; align-items: stretch; }
+    .tourn-admin-actions { width: 100%; }
+    .tourn-admin-actions .btn { flex: 1; text-align: center; }
+    /* Championship finalists: shrink to fit, no fixed min-width */
+    .champ-finalist { min-width: 0; flex: 1; padding: 6px 8px; font-size: 13px; }
+    .champ-score { font-size: 16px; }
   }
   @media (max-width: 480px) {
     header { padding: 10px 14px; }
@@ -1388,6 +1395,35 @@
   }
   .tourn-back-btn:hover { background: #f0fdf4; }
   .tourn-detail-body { padding: 16px; max-width: 100%; overflow-x: hidden; }
+
+  /* Event header row: name left, admin actions right */
+  .tourn-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .tourn-admin-actions { display: flex; gap: 8px; flex-wrap: wrap; flex-shrink: 0; }
+
+  /* Standings: horizontal-scroll only, bounded */
+  .tourn-standings-scroll {
+    overflow-x: auto;
+    max-width: 100%;
+    margin-bottom: 16px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Games list: independent vertical scroll */
+  .tourn-games-scroll {
+    overflow-y: auto;
+    max-height: 35vh;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #fff;
+    -webkit-overflow-scrolling: touch;
+  }
 
   .tourn-section-title {
     font-size: 12px;
@@ -4075,30 +4111,30 @@ function renderTournamentDetail(id) {
   detail.innerHTML = `
     <button class="tourn-back-btn" onclick="tournamentBack()">‹ Events</button>
     <div class="tourn-detail-body">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:8px">
+      <div class="tourn-header-row">
         <div>
           <h3 style="margin:0 0 2px">${escapeHtml(t.name)}</h3>
           <span class="tourn-format-badge">${isPlayoff ? 'Round Robin + Finals' : 'Round Robin'}</span>
         </div>
-        ${isAdmin() ? `<div style="display:flex;gap:8px;flex-wrap:wrap">
-          ${rrPairsLeft > 0 ? `<button class="btn btn-sm btn-primary" onclick="generateTournamentGames('${id}')">⚙ Generate ${rrPairsLeft} RR game${rrPairsLeft>1?'s':''}</button>` : ''}
+        ${isAdmin() ? `<div class="tourn-admin-actions">
+          ${rrPairsLeft > 0 ? `<button class="btn btn-sm btn-primary" onclick="generateTournamentGames('${id}')">⚙ Generate ${rrPairsLeft} game${rrPairsLeft>1?'s':''}</button>` : ''}
           <button class="btn btn-sm btn-danger" onclick="deleteTournamentUI('${id}')">Delete</button>
         </div>` : ''}
       </div>
 
       ${champSection}
 
-      <div class="tourn-section-title" style="margin-top:14px">Round Robin Standings</div>
+      <div class="tourn-section-title" style="margin-top:14px">Standings</div>
       ${standings.length ? `
-      <div style="overflow-x:auto;max-width:100%;margin-bottom:16px">
+      <div class="tourn-standings-scroll">
         <table class="stats-table tourn-standings-table" style="width:100%">
           <thead><tr><th>#</th><th>Team</th><th>W</th><th>L</th><th>T</th><th>Pts</th><th>RF</th><th>RA</th><th>+/-</th></tr></thead>
           <tbody>${standingsRows}</tbody>
         </table>
-      </div>` : '<div class="help-text" style="margin-bottom:16px">No completed round-robin games yet.</div>'}
+      </div>` : '<div class="help-text" style="margin-bottom:16px">No games played yet.</div>'}
 
-      <div class="tourn-section-title">Round Robin Games</div>
-      <div>${rrGameRows}</div>
+      <div class="tourn-section-title">Games</div>
+      <div class="tourn-games-scroll">${rrGameRows}</div>
     </div>`;
 }
 
