@@ -4574,8 +4574,8 @@ function renderPitchingStats(g, away, home) {
   const hdr = name => `<tr class="stats-team-hdr"><th colspan="7">${escapeHtml(name)}</th></tr>
     <tr class="stats-col-hdr"><th>Player</th><th>IP</th><th>H</th><th>BB</th><th>K</th><th>R</th><th>Pitches</th></tr>`;
   return `<table>
-    <thead>${hdr(home.name)}</thead><tbody>${renderTeam(home, g.homePositions, 'top')}</tbody>
     <thead>${hdr(away.name)}</thead><tbody>${renderTeam(away, g.awayPositions, 'bottom')}</tbody>
+    <thead>${hdr(home.name)}</thead><tbody>${renderTeam(home, g.homePositions, 'top')}</tbody>
   </table>
   <div class="stats-key">
     <span><strong>IP</strong> Innings Pitched</span>
@@ -4605,8 +4605,8 @@ function renderFieldingStats(g, away, home) {
   const hdr = name => `<tr class="stats-team-hdr"><th colspan="3">${escapeHtml(name)}</th></tr>
     <tr class="stats-col-hdr"><th>Player</th><th>PO</th><th>E</th></tr>`;
   return `<table>
-    <thead>${hdr(home.name)}</thead><tbody>${renderTeam(home, g.homePositions, 'top')}</tbody>
     <thead>${hdr(away.name)}</thead><tbody>${renderTeam(away, g.awayPositions, 'bottom')}</tbody>
+    <thead>${hdr(home.name)}</thead><tbody>${renderTeam(home, g.homePositions, 'top')}</tbody>
   </table>
   <div class="stats-key">
     <span><strong>PO</strong> Putouts</span>
