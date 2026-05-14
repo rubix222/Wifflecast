@@ -4902,9 +4902,12 @@ function drawField(overrideBases = null) {
     if (!pid || !player) return '';
     const gloveMode = __fieldClickMode && __fieldClickMode.needFielder;
     if (gloveMode) {
-      // Out/error drag mode: glove image only, no circle
+      // Out/error drag mode: glove image only, no circle.
+      // A transparent rect covers the full marker area so pointer events register
+      // even though the <image> itself has pointer-events:none.
       const sz = 28, h = sz / 2;
       return `<g class="fielder" data-pid="${pid}" data-pos="${pos}" transform="translate(${cx},${cy})">
+        <rect x="${-h}" y="${-h}" width="${sz}" height="${sz + 20}" fill="transparent" style="pointer-events:all"/>
         <image href="glove.png" x="${-h}" y="${-h}" width="${sz}" height="${sz}" style="pointer-events:none"/>
         <text class="name bg" y="${h + 8}">${escapeHtml(player.name)}</text>
         <text class="name" y="${h + 8}">${escapeHtml(player.name)}</text>
