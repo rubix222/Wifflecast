@@ -1937,7 +1937,13 @@
   <section id="view-games" class="view">
     <div class="toolbar">
       <h2>Games</h2>
-      <button id="btn-add-game" class="btn btn-primary" style="display:none">+ New Game</button>
+      <div style="display:flex;align-items:center;gap:12px">
+        <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:#6b7280;cursor:pointer;user-select:none">
+          <input type="checkbox" id="chk-show-finished" onchange="showFinishedGames=this.checked;Render.games()">
+          Show finished
+        </label>
+        <button id="btn-add-game" class="btn btn-primary" style="display:none">+ New Game</button>
+      </div>
     </div>
     <div class="player-split games-split">
       <div class="player-list-panel" id="games-list"></div>
@@ -2637,6 +2643,7 @@ let teamDetailTab = 'batting'; // 'batting' | 'pitching'
 
 // Game view state
 let selectedGameId = null;
+let showFinishedGames = false;
 let statsSort    = { col: 'AVG', dir: -1 };
 let pitchSort    = { col: 'IP',  dir: -1 };
 let teamBatSort  = { col: 'AVG', dir: -1 };
@@ -3725,6 +3732,11 @@ const Render = {
   games() {
     const listEl = $('#games-list');
     if (!listEl) return;
+
+    // Sync checkbox with state (survives re-renders)
+    const chk = $('#chk-show-finished');
+    if (chk) chk.checked = showFinishedGames;
+
     if (!State.games.length) {
       const hasTwoTeams = State.teams.length >= 2;
       listEl.innerHTML = `<div style="padding:16px;color:#6b7280;font-size:13px">
@@ -3733,7 +3745,22 @@ const Render = {
       </div>`;
       return;
     }
-    const sorted = [...State.games].sort((a, b) => b.createdAt - a.createdAt);
+    const allSorted = [...State.games].sort((a, b) => b.createdAt - a.createdAt);
+    const sorted = showFinishedGames
+      ? allSorted
+      : allSorted.filter(g => g.status !== 'completed');
+
+    // If the selected game is now hidden, deselect it
+    if (selectedGameId && !sorted.find(g => g.id === selectedGameId)) {
+      selectedGameId = null;
+      const detail = $('#games-detail');
+      if (detail) detail.innerHTML = `<div class="player-detail-empty"><span>← Select a game</span></div>`;
+    }
+
+    if (!sorted.length) {
+      listEl.innerHTML = `<div style="padding:16px;color:#6b7280;font-size:13px">No active games. <label style="cursor:pointer;color:#0369a1" onclick="showFinishedGames=true;Render.games()">Show finished?</label></div>`;
+      return;
+    }
     // Keep selectedGameId valid
     if (selectedGameId && !State.getGame(selectedGameId)) selectedGameId = null;
     listEl.innerHTML = sorted.map(g => {
