@@ -4329,6 +4329,7 @@ function captureSnapshot(g) {
 }
 
 async function undoPlay() {
+  if (!assertScoringLock(LiveGameId)) return;
   if (!_undoStack.length) { toast('Nothing to undo', 'error'); return; }
   const g = State.getGame(LiveGameId); if (!g) return;
   const snap = _undoStack.pop();
@@ -4339,6 +4340,7 @@ async function undoPlay() {
 }
 
 async function redoPlay() {
+  if (!assertScoringLock(LiveGameId)) return;
   if (!_redoStack.length) { toast('Nothing to redo', 'error'); return; }
   const g = State.getGame(LiveGameId); if (!g) return;
   const snap = _redoStack.pop();
@@ -4419,6 +4421,25 @@ function startScoringHeartbeat(gameId) {
 
 function stopScoringHeartbeat() {
   if (_scoringHeartbeat) { clearInterval(_scoringHeartbeat); _scoringHeartbeat = null; }
+}
+
+// Returns true if the current user still owns the scoring lock.
+// If the lock was taken over, switches the user to watch-only and returns false.
+function assertScoringLock(gameId) {
+  if (!gameId || !currentUser) return false;
+  const g = State.getGame(gameId);
+  if (!g || g.status === 'completed') return false;
+  if (g.scoringLockedBy !== currentUser.uid) {
+    // Lock was taken over — kick this scorer out gracefully
+    stopScoringHeartbeat();
+    LiveGameWatchOnly = true;
+    const locker = g.scoringLockedBy ? State.getUser(g.scoringLockedBy) : null;
+    const name = locker?.name || 'Another user';
+    toast(`${name} took over scoring. You are now watching.`, 'error');
+    renderLiveGame(gameId, true);
+    return false;
+  }
+  return true;
 }
 
 async function openGameForScoring(gameId) {
@@ -5527,6 +5548,7 @@ async function finishError(errBase, errorById, location) {
 }
 
 async function applyPaEnd(g, ev) {
+  if (!assertScoringLock(g.id)) return;
   const batterId = currentBatterId(g);
   const pitcherId = currentPitcherId(g);
   const inning = g.currentInning;
@@ -5702,6 +5724,7 @@ async function finishGame(g, _reason) {
 }
 
 async function endHalfInning(gameId) {
+  if (!assertScoringLock(gameId)) return;
   if (!confirm('End this half-inning early? The current at-bat will be discarded.')) return;
   const g = State.getGame(gameId); if (!g) return;
   await endHalfInningInternal(g);
@@ -5709,6 +5732,7 @@ async function endHalfInning(gameId) {
 }
 
 async function endGameEarly(gameId) {
+  if (!assertScoringLock(gameId)) return;
   if (!confirm('End the game now? Final scores will be locked.')) return;
   const g = State.getGame(gameId); if (!g) return;
   await State.updateGame(gameId, { status: 'completed', isOver: true });
