@@ -1892,6 +1892,14 @@
       <div id="admin-teams-container"></div>
     </div>
     <div class="admin-panel-section">
+      <h3 class="admin-panel-heading">Games</h3>
+      <div id="admin-games-container"></div>
+    </div>
+    <div class="admin-panel-section">
+      <h3 class="admin-panel-heading">Events</h3>
+      <div id="admin-events-container"></div>
+    </div>
+    <div class="admin-panel-section">
       <h3 class="admin-panel-heading">Data Management</h3>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
         <button id="btn-export" class="btn">⬇ Export JSON</button>
@@ -1911,7 +1919,7 @@
     <div class="toolbar"><h2>Rules</h2></div>
     <div class="rules-grid">
       <div class="rules-card">
-        <h3>⚾ The Count</h3>
+        <h3>⚾ Batting</h3>
         <ul>
           <li><strong>4 balls</strong> = walk (batter advances to 1B, runners advance if forced)</li>
           <li><strong>3 strikes</strong> = strikeout — tracked as <em>looking</em>, <em>swinging</em>, or <em>foul-out</em></li>
@@ -1920,49 +1928,11 @@
         </ul>
       </div>
       <div class="rules-card">
-        <h3>🏏 Batting</h3>
-        <ul>
-          <li><strong>1B / 2B / 3B / HR</strong> — runners advance the same number of bases as the batter</li>
-          <li><strong>Ball in play (out)</strong> — tap a fielder + location to record the out</li>
-          <li><strong>Error</strong> — batter reaches base; no RBI credited</li>
-          <li><strong>Home run</strong> — all runners and batter score; mark where the ball left the field</li>
-        </ul>
-      </div>
-      <div class="rules-card">
-        <h3>📋 Innings &amp; Game</h3>
-        <ul>
-          <li>Default game length: <strong>6 innings</strong> (configurable when creating a game)</li>
-          <li><strong>3 outs</strong> end a half-inning</li>
-          <li>Home team bats in the bottom half; away team bats in the top half</li>
-          <li><strong>Walk-off</strong>: if the home team takes the lead in the bottom of the final inning, the game ends immediately</li>
-          <li>Tied after regulation → extra innings until a winner is decided</li>
-        </ul>
-      </div>
-      <div class="rules-card">
         <h3>🏃 Base Running</h3>
         <ul>
           <li>On a hit, all runners advance the same number of bases as the hit type</li>
           <li>On a walk, only runners forced advance</li>
           <li>Runs scored are credited to the batter as RBI (except on errors)</li>
-          <li>Runners who score are credited with an R in the stats</li>
-        </ul>
-      </div>
-      <div class="rules-card">
-        <h3>📊 Stats Tracked</h3>
-        <ul>
-          <li><strong>Batting:</strong> AB, H, 1B, 2B, 3B, HR, BB, K, R, RBI, AVG, OBP, SLG, OPS</li>
-          <li><strong>Pitching:</strong> IP, H, ER, BB, K, ERA</li>
-          <li><strong>Strikeouts:</strong> broken out by looking (KL), swinging (KS), and foul-out (KF)</li>
-          <li><strong>Teams:</strong> W/L/T record, runs for/against</li>
-        </ul>
-      </div>
-      <div class="rules-card">
-        <h3>🔧 Scoring &amp; Admin</h3>
-        <ul>
-          <li>Only users with <strong>scoring privilege</strong> (granted by admin) can record plays</li>
-          <li>Use <strong>↩ Undo / ↪ Redo</strong> in the scoring panel to correct mistakes</li>
-          <li>Tap a fielder on the field diagram to swap their position during a game</li>
-          <li>Admin can end a half-inning early or end a game at any time</li>
         </ul>
       </div>
     </div>
@@ -2117,6 +2087,7 @@ const Storage = {
         Render.games();
         Render.home();
         Render.tournaments && Render.tournaments();
+        Render.adminGames && Render.adminGames();
         if (LiveGameId) rerenderLive();
         Render.gamestream && Render.gamestream();
       }, err => console.warn('games listener:', err.message)),
@@ -2124,6 +2095,7 @@ const Storage = {
       fs.onSnapshot(fs.collection(fs.db, 'tournaments'), snap => {
         State.tournaments = snap.docs.map(d => d.data());
         Render.tournaments && Render.tournaments();
+        Render.adminEvents && Render.adminEvents();
       }, err => console.warn('tournaments listener:', err.message)),
 
       fs.onSnapshot(fs.collection(fs.db, 'users'), snap => {
@@ -3043,7 +3015,7 @@ async function toggleCanScore(uid) {
 }
 
 const Render = {
-  all() { this.home(); this.players(); this.teams(); this.games(); this.users(); this.adminPlayers(); this.adminTeams(); this.tournaments(); },
+  all() { this.home(); this.players(); this.teams(); this.games(); this.users(); this.adminPlayers(); this.adminTeams(); this.adminGames(); this.adminEvents(); this.tournaments(); },
 
   tournaments() {
     const btnAdd = $('#btn-add-tournament');
@@ -3250,6 +3222,64 @@ const Render = {
     }).join('');
     c.innerHTML = `<div class="stats-table-wrap"><table class="stats-table">
       <thead><tr><th>Name</th><th>Players</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+  },
+
+  adminGames() {
+    const c = $('#admin-games-container'); if (!c) return;
+    if (!isAdminUser()) { c.innerHTML = ''; return; }
+    if (!State.games.length) {
+      c.innerHTML = '<div class="empty-state"><p>No games yet.</p></div>';
+      return;
+    }
+    const sorted = [...State.games].sort((a, b) => b.createdAt - a.createdAt);
+    const rows = sorted.map(g => {
+      const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
+      const date = new Date(g.createdAt).toLocaleDateString();
+      const statusLabel = g.status === 'completed' ? `Final ${g.score.away}–${g.score.home}`
+        : g.status === 'in_progress' ? 'In Progress'
+        : 'Not Started';
+      const eventName = g.tournamentId ? State.getTournament(g.tournamentId)?.name : null;
+      return `<tr>
+        <td style="white-space:nowrap">${escapeHtml(away?.name||'?')} @ ${escapeHtml(home?.name||'?')}${eventName ? ` <span class="muted small">📋 ${escapeHtml(eventName)}</span>` : ''}</td>
+        <td class="muted small" style="white-space:nowrap">${date}</td>
+        <td style="white-space:nowrap"><span class="game-card-status status-${g.status}" style="font-size:11px">${statusLabel}</span></td>
+        <td style="white-space:nowrap">
+          <button class="btn-icon" title="Open" onclick="selectGame('${g.id}');switchTab('games')">↗</button>
+          <button class="btn-icon" title="Delete" onclick="deleteGame('${g.id}');Render.adminGames()">🗑</button>
+        </td>
+      </tr>`;
+    }).join('');
+    c.innerHTML = `<div class="stats-table-wrap"><table class="stats-table">
+      <thead><tr><th>Matchup</th><th>Date</th><th>Status</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+  },
+
+  adminEvents() {
+    const c = $('#admin-events-container'); if (!c) return;
+    if (!isAdminUser()) { c.innerHTML = ''; return; }
+    if (!State.tournaments.length) {
+      c.innerHTML = '<div class="empty-state"><p>No events yet.</p></div>';
+      return;
+    }
+    const sorted = [...State.tournaments].sort((a, b) => b.createdAt - a.createdAt);
+    const rows = sorted.map(t => {
+      const teamNames = (t.teamIds || []).map(id => State.getTeam(id)?.name || '?').join(', ');
+      const gameCount = State.games.filter(g => g.tournamentId === t.id).length;
+      return `<tr>
+        <td>${escapeHtml(t.name)}</td>
+        <td class="muted small">${escapeHtml(teamNames)}</td>
+        <td class="muted small" style="text-align:center">${gameCount}</td>
+        <td style="white-space:nowrap">
+          <button class="btn-icon" title="Open" onclick="selectTournament('${t.id}');switchTab('tournaments')">↗</button>
+          <button class="btn-icon" title="Delete" onclick="deleteTournamentUI('${t.id}')">🗑</button>
+        </td>
+      </tr>`;
+    }).join('');
+    c.innerHTML = `<div class="stats-table-wrap"><table class="stats-table">
+      <thead><tr><th>Name</th><th>Teams</th><th style="text-align:center">Games</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`;
   },
@@ -4555,6 +4585,16 @@ async function moveBatter(gameId, side, idx, delta) {
   renderLineup(fresh, side);
 }
 
+// Build a pitching rotation for one team: start from current pitcher, wrap through batting order
+function buildPitchingOrder(battingOrder, positions) {
+  const starterIdx = battingOrder.findIndex(pid => positions[pid] === 'P');
+  if (starterIdx < 0) return [...battingOrder]; // fallback
+  return [
+    ...battingOrder.slice(starterIdx),
+    ...battingOrder.slice(0, starterIdx),
+  ];
+}
+
 async function startGame(gameId) {
   const g = State.getGame(gameId); if (!g) return;
   const checkPositions = (team, positions, teamName) => {
@@ -4567,7 +4607,20 @@ async function startGame(gameId) {
   const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
   if (!checkPositions(home, g.homePositions, home.name)) return;
   if (!checkPositions(away, g.awayPositions, away.name)) return;
-  await State.updateGame(gameId, { status: 'in_progress' });
+
+  // Build pitching rotations from the batting order, starting at the assigned pitcher
+  const homePitchingOrder = buildPitchingOrder(g.homeBattingOrder, g.homePositions);
+  const awayPitchingOrder = buildPitchingOrder(g.awayBattingOrder, g.awayPositions);
+
+  await State.updateGame(gameId, {
+    status: 'in_progress',
+    homePitchingOrder,
+    awayPitchingOrder,
+    homePitcherIdx: 0,
+    awayPitcherIdx: 0,
+    homeBattersFaced: 0,
+    awayBattersFaced: 0,
+  });
   Modal.hide();
   Render.games();
   renderLiveGame(gameId);
@@ -5466,20 +5519,34 @@ function showSwapFielderModal(currentPid, currentPos) {
   const team = State.getTeam(fieldingTeamId(g));
   const others = team.playerIds.filter(pid => pid !== currentPid);
   const cur = State.getPlayer(currentPid);
+
+  // Check 4-batter rule if swapping the pitcher
+  const isPitcher = currentPos === 'P';
+  const fieldingSide = g.currentHalf === 'top' ? 'home' : 'away';
+  const faced = isPitcher ? (g[fieldingSide === 'home' ? 'homeBattersFaced' : 'awayBattersFaced'] || 0) : 4;
+
   const list = others.map(pid => {
     const p = State.getPlayer(pid);
     const otherPos = positions[pid] || 'BENCH';
-    return `<button class="btn" style="display:flex; justify-content:space-between; width:100%; margin-bottom:6px;" onclick="swapFielder('${currentPid}', '${pid}')">
+    return `<button class="btn" style="display:flex; justify-content:space-between; width:100%; margin-bottom:6px;" onclick="swapFielderGuarded('${currentPid}', '${pid}', ${faced})">
       <span>${escapeHtml(p?.name || '?')}</span>
       <span class="pill">${otherPos}</span>
     </button>`;
   }).join('');
+
+  const warningBanner = isPitcher && faced < 4
+    ? `<div style="background:#fef9c3;border:1px solid #fde68a;border-radius:6px;padding:8px 10px;font-size:12px;color:#92400e;margin-bottom:10px">
+        ⚠️ Pitcher has only faced <strong>${faced}</strong> of 4 required batters this inning.
+       </div>`
+    : '';
+
   Modal.show(`
     <div class="modal-header">
       <h3>Swap ${currentPos}: ${escapeHtml(cur?.name || '')}</h3>
       <button class="btn-icon" onclick="Modal.hide(); renderLiveGame('${g.id}')">✕</button>
     </div>
     <div class="modal-body">
+      ${warningBanner}
       <p class="help-text" style="margin-bottom:10px">Pick a player to move into the ${currentPos} role. The current ${currentPos} will take their position.</p>
       ${list || '<div class="muted">No other players available.</div>'}
     </div>
@@ -5489,6 +5556,17 @@ function showSwapFielderModal(currentPid, currentPos) {
   `);
 }
 
+// Handles the 4-batter confirmation for pitcher swaps
+function swapFielderGuarded(currentPid, newPid, faced) {
+  const g = State.getGame(LiveGameId); if (!g) return;
+  const positions = fieldingPositions(g);
+  const isPitcher = positions[currentPid] === 'P';
+  if (isPitcher && faced < 4) {
+    if (!confirm(`This pitcher has only faced ${faced} batter${faced === 1 ? '' : 's'} (minimum 4 required). Swap anyway?`)) return;
+  }
+  swapFielder(currentPid, newPid);
+}
+
 async function swapFielder(currentPid, newPid) {
   const g = State.getGame(LiveGameId); if (!g) return;
   const positions = { ...(g.currentHalf === 'top' ? g.homePositions : g.awayPositions) };
@@ -5496,10 +5574,25 @@ async function swapFielder(currentPid, newPid) {
   const newOldPos = positions[newPid];
   positions[currentPid] = newOldPos;
   positions[newPid] = oldPos;
-  const patch = g.currentHalf === 'top' ? { homePositions: positions } : { awayPositions: positions };
+  const posKey = g.currentHalf === 'top' ? 'homePositions' : 'awayPositions';
+  const patch = { [posKey]: positions };
+
+  // If this is a pitcher swap, reset the pitching index to point at newPid and clear faced count
+  if (oldPos === 'P') {
+    const fieldingSide = g.currentHalf === 'top' ? 'home' : 'away';
+    const orderKey  = fieldingSide === 'home' ? 'homePitchingOrder' : 'awayPitchingOrder';
+    const idxKey    = fieldingSide === 'home' ? 'homePitcherIdx'    : 'awayPitcherIdx';
+    const facedKey  = fieldingSide === 'home' ? 'homeBattersFaced'  : 'awayBattersFaced';
+    const order = g[orderKey] || [];
+    const newIdx = order.indexOf(newPid);
+    if (newIdx >= 0) patch[idxKey] = newIdx;
+    patch[facedKey] = 0;
+  }
+
   await State.updateGame(g.id, patch);
+  Modal.hide();
   renderLiveGame(g.id);
-  toast(`${oldPos}: ${State.getPlayer(newPid).name}`, 'success');
+  toast(`${oldPos}: ${State.getPlayer(newPid)?.name || '?'}`, 'success');
 }
 
 /* ============================================================
@@ -5937,6 +6030,10 @@ async function applyPaEnd(g, ev) {
   const idxKey = battingIdxKey(g);
   const newBatterIdx = g[idxKey] + 1;
 
+  // Track batters faced by the current pitcher (fielding team is opposite batting half)
+  const fieldingSide = half === 'top' ? 'home' : 'away';
+  const facedKey = fieldingSide === 'home' ? 'homeBattersFaced' : 'awayBattersFaced';
+
   const patch = {
     bases: newBases,
     outs: newOuts,
@@ -5948,6 +6045,7 @@ async function applyPaEnd(g, ev) {
     events: newEvents,
     [idxKey]: newBatterIdx,
     runnerCounter: g.runnerCounter || 0,
+    [facedKey]: (g[facedKey] || 0) + 1,
   };
 
   await State.updateGame(g.id, patch);
@@ -5976,6 +6074,36 @@ async function postPlayCheck(g) {
   }
 }
 
+// Returns position-map patch that cycles to next pitcher for the given side,
+// plus resets battersFaced for that side. Returns null if no rotation data.
+function buildPitcherCyclePatch(g, side) {
+  const orderKey   = side === 'home' ? 'homePitchingOrder'  : 'awayPitchingOrder';
+  const idxKey     = side === 'home' ? 'homePitcherIdx'     : 'awayPitcherIdx';
+  const facedKey   = side === 'home' ? 'homeBattersFaced'   : 'awayBattersFaced';
+  const posKey     = side === 'home' ? 'homePositions'      : 'awayPositions';
+
+  const order = g[orderKey];
+  if (!order || order.length < 2) return null;
+
+  const curIdx  = g[idxKey] ?? 0;
+  const nextIdx = (curIdx + 1) % order.length;
+
+  const curPid  = order[curIdx];
+  const nextPid = order[nextIdx];
+
+  // Swap P with next pitcher's current position
+  const positions = { ...(g[posKey] || {}) };
+  const nextOldPos = positions[nextPid] || 'BENCH';
+  positions[nextPid] = 'P';
+  positions[curPid]  = nextOldPos;
+
+  return {
+    [posKey]:  positions,
+    [idxKey]:  nextIdx,
+    [facedKey]: 0,
+  };
+}
+
 async function endHalfInningInternal(g) {
   let { currentInning, currentHalf } = g;
   if (currentHalf === 'top') {
@@ -5994,10 +6122,17 @@ async function endHalfInningInternal(g) {
     }
     // If tied, continue into extras
   }
+
+  // The team about to FIELD is the team that needs a new pitcher:
+  // top half → home team fields; bottom half → away team fields
+  const fieldingSide = currentHalf === 'top' ? 'home' : 'away';
+  const cyclePatch = buildPitcherCyclePatch(g, fieldingSide) || {};
+
   await State.updateGame(g.id, {
     currentInning, currentHalf,
     outs: 0, balls: 0, strikes: 0, fouls: 0,
     bases: { 1: null, 2: null, 3: null },
+    ...cyclePatch,
   });
   const fresh = State.getGame(g.id);
   await State.updateGame(g.id, { lineScore: ensureLineScore(fresh) });
