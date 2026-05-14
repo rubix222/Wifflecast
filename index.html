@@ -2202,10 +2202,12 @@ const State = {
     const home = this.getTeam(data.homeTeamId);
     const away = this.getTeam(data.awayTeamId);
     if (!home || !away) throw new Error('Both teams required');
-    const shared = (home.playerIds || []).filter(id => (away.playerIds || []).includes(id));
-    if (shared.length) {
-      const names = shared.map(id => this.getPlayer(id)?.name || id).join(', ');
-      throw new Error(`Player(s) on both teams: ${names}`);
+    if (!data.allowSharedPlayers) {
+      const shared = (home.playerIds || []).filter(id => (away.playerIds || []).includes(id));
+      if (shared.length) {
+        const names = shared.map(id => this.getPlayer(id)?.name || id).join(', ');
+        throw new Error(`Player(s) on both teams: ${names}`);
+      }
     }
 
     const defaultPositions = (team) => {
@@ -4130,7 +4132,7 @@ async function generateTournamentGames(tournId) {
     }
   if (!pairs.length) { toast('All round-robin matchups already generated', 'error'); return; }
   await Promise.all(pairs.map(([homeId, awayId]) =>
-    State.addGame({ homeTeamId: homeId, awayTeamId: awayId, numInnings: 6, tournamentId: tournId })
+    State.addGame({ homeTeamId: homeId, awayTeamId: awayId, numInnings: 6, tournamentId: tournId, allowSharedPlayers: true })
   ));
   Render.all();
   renderTournamentDetail(tournId);
@@ -4144,7 +4146,7 @@ async function generateChampionshipGame(tournId) {
   const [first, second] = standings;
   const game = await State.addGame({
     homeTeamId: first.team.id, awayTeamId: second.team.id,
-    numInnings: 6, tournamentId: tournId, isChampionship: true,
+    numInnings: 6, tournamentId: tournId, isChampionship: true, allowSharedPlayers: true,
   });
   Render.all();
   renderTournamentDetail(tournId);
