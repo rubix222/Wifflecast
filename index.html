@@ -1748,25 +1748,15 @@
 
   <section id="view-tournaments" class="view">
     <div class="toolbar">
-      <h2>Tournaments</h2>
-      <button id="btn-add-tournament" class="btn btn-primary" style="display:none">+ New Tournament</button>
+      <h2>Events</h2>
+      <button id="btn-add-tournament" class="btn btn-primary" style="display:none">+ New Event</button>
     </div>
     <div class="player-split" id="tournaments-split">
       <div class="player-list-panel" id="tournaments-list"></div>
       <div class="player-detail-panel" id="tournaments-detail">
-        <div class="player-detail-empty"><span>← Select a tournament</span></div>
+        <div class="player-detail-empty"><span>← Select an event</span></div>
       </div>
     </div>
-  </section>
-
-  <section id="view-gamestream" class="view">
-    <div class="toolbar">
-      <h2>Gamestream</h2>
-      <select id="gs-game-select" class="btn btn-sm" onchange="selectGamestream(this.value)" style="padding:6px 10px">
-        <option value="">— select a game —</option>
-      </select>
-    </div>
-    <div id="gamestream-container"></div>
   </section>
 
   <section id="view-admin" class="view">
@@ -1882,8 +1872,7 @@
   <button class="tab-btn" data-view="home"><span class="tab-icon">🏠</span><span>Home</span></button>
   <button class="tab-btn active" data-view="stats"><span class="tab-icon">📊</span><span>Stats</span></button>
   <button class="tab-btn" data-view="games"><span class="tab-icon">⚾</span><span>Games</span></button>
-  <button class="tab-btn" data-view="tournaments"><span class="tab-icon">🏆</span><span>Tournaments</span></button>
-  <button class="tab-btn" data-view="gamestream"><span class="tab-icon">📺</span><span>Gamestream</span></button>
+  <button class="tab-btn" data-view="tournaments"><span class="tab-icon">🏆</span><span>Events</span></button>
   <button class="tab-btn" data-view="rules"><span class="tab-icon">📋</span><span>Rules</span></button>
   <button class="tab-btn admin-only-tab" data-view="admin" style="display:none"><span class="tab-icon">⚙️</span><span>Admin</span></button>
 </nav>
@@ -2124,7 +2113,7 @@ const State = {
 
   // ---- Tournament CRUD ----
   async addTournament(data) {
-    const t = { id: uid(), name: data.name.trim(), teamIds: [...(data.teamIds||[])], createdAt: Date.now(), status: 'active' };
+    const t = { id: uid(), name: data.name.trim(), teamIds: [...(data.teamIds||[])], format: data.format || 'round_robin', createdAt: Date.now(), status: 'active' };
     this.tournaments.push(t);
     await Storage.saveTournament(t);
     return t;
@@ -2930,7 +2919,7 @@ async function toggleCanScore(uid) {
 }
 
 const Render = {
-  all() { this.home(); this.players(); this.teams(); this.games(); this.users(); this.adminPlayers(); this.adminTeams(); this.gamestream(); this.tournaments(); },
+  all() { this.home(); this.players(); this.teams(); this.games(); this.users(); this.adminPlayers(); this.adminTeams(); this.tournaments(); },
 
   tournaments() {
     const btnAdd = $('#btn-add-tournament');
@@ -3664,10 +3653,27 @@ const Render = {
       const away = State.getTeam(g.awayTeamId);
       const date = new Date(g.createdAt).toLocaleDateString();
       const showScore = g.status !== 'setup';
-      const inningStr = g.status === 'in_progress'
+      const isLive = g.status === 'in_progress';
+      const inningStr = isLive
         ? `${g.currentHalf === 'top' ? 'Top' : 'Bot'} ${g.currentInning}`
         : (g.status === 'completed' ? 'Final' : '');
       const active = g.id === selectedGameId ? 'selected' : '';
+
+      // Scoring lock info for live games
+      const lockHolder = isLive && g.scoringLockedBy ? State.getUser(g.scoringLockedBy) : null;
+      const lockStale  = isLive && g.scoringLockedAt && (Date.now() - g.scoringLockedAt) >= SCORING_LOCK_STALE_MS;
+      const scorerName = lockHolder && !lockStale ? lockHolder.name || null : null;
+      const scoringLine = scorerName
+        ? `<div style="font-size:11px;color:#059669;margin-top:3px">🟢 ${escapeHtml(scorerName)} is scoring</div>`
+        : '';
+
+      // Watch / Score buttons for live games
+      const liveActions = isLive ? `
+        <div style="display:flex;gap:6px;margin-top:6px" onclick="event.stopPropagation()">
+          <button class="btn btn-sm" onclick="renderLiveGame('${g.id}',true)">👁 Watch</button>
+          ${canUserScore() ? `<button class="btn btn-sm btn-primary" onclick="openGameForScoring('${g.id}')">✏️ Score</button>` : ''}
+        </div>` : '';
+
       return `<div class="player-list-item game-list-item ${active}" onclick="selectGame('${g.id}')">
         <div style="width:100%">
           <div style="display:flex;justify-content:space-between;align-items:center">
@@ -3676,6 +3682,8 @@ const Render = {
           </div>
           <div style="font-weight:600;font-size:13px;margin-top:3px">${escapeHtml(away?.name||'?')} @ ${escapeHtml(home?.name||'?')}</div>
           ${showScore ? `<div style="font-size:12px;color:#6b7280">${g.score.away} — ${g.score.home}</div>` : ''}
+          ${scoringLine}
+          ${liveActions}
           ${isAdmin() ? `<button class="btn-icon" style="float:right;margin-top:-18px" title="Delete" onclick="event.stopPropagation();deleteGame('${g.id}')">🗑</button>` : ''}
         </div>
       </div>`;
@@ -4047,60 +4055,61 @@ function showNewTournamentModal() {
      </label>`).join('');
   Modal.show(`
     <div class="modal-header">
-      <h2>New Tournament</h2>
+      <h2>New Event</h2>
       <button class="btn-icon" onclick="Modal.hide()">✕</button>
     </div>
-    <form onsubmit="submitNewTournament(event)">
-      <div class="modal-body">
-        <div class="form-row">
-          <label>Tournament name</label>
-          <input type="text" id="tourn-name" required placeholder="e.g. Summer Classic 2025">
-        </div>
-        <div class="form-row">
-          <label>Format</label>
-          <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
-            <label class="tourn-team-opt">
-              <input type="radio" name="tourn-format" value="round_robin" checked>
-              <div>
-                <strong>Round Robin</strong>
-                <div class="help-text">All teams play each other. Final standings determine the winner.</div>
-              </div>
-            </label>
-            <label class="tourn-team-opt">
-              <input type="radio" name="tourn-format" value="playoff">
-              <div>
-                <strong>Round Robin + Finals</strong>
-                <div class="help-text">All teams play each other. Top 2 records advance to a championship game. Tiebreaker: fewest runs allowed.</div>
-              </div>
-            </label>
-          </div>
-        </div>
-        <div class="form-row">
-          <label>Teams (select 2 or more)</label>
-          <div>${teamOpts || '<span class="help-text">Add teams first.</span>'}</div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label>Event name</label>
+        <input type="text" id="tourn-name" placeholder="e.g. Summer Classic 2025">
+      </div>
+      <div class="form-row">
+        <label>Format</label>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+          <label class="tourn-team-opt">
+            <input type="radio" name="tourn-format" value="round_robin" checked>
+            <div>
+              <strong>Round Robin</strong>
+              <div class="help-text">All teams play each other. Final standings determine the winner.</div>
+            </div>
+          </label>
+          <label class="tourn-team-opt">
+            <input type="radio" name="tourn-format" value="playoff">
+            <div>
+              <strong>Round Robin + Finals</strong>
+              <div class="help-text">All teams play each other. Top 2 records advance to a championship game. Tiebreaker: fewest runs allowed.</div>
+            </div>
+          </label>
         </div>
       </div>
-      <div class="modal-footer">
-        <button type="button" class="btn" onclick="Modal.hide()">Cancel</button>
-        <button type="submit" class="btn btn-primary">Create</button>
+      <div class="form-row">
+        <label>Teams (select 2 or more)</label>
+        <div>${teamOpts || '<span class="help-text">Add teams first.</span>'}</div>
       </div>
-    </form>`);
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn" onclick="Modal.hide()">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="submitNewTournament()">Create</button>
+    </div>`);
 }
 
-async function submitNewTournament(e) {
-  e.preventDefault();
-  const name    = $('#tourn-name').value.trim();
+async function submitNewTournament() {
+  const name    = $('#tourn-name')?.value.trim();
   const format  = $('input[name="tourn-format"]:checked')?.value || 'round_robin';
   const teamIds = $$('input[name="tourn-team"]:checked').map(cb => cb.value);
-  if (!name) return;
+  if (!name) { toast('Enter an event name', 'error'); return; }
   if (teamIds.length < 2) { toast('Select at least 2 teams', 'error'); return; }
   if (format === 'playoff' && teamIds.length < 3) { toast('Playoff format needs at least 3 teams', 'error'); return; }
-  const t = await State.addTournament({ name, teamIds, format });
-  Modal.hide();
-  selectedTournamentId = t.id;
-  Render.tournaments();
-  switchTab('tournaments');
-  toast('Tournament created!', 'success');
+  try {
+    const t = await State.addTournament({ name, teamIds, format });
+    Modal.hide();
+    selectedTournamentId = t.id;
+    Render.tournaments();
+    switchTab('tournaments');
+    toast('Event created!', 'success');
+  } catch (err) {
+    toast('Failed to create event: ' + (err.message || err), 'error');
+  }
 }
 
 async function generateTournamentGames(tournId) {
@@ -4299,6 +4308,8 @@ async function startGame(gameId) {
    ============================================================ */
 let LiveGameId = null;
 let _lastLiveGameId = null;
+let LiveGameWatchOnly = false;
+let _scoringHeartbeat = null;
 let _selectedPlayTs = null;
 const _undoStack = [];
 const _redoStack = [];
@@ -4337,13 +4348,14 @@ async function redoPlay() {
   toast('Redone');
 }
 
-function renderLiveGame(gameId) {
+function renderLiveGame(gameId, watchOnly = false) {
   if (gameId !== _lastLiveGameId) {
     _undoStack.length = 0;
     _redoStack.length = 0;
   }
   _lastLiveGameId = gameId;
   LiveGameId = gameId;
+  LiveGameWatchOnly = watchOnly;
   _selectedPlayTs = null;
   const g = State.getGame(gameId);
   if (!g) return;
@@ -4359,6 +4371,8 @@ function renderLiveGame(gameId) {
 }
 
 function exitLiveGame() {
+  stopScoringHeartbeat();
+  releaseScoringLock(LiveGameId);
   closeLiveMenu();
   const overlay = $('#live-game-overlay');
   if (overlay) {
@@ -4366,7 +4380,65 @@ function exitLiveGame() {
     overlay.innerHTML = '';
   }
   LiveGameId = null;
+  LiveGameWatchOnly = false;
 }
+
+// ---- Scoring lock ----
+const SCORING_LOCK_STALE_MS = 5 * 60 * 1000; // 5 minutes
+
+async function acquireScoringLock(gameId) {
+  if (!currentUser) return false;
+  const g = State.getGame(gameId);
+  if (!g) return false;
+  const now = Date.now();
+  if (g.scoringLockedBy && g.scoringLockedBy !== currentUser.uid) {
+    if (now - (g.scoringLockedAt || 0) < SCORING_LOCK_STALE_MS) return false;
+  }
+  await State.updateGame(gameId, { scoringLockedBy: currentUser.uid, scoringLockedAt: now });
+  return true;
+}
+
+async function releaseScoringLock(gameId) {
+  if (!currentUser || !gameId) return;
+  const g = State.getGame(gameId);
+  if (g?.scoringLockedBy === currentUser.uid) {
+    await State.updateGame(gameId, { scoringLockedBy: null, scoringLockedAt: null });
+  }
+}
+
+function startScoringHeartbeat(gameId) {
+  stopScoringHeartbeat();
+  _scoringHeartbeat = setInterval(async () => {
+    if (!currentUser || !LiveGameId) return;
+    const g = State.getGame(gameId);
+    if (g?.scoringLockedBy === currentUser.uid) {
+      await State.updateGame(gameId, { scoringLockedAt: Date.now() });
+    }
+  }, 60000);
+}
+
+function stopScoringHeartbeat() {
+  if (_scoringHeartbeat) { clearInterval(_scoringHeartbeat); _scoringHeartbeat = null; }
+}
+
+async function openGameForScoring(gameId) {
+  if (!canUserScore()) { renderLiveGame(gameId, true); return; }
+  const locked = await acquireScoringLock(gameId);
+  if (!locked) {
+    const g = State.getGame(gameId);
+    const lockerProfile = g?.scoringLockedBy ? State.getUser(g.scoringLockedBy) : null;
+    const name = lockerProfile?.name || 'Someone';
+    toast(`${name} is already scoring this game`, 'error');
+    renderLiveGame(gameId, true);
+    return;
+  }
+  startScoringHeartbeat(gameId);
+  renderLiveGame(gameId, false);
+}
+
+window.addEventListener('beforeunload', () => {
+  if (LiveGameId) releaseScoringLock(LiveGameId);
+});
 
 function renderLastScorerPill(g) {
   const lastPa = [...(g.events || [])].reverse().find(e => e.type === 'pa_end');
@@ -4521,7 +4593,7 @@ function liveGameHTML(g, home, away) {
   const fieldingTeam = battingSide === 'away' ? home : away;
   const inningStr = (g.currentHalf === 'top' ? '▲ Top ' : '▼ Bot ') + g.currentInning;
   const isCompleted = g.status === 'completed';
-  const canScore = canUserScore();
+  const canScore = !LiveGameWatchOnly && canUserScore();
   const batterId = currentBatterId(g);
   const batter = State.getPlayer(batterId);
 
@@ -6133,8 +6205,8 @@ Object.assign(window, {
   bipChooseKind, bipChooseDetail, bipCancel,
   showDoublePlayResult, applyDoublePlay,
   showTagUpResult, applyTagUp,
-  toggleCanScore, showLinkPlayerModal, submitLinkPlayer, selectGamestream,
-  showNewGameModal, openGame, selectGame, deselectGame, deleteGame,
+  toggleCanScore, showLinkPlayerModal, submitLinkPlayer,
+  showNewGameModal, openGame, selectGame, deselectGame, deleteGame, openGameForScoring,
   submitPlayer, submitTeam, submitNewGame,
   startGame, setPosition, moveBatter,
   endHalfInning, endGameEarly,
