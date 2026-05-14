@@ -1,0 +1,25 @@
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # script-src: own origin + inline scripts (single-file app) + eval (EmailJS template engine)
+    #             + Firebase SDK CDN + EmailJS CDN
+    Content-Security-Policy = """
+      default-src 'self';
+      script-src  'self' 'unsafe-inline' 'unsafe-eval'
+                  https://www.gstatic.com
+                  https://cdn.jsdelivr.net;
+      connect-src 'self'
+                  https://*.googleapis.com
+                  https://*.firebaseio.com
+                  wss://*.firebaseio.com
+                  https://api.emailjs.com;
+      img-src     'self' data: blob:;
+      style-src   'self' 'unsafe-inline';
+      font-src    'self' data:;
+      frame-src   'none';
+      object-src  'none';
+    """
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
