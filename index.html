@@ -1073,20 +1073,6 @@
   }
   .detail-tabs button.active { background: #166534; color: #fff; border-color: #166534; }
 
-  /* Player stat columns — 3-section horizontal scroll layout */
-  .player-stat-cols {
-    display: flex;
-    gap: 16px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: 4px;
-  }
-  .player-stat-col {
-    flex: 1 1 170px;
-    min-width: 170px;
-  }
-  .player-stat-col .stat-section-title { margin-top: 0; margin-bottom: 8px; }
-
   .stat-row-lg {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
@@ -2680,58 +2666,72 @@ const fmt = {
   },
 };
 
-// Shared 3-section stat columns — used on both the Stats tab (modal) and Home page
-function renderPlayerStatColumns(s) {
-  const bat = `
-    <div class="player-stat-col">
-      <div class="stat-section-title">Batting</div>
-      <div class="stat-row-lg">
-        <div class="stat-lg hi"><div class="stat-label">AVG</div><div class="stat-value">${fmt.avg(s.AVG)}</div></div>
-        <div class="stat-lg hi"><div class="stat-label">SLG</div><div class="stat-value">${fmt.avg(s.SLG)}</div></div>
-      </div>
-      <div class="stat-row-lg" style="margin-top:8px">
-        <div class="stat-lg"><div class="stat-label">PA</div><div class="stat-value">${s.PA}</div></div>
-        <div class="stat-lg"><div class="stat-label">AB</div><div class="stat-value">${s.AB}</div></div>
-        <div class="stat-lg"><div class="stat-label">H</div><div class="stat-value">${s.H}</div></div>
-        <div class="stat-lg"><div class="stat-label">1B</div><div class="stat-value">${s.singles}</div></div>
-        <div class="stat-lg"><div class="stat-label">2B</div><div class="stat-value">${s.doubles}</div></div>
-        <div class="stat-lg"><div class="stat-label">3B</div><div class="stat-value">${s.triples}</div></div>
-        <div class="stat-lg"><div class="stat-label">HR</div><div class="stat-value">${s.hrs}</div></div>
-        <div class="stat-lg"><div class="stat-label">R</div><div class="stat-value">${s.R}</div></div>
-        <div class="stat-lg"><div class="stat-label">RBI</div><div class="stat-value">${s.RBI}</div></div>
-        <div class="stat-lg"><div class="stat-label">BB</div><div class="stat-value">${s.BB}</div></div>
-        <div class="stat-lg"><div class="stat-label">K</div><div class="stat-value">${s.K_bat}</div></div>
-        <div class="stat-lg"><div class="stat-label">KL</div><div class="stat-value">${s.K_looking}</div></div>
-        <div class="stat-lg"><div class="stat-label">KS</div><div class="stat-value">${s.K_swinging}</div></div>
-        <div class="stat-lg"><div class="stat-label">KF</div><div class="stat-value">${s.K_foul}</div></div>
-      </div>
+// Returns the content for the currently active player stat tab
+function renderPlayerTabContent(tab, s) {
+  if (tab === 'pitching') return `
+    <div class="stat-row-lg">
+      <div class="stat-lg hi"><div class="stat-label">ERA</div><div class="stat-value">${s.ERA !== null ? s.ERA.toFixed(2) : '—'}</div></div>
+      <div class="stat-lg hi"><div class="stat-label">IP</div><div class="stat-value">${fmt.ip(s.IP)}</div></div>
+    </div>
+    <div class="stat-row-lg" style="margin-top:8px">
+      <div class="stat-lg"><div class="stat-label">GP</div><div class="stat-value">${s.pGP}</div></div>
+      <div class="stat-lg"><div class="stat-label">K</div><div class="stat-value">${s.pK}</div></div>
+      <div class="stat-lg"><div class="stat-label">KL</div><div class="stat-value">${s.pKL}</div></div>
+      <div class="stat-lg"><div class="stat-label">KS</div><div class="stat-value">${s.pKS}</div></div>
+      <div class="stat-lg"><div class="stat-label">KF</div><div class="stat-value">${s.pKF}</div></div>
+      <div class="stat-lg"><div class="stat-label">BB</div><div class="stat-value">${s.pBB}</div></div>
+      <div class="stat-lg"><div class="stat-label">ER</div><div class="stat-value">${s.pER}</div></div>
+    </div>
+    ${s.pGP === 0 ? '<p style="color:#9ca3af;font-size:13px;margin-top:8px;margin-bottom:0">No appearances yet.</p>' : ''}`;
+  if (tab === 'fielding') return `
+    <div class="stat-row-lg">
+      <div class="stat-lg"><div class="stat-label">E</div><div class="stat-value">${s.E}</div></div>
     </div>`;
-  const pit = `
-    <div class="player-stat-col">
-      <div class="stat-section-title">Pitching</div>
-      <div class="stat-row-lg">
-        <div class="stat-lg hi"><div class="stat-label">ERA</div><div class="stat-value">${s.ERA !== null ? s.ERA.toFixed(2) : '—'}</div></div>
-        <div class="stat-lg hi"><div class="stat-label">IP</div><div class="stat-value">${fmt.ip(s.IP)}</div></div>
-      </div>
-      <div class="stat-row-lg" style="margin-top:8px">
-        <div class="stat-lg"><div class="stat-label">GP</div><div class="stat-value">${s.pGP}</div></div>
-        <div class="stat-lg"><div class="stat-label">K</div><div class="stat-value">${s.pK}</div></div>
-        <div class="stat-lg"><div class="stat-label">KL</div><div class="stat-value">${s.pKL}</div></div>
-        <div class="stat-lg"><div class="stat-label">KS</div><div class="stat-value">${s.pKS}</div></div>
-        <div class="stat-lg"><div class="stat-label">KF</div><div class="stat-value">${s.pKF}</div></div>
-        <div class="stat-lg"><div class="stat-label">BB</div><div class="stat-value">${s.pBB}</div></div>
-        <div class="stat-lg"><div class="stat-label">ER</div><div class="stat-value">${s.pER}</div></div>
-      </div>
-      ${s.pGP === 0 ? '<p style="color:#9ca3af;font-size:13px;margin-top:8px;margin-bottom:0">No appearances yet.</p>' : ''}
+  // batting (default)
+  return `
+    <div class="stat-row-lg">
+      <div class="stat-lg hi"><div class="stat-label">AVG</div><div class="stat-value">${fmt.avg(s.AVG)}</div></div>
+      <div class="stat-lg hi"><div class="stat-label">SLG</div><div class="stat-value">${fmt.avg(s.SLG)}</div></div>
+    </div>
+    <div class="stat-row-lg" style="margin-top:8px">
+      <div class="stat-lg"><div class="stat-label">PA</div><div class="stat-value">${s.PA}</div></div>
+      <div class="stat-lg"><div class="stat-label">AB</div><div class="stat-value">${s.AB}</div></div>
+      <div class="stat-lg"><div class="stat-label">H</div><div class="stat-value">${s.H}</div></div>
+      <div class="stat-lg"><div class="stat-label">1B</div><div class="stat-value">${s.singles}</div></div>
+      <div class="stat-lg"><div class="stat-label">2B</div><div class="stat-value">${s.doubles}</div></div>
+      <div class="stat-lg"><div class="stat-label">3B</div><div class="stat-value">${s.triples}</div></div>
+      <div class="stat-lg"><div class="stat-label">HR</div><div class="stat-value">${s.hrs}</div></div>
+      <div class="stat-lg"><div class="stat-label">R</div><div class="stat-value">${s.R}</div></div>
+      <div class="stat-lg"><div class="stat-label">RBI</div><div class="stat-value">${s.RBI}</div></div>
+      <div class="stat-lg"><div class="stat-label">BB</div><div class="stat-value">${s.BB}</div></div>
+      <div class="stat-lg"><div class="stat-label">K</div><div class="stat-value">${s.K_bat}</div></div>
+      <div class="stat-lg"><div class="stat-label">KL</div><div class="stat-value">${s.K_looking}</div></div>
+      <div class="stat-lg"><div class="stat-label">KS</div><div class="stat-value">${s.K_swinging}</div></div>
+      <div class="stat-lg"><div class="stat-label">KF</div><div class="stat-value">${s.K_foul}</div></div>
     </div>`;
-  const fld = `
-    <div class="player-stat-col">
-      <div class="stat-section-title">Fielding</div>
-      <div class="stat-row-lg">
-        <div class="stat-lg"><div class="stat-label">E</div><div class="stat-value">${s.E}</div></div>
-      </div>
+}
+
+// Shared tabbed player stats widget — used on both Home page and in modal
+function renderPlayerStatTabs(s, playerId) {
+  const tabs = ['batting', 'pitching', 'fielding'];
+  const tabBtns = tabs.map(t =>
+    `<button class="${playerStatsTab === t ? 'active' : ''}" data-pstab="${t}" onclick="setPlayerStatsTab('${t}','${playerId}')">${t[0].toUpperCase()+t.slice(1)}</button>`
+  ).join('');
+  return `
+    <div class="detail-tabs">${tabBtns}</div>
+    <div id="player-stats-content" data-pid="${playerId}">
+      ${renderPlayerTabContent(playerStatsTab, s)}
     </div>`;
-  return `<div class="player-stat-cols">${bat}${pit}${fld}</div>`;
+}
+
+function setPlayerStatsTab(tab, playerId) {
+  playerStatsTab = tab;
+  const s = State.computePlayerStats(playerId);
+  // Update tab button active states (works for both modal and home page)
+  $$('[data-pstab]').forEach(b => b.classList.toggle('active', b.dataset.pstab === tab));
+  // Swap content in place
+  const content = $('#player-stats-content');
+  if (content) content.innerHTML = renderPlayerTabContent(tab, s);
 }
 
 function showPlayerStatsModal(playerId) {
@@ -2744,7 +2744,7 @@ function showPlayerStatsModal(playerId) {
       <button class="btn-icon" onclick="Modal.hide()">✕</button>
     </div>
     <div class="modal-body">
-      ${renderPlayerStatColumns(s)}
+      ${renderPlayerStatTabs(s, playerId)}
     </div>`);
 }
 
@@ -2769,7 +2769,8 @@ function canUserScore() { return isAdmin() || (currentUser && currentUserProfile
 
 // Player view state
 let selectedPlayerId = null;
-let playersView = 'batting';     // 'batting' | 'pitching'
+let playersView    = 'batting';  // 'batting' | 'pitching'
+let playerStatsTab = 'batting';  // 'batting' | 'pitching' | 'fielding'
 
 // Team view state
 let selectedTeamId = null;
@@ -3179,7 +3180,7 @@ const Render = {
         <div class="home-card">
           <div class="home-section-title">My Player</div>
           <div class="home-player-name">${escapeHtml(myPlayer.jerseyNumber ? '#' + myPlayer.jerseyNumber + ' ' + myPlayer.name : myPlayer.name)}</div>
-          ${renderPlayerStatColumns(s)}
+          ${renderPlayerStatTabs(s, myPid)}
         </div>`;
     } else if (currentUser) {
       playerCard = `
@@ -6976,7 +6977,7 @@ Object.assign(window, {
   showBipOutTypeModal, showBipHitModal, showBipErrorModal,
   askLocation, cancelLocation, confirmLocation, finishHit,
   // Admin mode + player view
-  setPlayersView, selectPlayer, showPlayerStatsModal,
+  setPlayersView, selectPlayer, showPlayerStatsModal, setPlayerStatsTab,
   setStatsMain, setTeamsView, sortTeamStats,
   selectTeam, setTeamDetailTab,
   switchTab,
