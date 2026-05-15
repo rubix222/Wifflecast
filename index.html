@@ -1909,9 +1909,7 @@
     </div>
     <div class="player-split" id="tournaments-split">
       <div class="player-list-panel" id="tournaments-list"></div>
-      <div class="player-detail-panel" id="tournaments-detail">
-        <div class="player-detail-empty"><span>← Select an event</span></div>
-      </div>
+      <div class="player-detail-panel" id="tournaments-detail"></div>
     </div>
   </section>
 
@@ -2017,9 +2015,7 @@
     </div>
     <div class="player-split games-split">
       <div class="player-list-panel" id="games-list"></div>
-      <div class="player-detail-panel games-detail-panel" id="games-detail">
-        <div class="player-detail-empty"><span>← Select a game</span></div>
-      </div>
+      <div class="player-detail-panel games-detail-panel" id="games-detail"></div>
     </div>
   </section>
 </main>
@@ -3985,7 +3981,7 @@ const Render = {
     if (selectedGameId && !sorted.find(g => g.id === selectedGameId)) {
       selectedGameId = null;
       const detail = $('#games-detail');
-      if (detail) detail.innerHTML = `<div class="player-detail-empty"><span>← Select a game</span></div>`;
+      if (detail) detail.innerHTML = '';
     }
 
     if (!sorted.length) {
@@ -4282,7 +4278,7 @@ function deselectGame() {
   LiveGameId = null;
   Render.games();
   const detail = $('#games-detail');
-  if (detail) detail.innerHTML = '<div class="player-detail-empty"><span>← Select a game</span></div>';
+  if (detail) detail.innerHTML = '';
 }
 function openGame(id) {
   selectedGameId = id;
@@ -4328,7 +4324,7 @@ function tournamentBack() {
   const split = $('#tournaments-split');
   if (split) split.classList.remove('tourn-has-detail');
   const detail = $('#tournaments-detail');
-  if (detail) detail.innerHTML = '<div class="player-detail-empty"><span>← Select an event</span></div>';
+  if (detail) detail.innerHTML = '';
   // Re-render list to clear selected highlight
   Render.tournaments();
 }
@@ -4832,7 +4828,7 @@ async function deleteTournamentUI(id) {
   await State.deleteTournament(id);
   Render.all();
   const detail = $('#tournaments-detail');
-  if (detail) detail.innerHTML = '<div class="player-detail-empty"><span>← Select an event</span></div>';
+  if (detail) detail.innerHTML = '';
   toast('Event deleted');
 }
 
