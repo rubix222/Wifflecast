@@ -2156,7 +2156,9 @@
 
   const db = getFirestore(app);
   const auth = getAuth(app);
-  setPersistence(auth, browserLocalPersistence);
+  // Gracefully skip persistence if localStorage is unavailable (file:// protocol,
+  // privacy mode with storage blocked, etc.)
+  setPersistence(auth, browserLocalPersistence).catch(() => {});
   window._fs = { db, collection, doc, getDocs, setDoc, deleteDoc, onSnapshot,
                  auth, onAuthStateChanged, signInWithEmailAndPassword,
                  createUserWithEmailAndPassword, signOut,
@@ -3636,39 +3638,9 @@ const Render = {
         </div>`;
     }
 
-    // Not signed in — show welcome card + live/recent games (no My Teams section)
+    // Not signed in — show welcome card only
     if (!currentUser) {
-      const recent = [...State.games]
-        .filter(g => g.status === 'completed' || g.status === 'in_progress')
-        .sort((a, b) => b.createdAt - a.createdAt)
-        .slice(0, 6);
-      const recentHtml = recent.map(g => {
-        const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
-        const isLive = g.status === 'in_progress';
-        const score  = g.status === 'completed' ? `${g.score.away}–${g.score.home}` : 'LIVE';
-        const date   = new Date(g.createdAt).toLocaleDateString();
-        return `<div class="home-recent-game" onclick="renderLiveGame('${g.id}',true);switchTab('games')">
-          <div>
-            <div style="font-weight:600">${escapeHtml(away?.name||'?')} @ ${escapeHtml(home?.name||'?')}</div>
-            <div style="font-size:12px;color:#9ca3af">${date}</div>
-          </div>
-          <div style="display:flex;gap:6px;align-items:center" onclick="event.stopPropagation()">
-            <div class="home-game-score ${isLive ? 'status-in_progress' : ''}">${score}</div>
-            <button class="btn btn-sm" onclick="renderLiveGame('${g.id}',true);switchTab('games')">👁 Watch</button>
-          </div>
-        </div>`;
-      }).join('') || '<p style="color:#6b7280;font-size:14px;margin:0">No games yet.</p>';
-
-      c.innerHTML = `
-        <div style="padding-top:8px">
-          <div class="home-grid">
-            ${playerCard}
-            <div class="home-card">
-              <div class="home-section-title">Recent Games</div>
-              ${recentHtml}
-            </div>
-          </div>
-        </div>`;
+      c.innerHTML = `<div style="padding-top:8px"><div class="home-grid">${playerCard}</div></div>`;
       return;
     }
 
