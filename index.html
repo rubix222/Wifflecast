@@ -2458,6 +2458,7 @@ const State = {
     let singles=0, doubles=0, triples=0, hrs=0;
     const pitchedGames = new Set();
     const battedGames  = new Set();
+    const fieldedGames = new Set();
 
     this.games.forEach(g => {
       (g.events || []).forEach(e => {
@@ -2500,8 +2501,8 @@ const State = {
           pStrikePitches += e.strikePitches || 0;
           pitchedGames.add(g.id);
         }
-        if (e.errorById === playerId) E++;
-        if (e.fielderId === playerId && e.outcome === 'OUT') PO++;
+        if (e.errorById === playerId) { E++; fieldedGames.add(g.id); }
+        if (e.fielderId === playerId && e.outcome === 'OUT') { PO++; fieldedGames.add(g.id); }
         if (e.runsScoredBy && e.runsScoredBy.includes(playerId)) R++;
       });
     });
@@ -2522,13 +2523,14 @@ const State = {
     const pKPerInn = IP > 0     ? pK / IP             : null;
     const pBBPerInn = IP > 0    ? pBB / IP            : null;
     const GP  = battedGames.size;
+    const fGP = fieldedGames.size;
 
     return {
       GP, AB, H, R, RBI, BB, K_bat, K_looking, K_swinging, K_foul, AVG, OBP, SLG, OPS, PA, TB,
       singles, doubles, triples, hrs,
       pK, pKL, pKS, pKF, pBB, pER, pR, pH, IP, ERA, pWHIP,
       pBF, pPitches, pStrikePitches, pPerIP, pPerBF, pSPct, pKPerBF, pKPerInn, pBBPerInn,
-      E, PO, pGP,
+      E, PO, pGP, fGP,
     };
   },
 
@@ -2611,8 +2613,9 @@ const State = {
 
   computeTeamFieldingStats(teamId) {
     let E = 0, PO = 0;
-    this.games.forEach(g => {
-      if (g.homeTeamId !== teamId && g.awayTeamId !== teamId) return;
+    const games = this.games.filter(g => g.homeTeamId === teamId || g.awayTeamId === teamId);
+    const GP = games.filter(g => g.status === 'completed').length;
+    games.forEach(g => {
       // The team fields during the opposite half from when they bat
       const fieldingHalf = g.homeTeamId === teamId ? 'top' : 'bottom';
       (g.events || []).forEach(e => {
@@ -2621,7 +2624,7 @@ const State = {
         if (e.outcome === 'OUT' || e.outcome === 'K') PO++;
       });
     });
-    return { E, PO };
+    return { GP, E, PO };
   },
 
   // Hit locations across all games for a player
@@ -2776,6 +2779,7 @@ const BATTING_COLS = [
   { key: 'K',   label: 'K'   },
 ];
 const PITCH_COLS = [
+  { key: 'GP',     label: 'GP'     },
   { key: 'IP',     label: 'IP',     fmt: v => fmt.ip(v) },
   { key: 'ERA',    label: 'ERA',    fmt: v => v !== null ? v.toFixed(2) : '—', nullLow: true },
   { key: 'K',      label: 'K'      },
@@ -2792,6 +2796,7 @@ const PITCH_COLS = [
   { key: 'bbPerInn',label:'BB/Inn',fmt: v => v !== null ? v.toFixed(2) : '—' },
 ];
 const FIELD_COLS = [
+  { key: 'GP', label: 'GP' },
   { key: 'PO', label: 'PO' },
   { key: 'E',  label: 'E'  },
 ];
@@ -2810,20 +2815,20 @@ function playerBattingData(s) {
     R: s.R, RBI: s.RBI, BB: s.BB, K: s.K_bat };
 }
 function playerPitchingData(s) {
-  return { IP: s.IP, ERA: s.ERA, K: s.pK, BB: s.pBB, H: s.pH, R: s.pR, ER: s.pER,
+  return { GP: s.pGP, IP: s.IP, ERA: s.ERA, K: s.pK, BB: s.pBB, H: s.pH, R: s.pR, ER: s.pER,
     WHIP: s.pWHIP, pPerIP: s.pPerIP, pPerBF: s.pPerBF, sPct: s.pSPct,
     kPerBF: s.pKPerBF, kPerInn: s.pKPerInn, bbPerInn: s.pBBPerInn };
 }
 function playerFieldingData(s) {
-  return { PO: s.PO, E: s.E };
+  return { GP: s.fGP, PO: s.PO, E: s.E };
 }
 function teamBattingData(bs, gp = 0) {
   return { GP: gp, PA: bs.PA, AB: bs.AB, AVG: bs.AVG, OBP: bs.OBP, SLG: bs.SLG, H: bs.H,
     '1B': bs.singles, '2B': bs.doubles, '3B': bs.triples, HR: bs.hrs,
     R: bs.R, RBI: bs.RBI, BB: bs.BB, K: bs.K };
 }
-function teamPitchingData(ps) {
-  return { IP: ps.IP, ERA: ps.ERA, K: ps.K, BB: ps.BB, H: ps.H, R: ps.R, ER: ps.ER,
+function teamPitchingData(ps, gp = 0) {
+  return { GP: gp, IP: ps.IP, ERA: ps.ERA, K: ps.K, BB: ps.BB, H: ps.H, R: ps.R, ER: ps.ER,
     WHIP: ps.WHIP, pPerIP: ps.pPerIP, pPerBF: ps.pPerBF, sPct: ps.sPct,
     kPerBF: ps.kPerBF, kPerInn: ps.kPerInn, bbPerInn: ps.bbPerInn };
 }
@@ -2966,7 +2971,7 @@ function renderTeamStatTable(teamId) {
     <div class="stat-section-title">Batting</div>
     ${renderStatTableRow(BATTING_COLS, teamBattingData(bat, ts.gamesPlayed))}
     <div class="stat-section-title">Pitching</div>
-    ${renderStatTableRow(PITCH_COLS, teamPitchingData(pit))}
+    ${renderStatTableRow(PITCH_COLS, teamPitchingData(pit, ts.gamesPlayed))}
     <div class="stat-section-title">Fielding</div>
     ${renderStatTableRow(FIELD_COLS, fld)}`;
 }
@@ -2983,7 +2988,7 @@ function renderHomeTeamsSection(teams, view) {
     return { t,
       record:   { GP: ts.gamesPlayed, W: ts.wins, L: ts.losses, RF: ts.runsFor, RA: ts.runsAgainst },
       batting:  teamBattingData(bat, ts.gamesPlayed),
-      pitching: teamPitchingData(pit),
+      pitching: teamPitchingData(pit, ts.gamesPlayed),
       fielding: fld,
     };
   });
@@ -3936,7 +3941,7 @@ const Render = {
     if (teamsView === 'pitching') {
       const COLS = PITCH_COLS;
       const sort = teamPitSort;
-      let rows = sorted.map(t => ({ t, d: teamPitchingData(State.computeTeamPitchingStats(t.id)) }));
+      let rows = sorted.map(t => ({ t, d: teamPitchingData(State.computeTeamPitchingStats(t.id), State.computeTeamStats(t.id).gamesPlayed) }));
       rows.sort((a, b) => {
         if (sort.col === 'name') return b.t.name.localeCompare(a.t.name) * sort.dir;
         let av = a.d[sort.col] ?? null, bv = b.d[sort.col] ?? null;
