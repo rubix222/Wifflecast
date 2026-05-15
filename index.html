@@ -1877,8 +1877,7 @@
         <div id="teams-toolbar"></div>
       </div>
       <div class="players-subnav" id="teams-subnav">
-        <button class="active" data-tview="detail" onclick="setTeamsView('detail')">Detail</button>
-        <button data-tview="batting" onclick="setTeamsView('batting')">Batting</button>
+        <button class="active" data-tview="batting" onclick="setTeamsView('batting')">Batting</button>
         <button data-tview="pitching" onclick="setTeamsView('pitching')">Pitching</button>
         <button data-tview="fielding" onclick="setTeamsView('fielding')">Fielding</button>
       </div>
@@ -2849,7 +2848,6 @@ let playersView    = 'batting';  // 'batting' | 'pitching' | 'fielding'
 
 // Team view state
 let selectedTeamId = null;
-let teamDetailTab = 'batting'; // 'batting' | 'pitching'
 
 // Game view state
 let selectedGameId = null;
@@ -2860,7 +2858,7 @@ let fieldSort    = { col: 'PO',  dir: -1 };
 let teamBatSort  = { col: 'AVG', dir: -1 };
 let teamPitSort  = { col: 'ERA', dir:  1 };
 let teamFieldSort = { col: 'E',  dir: -1 };
-let teamsView     = 'detail';  // 'detail' | 'batting' | 'pitching' | 'fielding'
+let teamsView     = 'batting'; // 'batting' | 'pitching' | 'fielding'
 
 function setPlayersView(view) {
   playersView = view;
@@ -2887,10 +2885,6 @@ function sortTeamStats(col, which) {
   const s = which === 'pitching' ? teamPitSort : which === 'fielding' ? teamFieldSort : teamBatSort;
   s.dir = s.col === col ? -s.dir : -1;
   s.col = col;
-  Render.teams();
-}
-function setTeamDetailTab(tab) {
-  teamDetailTab = tab;
   Render.teams();
 }
 function sortStats(col, which) {
@@ -3277,7 +3271,7 @@ const Render = {
         ${myTeams.length ? myTeams.map(t => {
           const ts = State.computeTeamStats(t.id);
           return `<div style="margin-bottom:16px">
-            <div class="home-team-chip" onclick="setStatsMain('teams');selectTeam('${t.id}');setTeamsView('detail');switchTab('stats')" style="margin-bottom:8px">
+            <div class="home-team-chip" onclick="setStatsMain('teams');selectTeam('${t.id}');setTeamsView('batting');switchTab('stats')" style="margin-bottom:8px">
               <strong>${escapeHtml(t.name)}</strong>
               <span style="color:#6b7280;font-size:13px">${ts.wins}-${ts.losses}${ts.ties ? '-'+ts.ties : ''}</span>
             </div>
@@ -3739,7 +3733,7 @@ const Render = {
       const nameSortArr = sort.col === 'name' ? (sort.dir === -1 ? '<span class="sort-arr">▼</span>' : '<span class="sort-arr">▲</span>') : '<span class="sort-arr" style="opacity:0.25">▼</span>';
       c.innerHTML = `<div class="stats-table-wrap"><table class="stats-table">
         <thead><tr><th onclick="sortTeamStats('name','batting')">Team${nameSortArr}</th>${COLS.map(thArr).join('')}</tr></thead>
-        <tbody>${rows.map(({ t, d }) => `<tr onclick="selectTeam('${t.id}');setTeamsView('detail')" style="cursor:pointer">
+        <tbody>${rows.map(({ t, d }) => `<tr onclick="selectTeam('${t.id}');setTeamsView('batting')" style="cursor:pointer">
           <td>${escapeHtml(t.name)}</td>
           ${COLS.map(col => `<td>${col.fmt ? col.fmt(d[col.key]) : (d[col.key] ?? '—')}</td>`).join('')}
         </tr>`).join('')}</tbody>
@@ -3781,7 +3775,7 @@ const Render = {
       const nameSortArr = sort.col === 'name' ? (sort.dir === -1 ? '<span class="sort-arr">▼</span>' : '<span class="sort-arr">▲</span>') : '<span class="sort-arr" style="opacity:0.25">▼</span>';
       c.innerHTML = `<div class="stats-table-wrap"><table class="stats-table">
         <thead><tr><th onclick="sortTeamStats('name','pitching')">Team${nameSortArr}</th>${COLS.map(thArr).join('')}</tr></thead>
-        <tbody>${rows.map(({ t, d }) => `<tr onclick="selectTeam('${t.id}');setTeamsView('detail')" style="cursor:pointer">
+        <tbody>${rows.map(({ t, d }) => `<tr onclick="selectTeam('${t.id}');setTeamsView('batting')" style="cursor:pointer">
           <td>${escapeHtml(t.name)}</td>
           ${COLS.map(col => `<td>${col.fmt ? col.fmt(d[col.key]) : (d[col.key] ?? '—')}</td>`).join('')}
         </tr>`).join('')}</tbody>
@@ -3811,7 +3805,7 @@ const Render = {
       const nameSortArr = sort.col === 'name' ? (sort.dir === -1 ? '<span class="sort-arr">▼</span>' : '<span class="sort-arr">▲</span>') : '<span class="sort-arr" style="opacity:0.25">▼</span>';
       c.innerHTML = `<div class="stats-table-wrap"><table class="stats-table">
         <thead><tr><th onclick="sortTeamStats('name','fielding')">Team${nameSortArr}</th>${COLS.map(thArr).join('')}</tr></thead>
-        <tbody>${rows.map(({ t, d }) => `<tr onclick="selectTeam('${t.id}');setTeamsView('detail')" style="cursor:pointer">
+        <tbody>${rows.map(({ t, d }) => `<tr onclick="selectTeam('${t.id}');setTeamsView('batting')" style="cursor:pointer">
           <td>${escapeHtml(t.name)}</td>
           ${COLS.map(col => `<td>${d[col.key] ?? '—'}</td>`).join('')}
         </tr>`).join('')}</tbody>
@@ -3819,59 +3813,6 @@ const Render = {
       return;
     }
 
-    // ── DETAIL VIEW (existing) ──
-    if (!selectedTeamId || !State.getTeam(selectedTeamId)) {
-      selectedTeamId = sorted[0]?.id || null;
-    }
-    const sel = selectedTeamId ? State.getTeam(selectedTeamId) : null;
-
-    const listItems = sorted.map(t => {
-      const s = State.computeTeamStats(t.id);
-      const active = t.id === selectedTeamId ? 'selected' : '';
-      return `<div class="player-list-item ${active}" onclick="selectTeam('${t.id}')">
-        <div>
-          <div class="pli-name">${escapeHtml(t.name)}</div>
-          <div class="pli-sub">${s.wins}-${s.losses}${s.ties ? '-'+s.ties : ''} · ${s.gamesPlayed} GP</div>
-        </div>
-      </div>`;
-    }).join('');
-
-    let detailHtml = '<div class="player-detail-empty"><span>← Select a team</span></div>';
-    if (sel) {
-      const s = State.computeTeamStats(sel.id);
-      const bat = State.computeTeamBattingStats(sel.id);
-      const pit = State.computeTeamPitchingStats(sel.id);
-      const players = sel.playerIds.map(id => State.getPlayer(id)).filter(Boolean);
-      const actions = isAdmin()
-        ? `<button class="btn-icon" title="Edit" onclick="showTeamModal('${sel.id}')">✎</button>
-           <button class="btn-icon" title="Delete" onclick="deleteTeam('${sel.id}')">🗑</button>`
-        : '';
-
-      detailHtml = `
-        <div class="detail-player-header">
-          <div>
-            <div class="detail-player-name">${escapeHtml(sel.name)}</div>
-            <div class="detail-player-sub">${s.wins}-${s.losses}${s.ties ? '-'+s.ties : ''} · ${s.gamesPlayed} GP · RF ${s.runsFor} / RA ${s.runsAgainst}</div>
-          </div>
-          <div class="detail-actions">${actions}</div>
-        </div>
-        <div class="stat-section-title">Roster</div>
-        <div class="row-flex" style="margin-bottom:14px">
-          ${players.map(p => `<span class="pill">${escapeHtml(p.jerseyNumber ? '#' + p.jerseyNumber + ' ' : '')}${escapeHtml(p.name)}</span>`).join('')}
-        </div>
-        <div class="detail-tabs">
-          <button class="${teamDetailTab === 'batting' ? 'active' : ''}" onclick="setTeamDetailTab('batting')">Batting</button>
-          <button class="${teamDetailTab === 'pitching' ? 'active' : ''}" onclick="setTeamDetailTab('pitching')">Pitching</button>
-        </div>
-        <div class="detail-tab-body">
-          ${teamDetailTab === 'batting' ? renderTeamBattingRow(bat) : renderTeamPitchingRow(pit)}
-        </div>`;
-    }
-
-    c.innerHTML = `<div class="player-split">
-      <div class="player-list-panel">${listItems}</div>
-      <div class="player-detail-panel">${detailHtml}</div>
-    </div>`;
   },
 
   games() {
@@ -7043,7 +6984,7 @@ Object.assign(window, {
   // Admin mode + player view
   setPlayersView, selectPlayer, showPlayerStatsModal,
   setStatsMain, setTeamsView, sortTeamStats,
-  selectTeam, setTeamDetailTab,
+  selectTeam,
   switchTab,
   sortStats, showCreateMyPlayerModal, submitMyPlayer,
 });
