@@ -6279,7 +6279,24 @@ function _buildOutcomeAnim(ev, g) {
                          toSvg: loc || { x: 200, y: 18 }, phase1Dur: 350, phase2Dur: 920 };
     case 'OUT': {
       const dest = loc || FIELD.SECOND;
-      return { text: 'Out!', color: '#fb923c',
+      let outText  = 'Out!';
+      let outColor = '#fb923c';
+      let outBig   = false;
+      if (ev.doublePlay) {
+        outText  = 'Double Play! ⚡';
+        outColor = '#fde68a';
+        outBig   = true;
+      } else if (ev.dpAttempted) {
+        outText  = 'Runner Safe — No DP';
+        outColor = '#fb923c';
+      } else if (ev.sacFly && !ev.sacFlyOut) {
+        outText  = 'Tag Up — Runner Scores! 🏃';
+        outColor = '#4ade80';
+      } else if (ev.sacFly && ev.sacFlyOut) {
+        outText  = 'Tag Play — Out! ✋';
+        outColor = '#fb923c';
+      }
+      return { text: outText, color: outColor, big: outBig,
                fromSvg: FIELD.MOUND, viaSvg: FIELD.HOME,
                toSvg: dest, phase1Dur: 350, phase2Dur: 450,
                fielderInfo: _getFielderInfo(ev.fielderId, g) };
@@ -6880,7 +6897,7 @@ async function applyDoublePlay(attempted, successful) {
   Modal.hide();
   const g = State.getGame(LiveGameId);
   const dpBase = (attempted && successful) ? leadForcedBase(g.bases) : null;
-  await applyPaEnd(g, { outcome: 'OUT', hitType: args.hitType, fielderId: args.fielderId, location: args.location, doublePlayBase: dpBase });
+  await applyPaEnd(g, { outcome: 'OUT', hitType: args.hitType, fielderId: args.fielderId, location: args.location, doublePlayBase: dpBase, dpAttempted: attempted });
 }
 
 function showTagUpPrompt(g) {
@@ -6958,6 +6975,7 @@ async function applyPaEnd(g, ev) {
     fielderId: ev.fielderId || null,
     location: ev.location || null,
     doublePlay: !!ev.doublePlayBase,
+    dpAttempted: !!ev.dpAttempted,
     sacFly: !!(ev.sacFlyScored || ev.sacFlyOut),
     sacFlyOut: !!ev.sacFlyOut,
     rbi: 0,
