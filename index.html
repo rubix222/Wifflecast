@@ -2876,7 +2876,7 @@ function renderStatTableRow(cols, data) {
     const v = data[c.key];
     return `<td>${c.fmt ? c.fmt(v) : (v ?? '—')}</td>`;
   }).join('');
-  return `<div class="stats-table-wrap"><table class="stats-table">
+  return `<div class="stats-table-wrap" style="-webkit-overflow-scrolling:touch"><table class="stats-table" style="width:auto">
     <thead><tr>${ths}</tr></thead>
     <tbody><tr>${tds}</tr></tbody>
   </table></div>`;
