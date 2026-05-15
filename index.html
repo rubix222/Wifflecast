@@ -253,10 +253,11 @@
   }
   #anim-ball {
     position: absolute;
-    width: 20px; height: 20px;
+    width: 22px; height: 22px;
     font-size: 18px;
-    line-height: 20px;
-    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     will-change: transform;
     filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
   }
@@ -2151,6 +2152,27 @@ const escapeHtml = (s) => String(s ?? '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
+// Save/restore scrollTop for all independent scroll containers so background
+// Firestore re-renders don't jump the user's scroll position.
+function _withScrollPreserved(fn) {
+  const selectors = [
+    ['main',                  () => document.querySelector('main')],
+    ['games-list',            () => document.getElementById('games-list')],
+    ['games-detail',          () => document.getElementById('games-detail')],
+    ['tournaments-list',      () => document.getElementById('tournaments-list')],
+    ['tournaments-detail',    () => document.getElementById('tournaments-detail')],
+    ['admin-players-container', () => document.getElementById('admin-players-container')],
+    ['admin-games-container', () => document.getElementById('admin-games-container')],
+  ];
+  const saved = selectors.map(([, getter]) => {
+    const el = getter(); return el ? el.scrollTop : 0;
+  });
+  fn();
+  selectors.forEach(([, getter], i) => {
+    const el = getter(); if (el) el.scrollTop = saved[i];
+  });
+}
+
 function toast(msg, type = '') {
   const el = $('#toast');
   el.textContent = msg;
@@ -2201,16 +2223,20 @@ const Storage = {
     this._unsubs.push(
       fs.onSnapshot(fs.collection(fs.db, 'players'), snap => {
         State.players = snap.docs.map(d => d.data());
-        Render.players();
-        Render.adminPlayers();
-        Render.home();
+        _withScrollPreserved(() => {
+          Render.players();
+          Render.adminPlayers();
+          Render.home();
+        });
       }, err => console.warn('players listener:', err.message)),
 
       fs.onSnapshot(fs.collection(fs.db, 'teams'), snap => {
         State.teams = snap.docs.map(d => d.data());
-        Render.teams();
-        Render.adminTeams();
-        Render.home();
+        _withScrollPreserved(() => {
+          Render.teams();
+          Render.adminTeams();
+          Render.home();
+        });
       }, err => console.warn('teams listener:', err.message)),
 
       fs.onSnapshot(fs.collection(fs.db, 'games'), snap => {
@@ -2223,18 +2249,26 @@ const Storage = {
             if (idx >= 0) State.games[idx] = g; else State.games.push(g);
           }
         });
-        Render.games();
-        Render.home();
-        Render.tournaments && Render.tournaments();
-        Render.adminGames && Render.adminGames();
+        // Preserve scroll across all background re-renders triggered by game changes.
+        // Also refresh player/team stats since they're computed from game events.
+        _withScrollPreserved(() => {
+          Render.games();
+          Render.home();
+          Render.players();
+          Render.teams();
+          Render.tournaments && Render.tournaments();
+          Render.adminGames && Render.adminGames();
+          Render.gamestream && Render.gamestream();
+        });
         if (LiveGameId) rerenderLive();
-        Render.gamestream && Render.gamestream();
       }, err => console.warn('games listener:', err.message)),
 
       fs.onSnapshot(fs.collection(fs.db, 'tournaments'), snap => {
         State.tournaments = snap.docs.map(d => d.data());
-        Render.tournaments && Render.tournaments();
-        Render.adminEvents && Render.adminEvents();
+        _withScrollPreserved(() => {
+          Render.tournaments && Render.tournaments();
+          Render.adminEvents && Render.adminEvents();
+        });
       }, err => console.warn('tournaments listener:', err.message)),
 
       fs.onSnapshot(fs.collection(fs.db, 'users'), snap => {
@@ -5727,7 +5761,16 @@ function rerenderLive() {
     _detectAndQueueAnims(g, _prevGameSnap);
   }
   _prevGameSnap = g ? _snapGame(g) : null;
+  // Preserve scroll positions inside the live game view (Plays tab log, stats scroll)
+  const _plEl  = document.querySelector('.play-log');
+  const _plScr = _plEl  ? _plEl.scrollTop  : 0;
+  const _stEl  = document.querySelector('.lg-stats-scroll');
+  const _stScr = _stEl  ? _stEl.scrollTop  : 0;
   renderLiveGame(LiveGameId, LiveGameWatchOnly); // preserve watch-only flag
+  const newPlEl = document.querySelector('.play-log');
+  if (newPlEl) newPlEl.scrollTop = _plScr;
+  const newStEl = document.querySelector('.lg-stats-scroll');
+  if (newStEl) newStEl.scrollTop = _stScr;
 }
 
 function renderBatterRow(g) {
@@ -6008,13 +6051,14 @@ function _runAnim(item) {
     if (hasBall) {
       const from = sc(item.fromSvg.x, item.fromSvg.y);
 
-      // Place ball at starting position (10px = half of 20px container for exact centering)
+      // Place ball at starting position (11px = half of 22px flex container for exact centering)
       ballEl.style.cssText = `
-        position:absolute; font-size:18px; line-height:20px; text-align:center;
-        width:20px; height:20px;
+        position:absolute; font-size:18px;
+        display:flex; align-items:center; justify-content:center;
+        width:22px; height:22px;
         will-change:transform; filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));
-        left:${from.x - 10}px; top:${from.y - 10}px;
-        transform:translate(0,0) scale(1); transition:none; opacity:1; display:block;`;
+        left:${from.x - 11}px; top:${from.y - 11}px;
+        transform:translate(0,0) scale(1); transition:none; opacity:1;`;
 
       // Pre-compute all destination offsets (relative to `from`)
       if (item.viaSvg) {
