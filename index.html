@@ -1126,9 +1126,14 @@
     cursor: pointer;
     user-select: none;
   }
-  .stats-table th:first-child { text-align: left; min-width: 150px; }
+  .stats-table th:first-child {
+    text-align: left; min-width: 150px;
+    position: sticky; left: 0; z-index: 2;
+    background: #f9fafb;
+  }
   .stats-table th:hover { background: #f0fdf4; color: #166534; }
   .stats-table th.sorted { color: #166534; background: #f0fdf4; }
+  .stats-table th.sorted:first-child { background: #f0fdf4; }
   .stats-table th .sort-arr { margin-left: 3px; opacity: 0.7; font-size: 9px; }
   .stats-table td {
     padding: 8px 12px;
@@ -1137,9 +1142,20 @@
     text-align: right;
     font-variant-numeric: tabular-nums;
   }
-  .stats-table td:first-child { text-align: left; font-weight: 600; color: #111827; }
+  .stats-table td:first-child {
+    text-align: left; font-weight: 600; color: #111827;
+    position: sticky; left: 0; z-index: 1;
+    background: #fff;
+  }
   .stats-table tr:last-child td { border-bottom: none; }
   .stats-table tr:hover td { background: #f9fafb; }
+  .stats-table tr:hover td:first-child { background: #f9fafb; }
+  /* Single-row inline tables (home page stat rows) have no name column —
+     suppress sticky and the 150px min-width so stat columns stay compact */
+  .stats-table--noname th:first-child,
+  .stats-table--noname td:first-child {
+    min-width: 0; position: static; background: transparent;
+  }
 
   .field-svg.location-mode { cursor: crosshair; }
 
@@ -1877,10 +1893,10 @@
         <div id="teams-toolbar"></div>
       </div>
       <div class="players-subnav" id="teams-subnav">
-        <button class="active" data-tview="batting" onclick="setTeamsView('batting')">Batting</button>
+        <button class="active" data-tview="record" onclick="setTeamsView('record')">Record</button>
+        <button data-tview="batting" onclick="setTeamsView('batting')">Batting</button>
         <button data-tview="pitching" onclick="setTeamsView('pitching')">Pitching</button>
         <button data-tview="fielding" onclick="setTeamsView('fielding')">Fielding</button>
-        <button data-tview="record" onclick="setTeamsView('record')">Record</button>
       </div>
       <div id="teams-container"></div>
     </div>
@@ -2881,7 +2897,7 @@ function renderStatTableRow(cols, data) {
     const v = data[c.key];
     return `<td>${c.fmt ? c.fmt(v) : (v ?? '—')}</td>`;
   }).join('');
-  return `<div class="stats-table-wrap" style="-webkit-overflow-scrolling:touch"><table class="stats-table" style="width:auto">
+  return `<div class="stats-table-wrap" style="-webkit-overflow-scrolling:touch"><table class="stats-table stats-table--noname" style="width:auto">
     <thead><tr>${ths}</tr></thead>
     <tbody><tr>${tds}</tr></tbody>
   </table></div>`;
@@ -2913,6 +2929,49 @@ function renderTeamStatTable(teamId) {
     ${renderStatTableRow(PITCH_COLS, teamPitchingData(pit))}
     <div class="stat-section-title">Fielding</div>
     ${renderStatTableRow(FIELD_COLS, fld)}`;
+}
+
+// Renders all 4 stat sections for a list of teams as combined tables
+// (one row per team per section) — used on the home page My Teams card.
+function renderHomeTeamsTables(teams) {
+  if (!teams.length) return '<p style="color:#6b7280;font-size:14px;margin:0">No teams yet.</p>';
+
+  const makeSection = (cols, rowData) => {
+    const ths = cols.map(c => `<th class="num-col">${c.label}</th>`).join('');
+    const trs = rowData.map(({ t, d }) => {
+      const tds = cols.map(c => `<td>${c.fmt ? c.fmt(d[c.key]) : (d[c.key] ?? '—')}</td>`).join('');
+      return `<tr onclick="selectTeam('${t.id}');setTeamsView('record');switchTab('stats')" style="cursor:pointer">
+        <td>${escapeHtml(t.name)}</td>${tds}
+      </tr>`;
+    }).join('');
+    return `<div class="stats-table-wrap"><table class="stats-table">
+      <thead><tr><th>Team</th>${ths}</tr></thead>
+      <tbody>${trs}</tbody>
+    </table></div>`;
+  };
+
+  const teamData = teams.map(t => {
+    const ts  = State.computeTeamStats(t.id);
+    const bat = State.computeTeamBattingStats(t.id);
+    const pit = State.computeTeamPitchingStats(t.id);
+    const fld = State.computeTeamFieldingStats(t.id);
+    return { t,
+      record:   { GP: ts.gamesPlayed, W: ts.wins, L: ts.losses, RF: ts.runsFor, RA: ts.runsAgainst },
+      batting:  teamBattingData(bat),
+      pitching: teamPitchingData(pit),
+      fielding: fld,
+    };
+  });
+
+  return `
+    <div class="stat-section-title" style="margin-top:0">Record</div>
+    ${makeSection(TEAM_RECORD_COLS, teamData.map(r => ({ t: r.t, d: r.record })))}
+    <div class="stat-section-title">Batting</div>
+    ${makeSection(BATTING_COLS, teamData.map(r => ({ t: r.t, d: r.batting })))}
+    <div class="stat-section-title">Pitching</div>
+    ${makeSection(PITCH_COLS, teamData.map(r => ({ t: r.t, d: r.pitching })))}
+    <div class="stat-section-title">Fielding</div>
+    ${makeSection(FIELD_COLS, teamData.map(r => ({ t: r.t, d: r.fielding })))}`;
 }
 
 function showPlayerStatsModal(playerId) {
@@ -2965,7 +3024,7 @@ let teamBatSort    = { col: 'AVG', dir: -1 };
 let teamPitSort    = { col: 'ERA', dir:  1 };
 let teamFieldSort  = { col: 'PO', dir: -1 };
 let teamRecordSort = { col: 'W',  dir: -1 };
-let teamsView      = 'batting'; // 'batting' | 'pitching' | 'fielding' | 'record'
+let teamsView      = 'record'; // 'record' | 'batting' | 'pitching' | 'fielding'
 
 function setPlayersView(view) {
   playersView = view;
@@ -3378,16 +3437,7 @@ const Render = {
     const teamsCard = `
       <div class="home-card">
         <div class="home-section-title">My Teams</div>
-        ${myTeams.length ? myTeams.map(t => {
-          const ts = State.computeTeamStats(t.id);
-          return `<div style="margin-bottom:16px">
-            <div class="home-team-chip" onclick="setStatsMain('teams');selectTeam('${t.id}');setTeamsView('batting');switchTab('stats')" style="margin-bottom:8px">
-              <strong>${escapeHtml(t.name)}</strong>
-              <span style="color:#6b7280;font-size:13px">${ts.wins}-${ts.losses}${ts.ties ? '-'+ts.ties : ''}</span>
-            </div>
-            ${renderTeamStatTable(t.id)}
-          </div>`;
-        }).join('') : '<p style="color:#6b7280;font-size:14px;margin:0">No teams yet.</p>'}
+        ${renderHomeTeamsTables(myTeams)}
       </div>`;
 
     // Recent games — filtered to current player's games when linked
