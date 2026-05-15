@@ -1599,7 +1599,21 @@
     margin-bottom: 10px;
     flex-wrap: wrap;
   }
-  /* ---------- Stats main nav (Players / Teams switcher) ---------- */
+  /* ---------- Stats section headers (Players / Teams) ---------- */
+  .stats-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .stats-section-heading {
+    font-size: 18px;
+    font-weight: 700;
+    color: #111827;
+  }
+  #stats-teams-section { margin-top: 36px; }
+
+  /* kept for any legacy references — no longer rendered */
   .stats-main-nav {
     display: flex;
     gap: 0;
@@ -1844,24 +1858,29 @@
   <section id="view-stats" class="view active">
     <div class="toolbar">
       <h2>Stats</h2>
-      <div id="stats-toolbar-right" style="display:flex;gap:8px;align-items:center"></div>
-    </div>
-    <div class="stats-main-nav">
-      <button class="active" data-smain="players" onclick="setStatsMain('players')">Players</button>
-      <button data-smain="teams" onclick="setStatsMain('teams')">Teams</button>
     </div>
     <div id="stats-players-section">
-      <div class="players-subnav">
+      <div class="stats-section-header">
+        <span class="stats-section-heading">Players</span>
+        <div id="players-toolbar"></div>
+      </div>
+      <div class="players-subnav" id="players-subnav">
         <button class="active" data-pview="batting" onclick="setPlayersView('batting')">Batting</button>
         <button data-pview="pitching" onclick="setPlayersView('pitching')">Pitching</button>
+        <button data-pview="fielding" onclick="setPlayersView('fielding')">Fielding</button>
       </div>
       <div id="players-container"></div>
     </div>
-    <div id="stats-teams-section" style="display:none">
+    <div id="stats-teams-section">
+      <div class="stats-section-header">
+        <span class="stats-section-heading">Teams</span>
+        <div id="teams-toolbar"></div>
+      </div>
       <div class="players-subnav" id="teams-subnav">
         <button class="active" data-tview="detail" onclick="setTeamsView('detail')">Detail</button>
         <button data-tview="batting" onclick="setTeamsView('batting')">Batting</button>
         <button data-tview="pitching" onclick="setTeamsView('pitching')">Pitching</button>
+        <button data-tview="fielding" onclick="setTeamsView('fielding')">Fielding</button>
       </div>
       <div id="teams-container"></div>
     </div>
@@ -2546,6 +2565,20 @@ const State = {
     return { IP, ER, K, BB, H, ERA: IP > 0 ? (ER * 9) / IP : null };
   },
 
+  computeTeamFieldingStats(teamId) {
+    let E = 0;
+    this.games.forEach(g => {
+      if (g.homeTeamId !== teamId && g.awayTeamId !== teamId) return;
+      // The team fields during the opposite half from when they bat
+      const fieldingHalf = g.homeTeamId === teamId ? 'top' : 'bottom';
+      (g.events || []).forEach(e => {
+        if (e.type !== 'pa_end' || e.half !== fieldingHalf) return;
+        if (e.errorById) E++;
+      });
+    });
+    return { E };
+  },
+
   // Hit locations across all games for a player
   getPlayerHitLocations(playerId) {
     const locs = [];
@@ -2812,7 +2845,7 @@ function canUserScore() { return isAdmin() || (currentUser && currentUserProfile
 
 // Player view state
 let selectedPlayerId = null;
-let playersView    = 'batting';  // 'batting' | 'pitching'
+let playersView    = 'batting';  // 'batting' | 'pitching' | 'fielding'
 
 // Team view state
 let selectedTeamId = null;
@@ -2823,14 +2856,15 @@ let selectedGameId = null;
 let showFinishedGames = false;
 let statsSort    = { col: 'AVG', dir: -1 };
 let pitchSort    = { col: 'IP',  dir: -1 };
+let fieldSort    = { col: 'PO',  dir: -1 };
 let teamBatSort  = { col: 'AVG', dir: -1 };
 let teamPitSort  = { col: 'ERA', dir:  1 };
-let statsMainView = 'players'; // 'players' | 'teams'
-let teamsView     = 'detail';  // 'detail' | 'batting' | 'pitching'
+let teamFieldSort = { col: 'E',  dir: -1 };
+let teamsView     = 'detail';  // 'detail' | 'batting' | 'pitching' | 'fielding'
 
 function setPlayersView(view) {
   playersView = view;
-  $$('.players-subnav button').forEach(b => b.classList.toggle('active', b.dataset.pview === view));
+  $$('#players-subnav button').forEach(b => b.classList.toggle('active', b.dataset.pview === view));
   Render.players();
 }
 function selectPlayer(id) {
@@ -2842,14 +2876,7 @@ function selectTeam(id) {
   Render.teams();
 }
 function setStatsMain(view) {
-  statsMainView = view;
-  $$('.stats-main-nav button').forEach(b => b.classList.toggle('active', b.dataset.smain === view));
-  const ps = $('#stats-players-section');
-  const ts = $('#stats-teams-section');
-  if (ps) ps.style.display = view === 'players' ? '' : 'none';
-  if (ts) ts.style.display = view === 'teams' ? '' : 'none';
-  if (view === 'players') Render.players();
-  else Render.teams();
+  // Both sections always visible — kept for compatibility with home page links
 }
 function setTeamsView(view) {
   teamsView = view;
@@ -2857,7 +2884,7 @@ function setTeamsView(view) {
   Render.teams();
 }
 function sortTeamStats(col, which) {
-  const s = which === 'pitching' ? teamPitSort : teamBatSort;
+  const s = which === 'pitching' ? teamPitSort : which === 'fielding' ? teamFieldSort : teamBatSort;
   s.dir = s.col === col ? -s.dir : -1;
   s.col = col;
   Render.teams();
@@ -2867,7 +2894,7 @@ function setTeamDetailTab(tab) {
   Render.teams();
 }
 function sortStats(col, which) {
-  const s = which === 'pitching' ? pitchSort : statsSort;
+  const s = which === 'pitching' ? pitchSort : which === 'fielding' ? fieldSort : statsSort;
   s.dir = s.col === col ? -s.dir : -1;
   s.col = col;
   Render.players();
@@ -3553,15 +3580,15 @@ const Render = {
 
   players() {
     const c = $('#players-container');
-    const toolbar = $('#stats-toolbar-right');
 
-    // Toolbar buttons
+    // Toolbar buttons (next to Players section heading)
+    const toolbar = $('#players-toolbar');
     if (toolbar) {
       let btns = '';
       if (isAdmin()) {
-        btns = '<button class="btn btn-primary" onclick="showPlayerModal()">+ Add Player</button>';
+        btns = '<button class="btn btn-primary btn-sm" onclick="showPlayerModal()">+ Add Player</button>';
       } else if (currentUser && !currentUserProfile?.playerId) {
-        btns = '<button class="btn btn-primary" onclick="showCreateMyPlayerModal()">+ Create My Player</button>';
+        btns = '<button class="btn btn-primary btn-sm" onclick="showCreateMyPlayerModal()">+ Create My Player</button>';
       }
       toolbar.innerHTML = btns;
     }
@@ -3576,54 +3603,50 @@ const Render = {
       return;
     }
 
-    // ── STATS GRID VIEW (batting or pitching) ──────────────────────
-    const which = playersView; // 'batting' | 'pitching'
-    const sort  = which === 'pitching' ? pitchSort : statsSort;
+    // ── STATS GRID VIEW (batting | pitching | fielding) ────────────
+    const which = playersView;
+    const sort  = which === 'pitching' ? pitchSort : which === 'fielding' ? fieldSort : statsSort;
 
     const BATTING_COLS = [
-      { key: 'PA',    label: 'PA'  },
-      { key: 'AB',    label: 'AB'  },
-      { key: 'AVG',   label: 'AVG', fmt: v => fmt.avg(v) },
-      { key: 'SLG',   label: 'SLG', fmt: v => fmt.avg(v) },
-      { key: 'H',     label: 'H'   },
-      { key: 'singles', label: '1B' },
-      { key: 'doubles', label: '2B' },
-      { key: 'triples', label: '3B' },
-      { key: 'hrs',   label: 'HR'  },
-      { key: 'R',     label: 'R'   },
-      { key: 'RBI',   label: 'RBI' },
-      { key: 'BB',    label: 'BB'  },
-      { key: 'K_bat', label: 'K'   },
-      { key: 'E',     label: 'E'   },
+      { key: 'PA',      label: 'PA'  },
+      { key: 'AB',      label: 'AB'  },
+      { key: 'AVG',     label: 'AVG', fmt: v => fmt.avg(v) },
+      { key: 'SLG',     label: 'SLG', fmt: v => fmt.avg(v) },
+      { key: 'H',       label: 'H'   },
+      { key: 'singles', label: '1B'  },
+      { key: 'doubles', label: '2B'  },
+      { key: 'triples', label: '3B'  },
+      { key: 'hrs',     label: 'HR'  },
+      { key: 'R',       label: 'R'   },
+      { key: 'RBI',     label: 'RBI' },
+      { key: 'BB',      label: 'BB'  },
+      { key: 'K_bat',   label: 'K'   },
     ];
     const PITCH_COLS = [
-      { key: 'pGP',   label: 'GP'  },
-      { key: 'IP',    label: 'IP',  fmt: v => fmt.ip(v) },
-      { key: 'ERA',   label: 'ERA', fmt: v => v !== null ? v.toFixed(2) : '—', nullLow: true },
-      { key: 'pK',    label: 'K'   },
-      { key: 'pBB',   label: 'BB'  },
-      { key: 'pER',   label: 'ER'  },
+      { key: 'pGP', label: 'GP'  },
+      { key: 'IP',  label: 'IP',  fmt: v => fmt.ip(v) },
+      { key: 'ERA', label: 'ERA', fmt: v => v !== null ? v.toFixed(2) : '—', nullLow: true },
+      { key: 'pK',  label: 'K'   },
+      { key: 'pBB', label: 'BB'  },
+      { key: 'pER', label: 'ER'  },
+    ];
+    const FIELD_COLS = [
+      { key: 'PO', label: 'PO' },
+      { key: 'E',  label: 'E'  },
     ];
 
-    const cols = which === 'pitching' ? PITCH_COLS : BATTING_COLS;
+    const cols = which === 'pitching' ? PITCH_COLS : which === 'fielding' ? FIELD_COLS : BATTING_COLS;
 
     // Build rows with computed stats
     let rows = sorted.map(p => ({ p, s: State.computePlayerStats(p.id) }));
 
     // Sort
     rows.sort((a, b) => {
-      if (sort.col === 'name') {
-        // dir -1 = desc (Z→A), dir 1 = asc (A→Z)
-        return b.p.name.localeCompare(a.p.name) * sort.dir;
-      }
+      if (sort.col === 'name') return b.p.name.localeCompare(a.p.name) * sort.dir;
       let av = a.s[sort.col] ?? null;
       let bv = b.s[sort.col] ?? null;
-      // ERA null means didn't pitch — push to bottom regardless of sort direction
-      const col = cols.find(c => c.key === sort.col);
-      // nullLow: null values always sort to the bottom regardless of direction
-      if (av === null) av = sort.dir > 0 ? Infinity  : -Infinity;
-      if (bv === null) bv = sort.dir > 0 ? Infinity  : -Infinity;
-      // dir -1 = desc (b-a), dir 1 = asc (a-b)
+      if (av === null) av = sort.dir > 0 ? Infinity : -Infinity;
+      if (bv === null) bv = sort.dir > 0 ? Infinity : -Infinity;
       return (bv - av) * sort.dir;
     });
 
@@ -3632,16 +3655,18 @@ const Render = {
       const arr = isSorted ? (sort.dir === -1 ? '▼' : '▲') : '<span style="opacity:0.25">▼</span>';
       return `<th class="num-col ${isSorted ? 'sorted' : ''}" onclick="sortStats('${col.key}','${which}')">${col.label}<span class="sort-arr">${arr}</span></th>`;
     };
+    const nameSortArr = sort.col === 'name'
+      ? (sort.dir === -1 ? '<span class="sort-arr">▼</span>' : '<span class="sort-arr">▲</span>')
+      : '<span class="sort-arr" style="opacity:0.25">▼</span>';
 
     const headers = `<tr>
-      <th onclick="sortStats('name','${which}')">Player${sort.col==='name' ? (sort.dir===-1?'<span class="sort-arr">▼</span>':'<span class="sort-arr">▲</span>'):'<span class="sort-arr" style="opacity:0.25">▼</span>'}</th>
+      <th onclick="sortStats('name','${which}')">Player${nameSortArr}</th>
       ${cols.map(thArr).join('')}
     </tr>`;
 
     const tBody = rows.map(({ p, s }) => {
       const cells = cols.map(col => {
-        let v = s[col.key];
-        const disp = col.fmt ? col.fmt(v) : (v ?? '—');
+        const disp = col.fmt ? col.fmt(s[col.key]) : (s[col.key] ?? '—');
         return `<td>${disp}</td>`;
       }).join('');
       return `<tr onclick="showPlayerStatsModal('${p.id}')" style="cursor:pointer" title="View ${escapeHtml(p.name)}'s stats">
@@ -3661,9 +3686,9 @@ const Render = {
   teams() {
     const c = $('#teams-container');
     if (!c) return;
-    const toolbar = $('#stats-toolbar-right');
-    if (toolbar && statsMainView === 'teams') {
-      toolbar.innerHTML = isAdmin() ? '<button class="btn btn-primary" onclick="showTeamModal()">+ Add Team</button>' : '';
+    const toolbar = $('#teams-toolbar');
+    if (toolbar) {
+      toolbar.innerHTML = isAdmin() ? '<button class="btn btn-primary btn-sm" onclick="showTeamModal()">+ Add Team</button>' : '';
     }
 
     if (!State.teams.length) {
@@ -3759,6 +3784,36 @@ const Render = {
         <tbody>${rows.map(({ t, d }) => `<tr onclick="selectTeam('${t.id}');setTeamsView('detail')" style="cursor:pointer">
           <td>${escapeHtml(t.name)}</td>
           ${COLS.map(col => `<td>${col.fmt ? col.fmt(d[col.key]) : (d[col.key] ?? '—')}</td>`).join('')}
+        </tr>`).join('')}</tbody>
+      </table></div>`;
+      return;
+    }
+
+    // ── FIELDING GRID ──
+    if (teamsView === 'fielding') {
+      const COLS = [
+        { key: 'E', label: 'E' },
+      ];
+      const sort = teamFieldSort;
+      let rows = sorted.map(t => {
+        const fs = State.computeTeamFieldingStats(t.id);
+        return { t, d: { E: fs.E } };
+      });
+      rows.sort((a, b) => {
+        if (sort.col === 'name') return b.t.name.localeCompare(a.t.name) * sort.dir;
+        return ((b.d[sort.col] ?? 0) - (a.d[sort.col] ?? 0)) * sort.dir;
+      });
+      const thArr = col => {
+        const isSorted = sort.col === col.key;
+        const arr = isSorted ? (sort.dir === -1 ? '▼' : '▲') : '<span style="opacity:0.25">▼</span>';
+        return `<th class="num-col ${isSorted ? 'sorted' : ''}" onclick="sortTeamStats('${col.key}','fielding')">${col.label}<span class="sort-arr">${arr}</span></th>`;
+      };
+      const nameSortArr = sort.col === 'name' ? (sort.dir === -1 ? '<span class="sort-arr">▼</span>' : '<span class="sort-arr">▲</span>') : '<span class="sort-arr" style="opacity:0.25">▼</span>';
+      c.innerHTML = `<div class="stats-table-wrap"><table class="stats-table">
+        <thead><tr><th onclick="sortTeamStats('name','fielding')">Team${nameSortArr}</th>${COLS.map(thArr).join('')}</tr></thead>
+        <tbody>${rows.map(({ t, d }) => `<tr onclick="selectTeam('${t.id}');setTeamsView('detail')" style="cursor:pointer">
+          <td>${escapeHtml(t.name)}</td>
+          ${COLS.map(col => `<td>${d[col.key] ?? '—'}</td>`).join('')}
         </tr>`).join('')}</tbody>
       </table></div>`;
       return;
