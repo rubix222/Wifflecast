@@ -5375,6 +5375,7 @@ window.addEventListener('beforeunload', () => {
 });
 
 function renderLastScorerPill(g) {
+  if (g.status === 'completed') return '';   // don't show scorer on finished games
   const lastPa = [...(g.events || [])].reverse().find(e => e.type === 'pa_end');
   const name = lastPa?.scoredByName;
   const notMe = lastPa?.scoredBy && lastPa.scoredBy !== currentUser?.uid;
@@ -5896,11 +5897,18 @@ const _animQueue   = [];
 let   _animRunning = false;
 
 function _snapGame(g) {
+  if (!g) return null;
+  const positions = fieldingPositions(g) || {};
+  const pitcherId = Object.keys(positions).find(pid => positions[pid] === 'P') || null;
   return {
-    eventsLen: (g?.events || []).length,
-    balls:   g?.balls   || 0,
-    strikes: g?.strikes || 0,
-    fouls:   g?.fouls   || 0,
+    eventsLen:     (g.events || []).length,
+    balls:         g.balls   || 0,
+    strikes:       g.strikes || 0,
+    fouls:         g.fouls   || 0,
+    status:        g.status  || 'setup',
+    currentInning: g.currentInning || 1,
+    currentHalf:   g.currentHalf   || 'top',
+    pitcherId,
   };
 }
 
@@ -5961,7 +5969,7 @@ function _runAnim(item) {
   const bannerEl   = document.getElementById('anim-banner');
   if (!overlay || !ballEl || !bannerEl) { _nextAnim(); return; }
 
-  const holdMs = item.big ? 1600 : 1200;
+  const holdMs = item.holdMs ?? (item.big ? 1600 : 1200);
   const fadeMs = 300;
 
   // ── Banner text (no SVG coords needed yet) ───────────────────
@@ -6098,40 +6106,79 @@ function _runAnim(item) {
 
 function _detectAndQueueAnims(newG, prev) {
   if (!newG || !prev) return;
-  const events = newG.events || [];
+  const events       = newG.events || [];
+  const hasNewEvents = events.length > prev.eventsLen;
+  const gameJustFinished = newG.status === 'completed' && prev.status !== 'completed';
+  const inningChanged    = newG.currentInning !== prev.currentInning ||
+                           newG.currentHalf   !== prev.currentHalf;
 
-  if (events.length > prev.eventsLen) {
-    // New plate appearance(s)
+  // ── 1. New plate-appearance outcomes ────────────────────────
+  if (hasNewEvents) {
     events.slice(prev.eventsLen).forEach(ev => {
       if (ev.type !== 'pa_end') return;
       const anim = _buildOutcomeAnim(ev, newG);
       if (anim) _queueAnim(anim);
     });
-    return; // don't also show pitch-count animations
+    // fall through — same Firestore push may also contain inning/status change
   }
 
-  // Individual pitch count changes.
-  // A foul with < 2 strikes increments BOTH fouls and strikes — subtract the
-  // foul-caused bump so we don't fire a duplicate Strike animation.
-  const dFouls   = (newG.fouls   || 0) - prev.fouls;
-  const rawDS    = (newG.strikes || 0) - prev.strikes;
-  const dStrikes = Math.max(0, rawDS - dFouls);  // pure strike presses only
-  const dBalls   = (newG.balls   || 0) - prev.balls;
-
-  for (let i = 0; i < dBalls;   i++)
-    _queueAnim({ text: 'Ball', color: '#fbbf24', fromSvg: FIELD.MOUND, toSvg: { x: 200, y: 368 } });
-  for (let i = 0; i < dStrikes; i++)
-    _queueAnim({ text: 'Strike ⚡', color: '#f87171', fromSvg: FIELD.MOUND, toSvg: FIELD.HOME });
-  for (let i = 0; i < dFouls;   i++) {
-    // Ball travels to plate then deflects into foul territory (random side each time)
-    const goRight = Math.random() < 0.5;
+  // ── 2. Game finished ────────────────────────────────────────
+  if (gameJustFinished) {
+    const away   = State.getTeam(newG.awayTeamId);
+    const home   = State.getTeam(newG.homeTeamId);
+    const winner = newG.score.away > newG.score.home ? away
+                 : newG.score.home > newG.score.away ? home : null;
     _queueAnim({
-      text: 'Foul!', color: '#fb923c',
-      fromSvg:  FIELD.MOUND,
-      viaSvg:   FIELD.HOME,
-      toSvg:    goRight ? { x: 338, y: 352 } : { x: 62, y: 352 },
-      phase1Dur: 380, phase2Dur: 340,
+      text: winner ? `${winner.name} wins! 🏆` : "It's a tie! 🏁",
+      color: '#fde68a', big: true, holdMs: 2400,
     });
+    return; // skip inning / pitcher checks — game is over
+  }
+
+  // ── 3. Inning / half change ──────────────────────────────────
+  if (inningChanged) {
+    const halfLabel = newG.currentHalf === 'top' ? '▲ Top' : '▼ Bottom';
+    _queueAnim({
+      text: `${halfLabel} of the ${ordinal(newG.currentInning)}`,
+      color: '#60a5fa', holdMs: 1800,
+    });
+    return; // pitcher swap after an inning flip is expected — don't fire that too
+  }
+
+  // ── 4. Mid-inning pitcher change (no new events, same half) ──
+  if (!hasNewEvents) {
+    const newPositions = fieldingPositions(newG) || {};
+    const newPid = Object.keys(newPositions).find(pid => newPositions[pid] === 'P') || null;
+    if (newPid && newPid !== prev.pitcherId) {
+      const pitcher = State.getPlayer(newPid);
+      _queueAnim({ text: `New Pitcher: ${pitcher?.name || '?'}`, color: '#a78bfa', holdMs: 1800 });
+    }
+  }
+
+  // ── 5. Pitch-count changes (ball / strike / foul) ────────────
+  // Only fires when there are no new pa_end events (counts reset to 0 on each PA end).
+  if (!hasNewEvents) {
+    // A foul with < 2 strikes increments BOTH fouls and strikes — subtract the
+    // foul-caused bump so we don't fire a duplicate Strike animation.
+    const dFouls   = (newG.fouls   || 0) - prev.fouls;
+    const rawDS    = (newG.strikes || 0) - prev.strikes;
+    const dStrikes = Math.max(0, rawDS - dFouls);  // pure strike presses only
+    const dBalls   = (newG.balls   || 0) - prev.balls;
+
+    for (let i = 0; i < dBalls;   i++)
+      _queueAnim({ text: 'Ball', color: '#fbbf24', fromSvg: FIELD.MOUND, toSvg: { x: 200, y: 368 } });
+    for (let i = 0; i < dStrikes; i++)
+      _queueAnim({ text: 'Strike ⚡', color: '#f87171', fromSvg: FIELD.MOUND, toSvg: FIELD.HOME });
+    for (let i = 0; i < dFouls;   i++) {
+      const goRight = Math.random() < 0.5;
+      _queueAnim({
+        text: 'Foul!', color: '#fb923c',
+        fromSvg:  FIELD.MOUND,
+        viaSvg:   FIELD.HOME,
+        toSvg:    goRight ? { x: 338, y: 352 } : { x: 62, y: 352 },
+        phase1Dur: 380, phase2Dur: 340,
+      });
+    }
   }
 }
 
