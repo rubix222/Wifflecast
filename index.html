@@ -253,8 +253,10 @@
   }
   #anim-ball {
     position: absolute;
+    width: 20px; height: 20px;
     font-size: 18px;
-    line-height: 1;
+    line-height: 20px;
+    text-align: center;
     will-change: transform;
     filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
   }
@@ -5906,6 +5908,20 @@ function _nextAnim() {
   _runAnim(_animQueue.shift());
 }
 
+// Immediately abort any running/queued animation (used by scorer on new action).
+function _cancelAnim() {
+  _animQueue.length = 0;
+  _animRunning = false;
+  const overlay   = document.getElementById('play-anim-overlay');
+  const ballEl    = document.getElementById('anim-ball');
+  const fielderEl = document.getElementById('anim-fielder');
+  const bannerEl  = document.getElementById('anim-banner');
+  if (overlay)   overlay.style.display  = 'none';
+  if (ballEl)    { ballEl.style.transition = 'none'; ballEl.style.display = 'none'; }
+  if (fielderEl) { fielderEl.style.transition = 'none'; fielderEl.style.display = 'none'; }
+  if (bannerEl)  { bannerEl.style.transition = 'none'; bannerEl.style.opacity = '0'; }
+}
+
 // Convert SVG 0-400 user coords → screen pixels via the CTM.
 // getScreenCTM() correctly accounts for viewBox letterboxing and any CSS transforms.
 function _svgToScreen(svgEl, sx, sy) {
@@ -5977,11 +5993,12 @@ function _runAnim(item) {
     if (hasBall) {
       const from = sc(item.fromSvg.x, item.fromSvg.y);
 
-      // Place ball at starting position
+      // Place ball at starting position (10px = half of 20px container for exact centering)
       ballEl.style.cssText = `
-        position:absolute; font-size:18px; line-height:1;
+        position:absolute; font-size:18px; line-height:20px; text-align:center;
+        width:20px; height:20px;
         will-change:transform; filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));
-        left:${from.x - 9}px; top:${from.y - 9}px;
+        left:${from.x - 10}px; top:${from.y - 10}px;
         transform:translate(0,0) scale(1); transition:none; opacity:1; display:block;`;
 
       // Pre-compute all destination offsets (relative to `from`)
@@ -6121,8 +6138,8 @@ function _buildOutcomeAnim(ev, g) {
   switch (ev.outcome) {
     case 'BB':  return { text: 'Walk! 🥊',      color: '#4ade80',
                          fromSvg: FIELD.MOUND,  toSvg: { x: 200, y: 368 } };
-    case 'K':   return { text: 'Strikeout! 🔥', color: '#f87171',
-                         fromSvg: FIELD.MOUND,  toSvg: FIELD.HOME };
+    case 'K':   return { text: ev.kType === 'foul_out' ? 'Foul Out! 🔥' : 'Strikeout! 🔥',
+                         color: '#f87171', fromSvg: FIELD.MOUND, toSvg: FIELD.HOME };
     case '1B':  return { text: 'Single! 🎯',    color: '#4ade80',
                          fromSvg: FIELD.MOUND,  viaSvg: FIELD.HOME,
                          toSvg: loc || FIELD.FIRST,  phase1Dur: 350, phase2Dur: 450 };
@@ -6453,14 +6470,17 @@ async function handlePitch(kind) {
   const g = State.getGame(LiveGameId); if (!g) return;
   if (g.status === 'completed') return;
   if (!canUserScore()) { toast('You need scoring privilege to record plays', 'error'); return; }
+  _cancelAnim();  // abort any in-progress animation before the new action
   _undoStack.push(captureSnapshot(g));
   _redoStack.length = 0;
 
   if (kind === 'ball') {
     g.balls++;
     if (g.balls >= 4) {
+      // Walk — outcome anim queued inside applyPaEnd
       await applyPaEnd(g, { outcome: 'BB' });
     } else {
+      _queueAnim({ text: 'Ball', color: '#fbbf24', fromSvg: FIELD.MOUND, toSvg: { x: 200, y: 368 } });
       await State.updateGame(g.id, { balls: g.balls });
       renderLiveGame(g.id);
     }
@@ -6469,8 +6489,10 @@ async function handlePitch(kind) {
   if (kind === 'strike_swinging' || kind === 'strike_looking') {
     g.strikes++;
     if (g.strikes >= 3) {
+      // Strikeout — outcome anim queued inside applyPaEnd
       await applyPaEnd(g, { outcome: 'K', kType: kind === 'strike_swinging' ? 'swinging' : 'looking' });
     } else {
+      _queueAnim({ text: 'Strike ⚡', color: '#f87171', fromSvg: FIELD.MOUND, toSvg: FIELD.HOME });
       await State.updateGame(g.id, { strikes: g.strikes });
       renderLiveGame(g.id);
     }
@@ -6479,9 +6501,18 @@ async function handlePitch(kind) {
   if (kind === 'foul') {
     g.fouls = (g.fouls || 0) + 1;
     if (g.fouls >= 4) {
+      // Foul-out strikeout — outcome anim queued inside applyPaEnd
       await applyPaEnd(g, { outcome: 'K', kType: 'foul_out' });
     } else {
       if (g.strikes < 2) g.strikes++;
+      const goRight = Math.random() < 0.5;
+      _queueAnim({
+        text: 'Foul!', color: '#fb923c',
+        fromSvg:  FIELD.MOUND,
+        viaSvg:   FIELD.HOME,
+        toSvg:    goRight ? { x: 338, y: 352 } : { x: 62, y: 352 },
+        phase1Dur: 380, phase2Dur: 340,
+      });
       await State.updateGame(g.id, { strikes: g.strikes, fouls: g.fouls });
       renderLiveGame(g.id);
     }
@@ -6801,6 +6832,12 @@ async function applyPaEnd(g, ev) {
     pitches: (g.balls || 0) + (g.strikes || 0) + (g.fouls || 0) + (['BB','K'].includes(ev.outcome) ? 0 : 1),
     strikePitches: (g.strikes || 0) + (g.fouls || 0) + (['BB','K'].includes(ev.outcome) ? 0 : 1),
   };
+
+  // Show outcome animation immediately for the scorer (watcher gets theirs via rerenderLive)
+  if (!LiveGameWatchOnly) {
+    const anim = _buildOutcomeAnim(event, g);
+    if (anim) _queueAnim(anim);
+  }
 
   const newBases = { 1: g.bases[1], 2: g.bases[2], 3: g.bases[3] };
   let runs = [];
