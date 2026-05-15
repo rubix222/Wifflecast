@@ -2123,9 +2123,10 @@ const Storage = {
       fs.onSnapshot(fs.collection(fs.db, 'users'), snap => {
         State.users = snap.docs.map(d => d.data());
         if (isAdminUser()) Render.users && Render.users();
-        // Refresh currentUserProfile in case canScore was changed
+        // Refresh currentUserProfile in case canScore or playerId was changed
         if (currentUser) {
           currentUserProfile = State.getUser(currentUser.uid) || currentUserProfile;
+          Render.home();
         }
         // Clean up any players linked to users that no longer exist
         const uids = new Set(State.users.map(u => u.uid));
@@ -3143,9 +3144,14 @@ const Render = {
         }).join('') : '<p style="color:#6b7280;font-size:14px;margin:0">No teams yet.</p>'}
       </div>`;
 
-    // Recent games
+    // Recent games — filtered to current player's games when linked
     const recent = [...State.games]
-      .filter(g => g.status === 'completed' || g.status === 'in_progress')
+      .filter(g => {
+        if (g.status !== 'completed' && g.status !== 'in_progress') return false;
+        if (!myPid) return true; // not linked, show all
+        return (g.homeBattingOrder || []).includes(myPid) ||
+               (g.awayBattingOrder || []).includes(myPid);
+      })
       .sort((a, b) => b.createdAt - a.createdAt)
       .slice(0, 6);
     const recentHtml = recent.map(g => {
@@ -3167,7 +3173,7 @@ const Render = {
           ${playerCard}
           ${teamsCard}
           <div class="home-card home-card-full">
-            <div class="home-section-title">Recent Games</div>
+            <div class="home-section-title">${myPid ? 'My Recent Games' : 'Recent Games'}</div>
             ${recentHtml}
           </div>
         </div>
