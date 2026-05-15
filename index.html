@@ -2156,9 +2156,12 @@
 
   const db = getFirestore(app);
   const auth = getAuth(app);
-  // Gracefully skip persistence if localStorage is unavailable (file:// protocol,
-  // privacy mode with storage blocked, etc.)
-  setPersistence(auth, browserLocalPersistence).catch(() => {});
+  // Only set persistence when the protocol supports it (http/https).
+  // Firebase already defaults to browserLocalPersistence, so this is a no-op on
+  // normal deployments — skipping it avoids a noisy console error in file:// / iframe contexts.
+  if (['http:', 'https:', 'chrome-extension:'].includes(location.protocol)) {
+    setPersistence(auth, browserLocalPersistence).catch(() => {});
+  }
   window._fs = { db, collection, doc, getDocs, setDoc, deleteDoc, onSnapshot,
                  auth, onAuthStateChanged, signInWithEmailAndPassword,
                  createUserWithEmailAndPassword, signOut,
