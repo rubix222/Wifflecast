@@ -5868,7 +5868,6 @@ const FIELD = {
 let _prevGameSnap  = null;   // snapshot before last Firestore push
 const _animQueue   = [];
 let   _animRunning = false;
-let   _foulSide    = 0;      // alternates left/right foul territory
 
 function _snapGame(g) {
   return {
@@ -5905,95 +5904,98 @@ function _runAnim(item) {
   const bannerEl = document.getElementById('anim-banner');
   if (!overlay || !ballEl || !bannerEl) { _nextAnim(); return; }
 
-  const svgEl    = document.getElementById('field-svg');
-  const ctm      = svgEl ? svgEl.getScreenCTM() : null;
-  const showBall = !!(ctm && item.fromSvg && item.toSvg);
-  const sc       = (sx, sy) => _svgToScreen(svgEl, sx, sy);
-
   const holdMs = item.big ? 1600 : 1200;
   const fadeMs = 300;
 
-  // ── Ball setup ──────────────────────────────────────────────
-  if (showBall) {
-    const from = sc(item.fromSvg.x, item.fromSvg.y);
-    ballEl.style.cssText = `
-      position:absolute; font-size:18px; line-height:1;
-      will-change:transform; filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));
-      left:${from.x - 9}px; top:${from.y - 9}px;
-      transform:translate(0,0) scale(1); transition:none; opacity:1; display:block;`;
-  } else {
-    ballEl.style.display = 'none';
-  }
-
-  // ── Banner setup ─────────────────────────────────────────────
+  // ── Banner text (no SVG coords needed yet) ───────────────────
   bannerEl.innerHTML        = item.text;
   bannerEl.style.color      = item.color || '#fff';
   bannerEl.style.fontSize   = item.big ? '34px' : '24px';
   bannerEl.style.opacity    = '0';
   bannerEl.style.transition = 'none';
   bannerEl.style.transform  = 'translate(-50%, -50%) scale(0.8)';
+  ballEl.style.display      = 'none';
   overlay.style.display     = 'block';
 
-  // ── Ball travel (one or two segments) ────────────────────────
-  let ballFlightMs = 0;
-  if (showBall) {
-    const from = sc(item.fromSvg.x, item.fromSvg.y);
+  // Defer ALL coordinate lookups to the next animation frame.
+  // This ensures we query the FRESH #field-svg that renderLiveGame()
+  // rebuilds synchronously after _runAnim is called.
+  requestAnimationFrame(() => {
+    const svgEl  = document.getElementById('field-svg');
+    const ctm    = svgEl ? svgEl.getScreenCTM() : null;
+    const hasBall = !!(ctm && item.fromSvg && item.toSvg);
 
-    if (item.viaSvg) {
-      // Two-segment path: fromSvg → viaSvg → toSvg
-      const p1Dur = item.phase1Dur || 380;
-      const p2Dur = item.phase2Dur || 340;
-      ballFlightMs = p1Dur + p2Dur;
+    // SVG user-space (0-400) → screen pixels using the live CTM
+    const sc = (sx, sy) => {
+      const pt = svgEl.createSVGPoint();
+      pt.x = sx; pt.y = sy;
+      const s = pt.matrixTransform(ctm);
+      return { x: s.x, y: s.y };
+    };
 
-      const via = sc(item.viaSvg.x, item.viaSvg.y);
-      const to  = sc(item.toSvg.x,  item.toSvg.y);
-      const dx1 = via.x - from.x, dy1 = via.y - from.y;
-      const dx2 = to.x  - from.x, dy2 = to.y  - from.y;
+    let ballFlightMs = 0;
 
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        // Phase 1: mound → plate
-        ballEl.style.transition = `transform ${p1Dur}ms ease-in`;
-        ballEl.style.transform  = `translate(${dx1}px,${dy1}px) scale(0.85)`;
-        // Phase 2: plate → foul territory (runs from current state)
-        setTimeout(() => {
-          ballEl.style.transition = `transform ${p2Dur}ms ease-out`;
-          ballEl.style.transform  = `translate(${dx2}px,${dy2}px) scale(0.7)`;
-        }, p1Dur);
-      }));
-    } else {
-      // Single-segment path
-      const ballDur = item.ballDur || 650;
-      ballFlightMs  = ballDur;
-      const to  = sc(item.toSvg.x, item.toSvg.y);
-      const dx  = to.x - from.x, dy = to.y - from.y;
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        ballEl.style.transition = `transform ${ballDur}ms ease-in, opacity 0.25s`;
-        ballEl.style.transform  = `translate(${dx}px,${dy}px) scale(0.7)`;
-      }));
+    if (hasBall) {
+      const from = sc(item.fromSvg.x, item.fromSvg.y);
+
+      // Place ball at starting position
+      ballEl.style.cssText = `
+        position:absolute; font-size:18px; line-height:1;
+        will-change:transform; filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));
+        left:${from.x - 9}px; top:${from.y - 9}px;
+        transform:translate(0,0) scale(1); transition:none; opacity:1; display:block;`;
+
+      // Pre-compute all destination offsets (relative to `from`)
+      if (item.viaSvg) {
+        const p1Dur = item.phase1Dur || 380;
+        const p2Dur = item.phase2Dur || 340;
+        ballFlightMs = p1Dur + p2Dur;
+        const via = sc(item.viaSvg.x, item.viaSvg.y);
+        const to  = sc(item.toSvg.x,  item.toSvg.y);
+        const dx1 = via.x - from.x, dy1 = via.y - from.y;
+        const dx2 = to.x  - from.x, dy2 = to.y  - from.y;
+        requestAnimationFrame(() => {
+          ballEl.style.transition = `transform ${p1Dur}ms ease-in`;
+          ballEl.style.transform  = `translate(${dx1}px,${dy1}px) scale(0.85)`;
+          setTimeout(() => {
+            ballEl.style.transition = `transform ${p2Dur}ms ease-out`;
+            ballEl.style.transform  = `translate(${dx2}px,${dy2}px) scale(0.7)`;
+          }, p1Dur);
+        });
+      } else {
+        const ballDur = item.ballDur || 650;
+        ballFlightMs  = ballDur;
+        const to  = sc(item.toSvg.x, item.toSvg.y);
+        const dx  = to.x - from.x, dy = to.y - from.y;
+        requestAnimationFrame(() => {
+          ballEl.style.transition = `transform ${ballDur}ms ease-in, opacity 0.25s`;
+          ballEl.style.transform  = `translate(${dx}px,${dy}px) scale(0.7)`;
+        });
+      }
     }
-  }
 
-  // ── Banner appears when ball arrives ─────────────────────────
-  setTimeout(() => {
-    bannerEl.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out';
-    bannerEl.style.opacity    = '1';
-    bannerEl.style.transform  = 'translate(-50%, -50%) scale(1)';
-  }, ballFlightMs);
+    // ── Banner appears when ball arrives ──────────────────────
+    setTimeout(() => {
+      bannerEl.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out';
+      bannerEl.style.opacity    = '1';
+      bannerEl.style.transform  = 'translate(-50%, -50%) scale(1)';
+    }, ballFlightMs);
 
-  // ── Fade everything out ───────────────────────────────────────
-  const totalVisible = ballFlightMs + holdMs;
-  setTimeout(() => {
-    ballEl.style.transition   = `opacity ${fadeMs}ms`;
-    ballEl.style.opacity      = '0';
-    bannerEl.style.transition = `opacity ${fadeMs}ms`;
-    bannerEl.style.opacity    = '0';
-  }, totalVisible);
+    // ── Fade everything out ───────────────────────────────────
+    const totalVisible = ballFlightMs + holdMs;
+    setTimeout(() => {
+      ballEl.style.transition   = `opacity ${fadeMs}ms`;
+      ballEl.style.opacity      = '0';
+      bannerEl.style.transition = `opacity ${fadeMs}ms`;
+      bannerEl.style.opacity    = '0';
+    }, totalVisible);
 
-  // ── Done — advance queue ──────────────────────────────────────
-  setTimeout(() => {
-    overlay.style.display = 'none';
-    _nextAnim();
-  }, totalVisible + fadeMs + 50);
+    // ── Done — advance queue ──────────────────────────────────
+    setTimeout(() => {
+      overlay.style.display = 'none';
+      _nextAnim();
+    }, totalVisible + fadeMs + 50);
+  });
 }
 
 function _detectAndQueueAnims(newG, prev) {
@@ -6023,8 +6025,8 @@ function _detectAndQueueAnims(newG, prev) {
   for (let i = 0; i < dStrikes; i++)
     _queueAnim({ text: 'Strike ⚡', color: '#f87171', fromSvg: FIELD.MOUND, toSvg: FIELD.HOME });
   for (let i = 0; i < dFouls;   i++) {
-    // Ball travels to plate then deflects into foul territory (alternates sides)
-    const goRight = (_foulSide++ % 2 === 0);
+    // Ball travels to plate then deflects into foul territory (random side each time)
+    const goRight = Math.random() < 0.5;
     _queueAnim({
       text: 'Foul!', color: '#fb923c',
       fromSvg:  FIELD.MOUND,
@@ -6036,16 +6038,35 @@ function _detectAndQueueAnims(newG, prev) {
 }
 
 function _buildOutcomeAnim(ev) {
-  const loc = ev.location; // {x,y} in 0-400 SVG space, or null
+  const raw = ev.location; // {x,y} in 0-400 SVG space, or null
+  // Small random jitter makes the ball feel organic and masks minor coord drift
+  const j  = () => (Math.random() - 0.5) * 14;
+  const loc = raw ? { x: raw.x + j(), y: raw.y + j() } : null;
+
+  // All balls-in-play: pitch travels mound→plate first, then out to the field
   switch (ev.outcome) {
-    case 'BB':        return { text: 'Walk! 🥊',        color: '#4ade80', fromSvg: FIELD.MOUND, toSvg: { x: 200, y: 368 } };
-    case 'K':         return { text: 'Strikeout! 🔥',   color: '#f87171', fromSvg: FIELD.MOUND, toSvg: FIELD.HOME };
-    case '1B':        return { text: 'Single! 🎯',      color: '#4ade80', fromSvg: FIELD.HOME,  toSvg: loc || FIELD.FIRST };
-    case '2B':        return { text: 'Double! 💥',      color: '#4ade80', fromSvg: FIELD.HOME,  toSvg: loc || FIELD.SECOND };
-    case '3B':        return { text: 'Triple! 🚀',      color: '#67e8f9', fromSvg: FIELD.HOME,  toSvg: loc || FIELD.THIRD };
-    case 'HR':        return { text: 'HOME RUN! 🎆',    color: '#fde68a', fromSvg: FIELD.HOME,  toSvg: loc || { x: 200, y: 18 }, big: true, ballDur: 950 };
-    case 'OUT':       return { text: 'Out!',            color: '#fb923c', fromSvg: FIELD.HOME,  toSvg: loc || FIELD.SECOND };
-    case 'ERR_REACH': return { text: 'Error!',          color: '#c084fc', fromSvg: FIELD.HOME,  toSvg: loc || FIELD.SECOND };
+    case 'BB':  return { text: 'Walk! 🥊',      color: '#4ade80',
+                         fromSvg: FIELD.MOUND,  toSvg: { x: 200, y: 368 } };
+    case 'K':   return { text: 'Strikeout! 🔥', color: '#f87171',
+                         fromSvg: FIELD.MOUND,  toSvg: FIELD.HOME };
+    case '1B':  return { text: 'Single! 🎯',    color: '#4ade80',
+                         fromSvg: FIELD.MOUND,  viaSvg: FIELD.HOME,
+                         toSvg: loc || FIELD.FIRST,  phase1Dur: 350, phase2Dur: 450 };
+    case '2B':  return { text: 'Double! 💥',    color: '#4ade80',
+                         fromSvg: FIELD.MOUND,  viaSvg: FIELD.HOME,
+                         toSvg: loc || FIELD.SECOND, phase1Dur: 350, phase2Dur: 520 };
+    case '3B':  return { text: 'Triple! 🚀',    color: '#67e8f9',
+                         fromSvg: FIELD.MOUND,  viaSvg: FIELD.HOME,
+                         toSvg: loc || FIELD.THIRD,  phase1Dur: 350, phase2Dur: 520 };
+    case 'HR':  return { text: 'HOME RUN! 🎆',  color: '#fde68a', big: true,
+                         fromSvg: FIELD.MOUND,  viaSvg: FIELD.HOME,
+                         toSvg: loc || { x: 200, y: 18 }, phase1Dur: 350, phase2Dur: 920 };
+    case 'OUT': return { text: 'Out!',           color: '#fb923c',
+                         fromSvg: FIELD.MOUND,  viaSvg: FIELD.HOME,
+                         toSvg: loc || FIELD.SECOND, phase1Dur: 350, phase2Dur: 450 };
+    case 'ERR_REACH': return { text: 'Error!',  color: '#c084fc',
+                         fromSvg: FIELD.MOUND,  viaSvg: FIELD.HOME,
+                         toSvg: loc || FIELD.SECOND, phase1Dur: 350, phase2Dur: 450 };
     default: return null;
   }
 }
