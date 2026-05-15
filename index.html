@@ -3529,14 +3529,20 @@ const Render = {
       .slice(0, 6);
     const recentHtml = recent.map(g => {
       const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
+      const isLive = g.status === 'in_progress';
       const score = g.status === 'completed' ? `${g.score.away}-${g.score.home}` : 'LIVE';
       const date = new Date(g.createdAt).toLocaleDateString();
+      const actions = `<div style="display:flex;gap:6px;align-items:center" onclick="event.stopPropagation()">
+        <div class="home-game-score ${isLive ? 'status-in_progress' : ''}">${score}</div>
+        <button class="btn btn-sm" onclick="renderLiveGame('${g.id}',true);switchTab('games')">👁 Watch</button>
+        ${isLive && canUserScore() ? `<button class="btn btn-sm btn-primary" onclick="openGameForScoring('${g.id}');switchTab('games')">▶ Resume</button>` : ''}
+      </div>`;
       return `<div class="home-recent-game" onclick="selectGame('${g.id}');switchTab('games')">
         <div>
           <div style="font-weight:600">${escapeHtml(away?.name||'?')} @ ${escapeHtml(home?.name||'?')}</div>
           <div style="font-size:12px;color:#9ca3af">${date}</div>
         </div>
-        <div class="home-game-score ${g.status === 'in_progress' ? 'status-in_progress' : ''}">${score}</div>
+        ${actions}
       </div>`;
     }).join('') || '<p style="color:#6b7280;font-size:14px;margin:0">No games yet.</p>';
 
