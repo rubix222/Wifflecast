@@ -5247,7 +5247,7 @@ function assertScoringLock(gameId) {
   if (!gameId || !currentUser) return false;
   const g = State.getGame(gameId);
   if (!g || g.status === 'completed') return false;
-  if (g.scoringLockedBy !== currentUser.uid) {
+  if (g.scoringLockedBy && g.scoringLockedBy !== currentUser.uid) {
     // Lock was taken over by someone else — switch to watch-only gracefully
     stopScoringHeartbeat();
     LiveGameWatchOnly = true;
