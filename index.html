@@ -2169,18 +2169,25 @@ const Storage = {
 
   async loadAll() {
     const fs = window._fs;
-    const [ps, ts, gs, us, tr] = await Promise.all([
+    // allSettled so a permission-denied on one collection (e.g. 'users' for
+    // unauthenticated visitors) doesn't prevent the rest from loading.
+    const [ps, ts, gs, us, tr] = await Promise.allSettled([
       fs.getDocs(fs.collection(fs.db, 'players')),
       fs.getDocs(fs.collection(fs.db, 'teams')),
       fs.getDocs(fs.collection(fs.db, 'games')),
       fs.getDocs(fs.collection(fs.db, 'users')),
       fs.getDocs(fs.collection(fs.db, 'tournaments')),
     ]);
-    State.players     = ps.docs.map(d => d.data());
-    State.teams       = ts.docs.map(d => d.data());
-    State.games       = gs.docs.map(d => d.data());
-    State.users       = us.docs.map(d => d.data());
-    State.tournaments = tr.docs.map(d => d.data());
+    if (ps.status === 'fulfilled') State.players     = ps.value.docs.map(d => d.data());
+    if (ts.status === 'fulfilled') State.teams       = ts.value.docs.map(d => d.data());
+    if (gs.status === 'fulfilled') State.games       = gs.value.docs.map(d => d.data());
+    if (us.status === 'fulfilled') State.users       = us.value.docs.map(d => d.data());
+    if (tr.status === 'fulfilled') State.tournaments = tr.value.docs.map(d => d.data());
+    // Surface load errors for debugging but don't throw — partial data is usable
+    [ps, ts, gs, us, tr].forEach((r, i) => {
+      if (r.status === 'rejected')
+        console.warn('loadAll collection', i, 'failed:', r.reason?.code, r.reason?.message);
+    });
   },
 
   unsubAll() {
@@ -7768,19 +7775,18 @@ async function boot() {
     currentUser = user;
     currentUserProfile = null;
 
-    try {
-      await Storage.loadAll();
-    } catch (err) {
-      // Rules may require auth — show a sign-in prompt instead of blank screen
-      console.warn('Firestore loadAll error:', err.code, err.message);
-      if (!user) {
-        const c = $('#players-container');
-        if (c) c.innerHTML = `<div class="empty-state">
-          <h3>Sign in to view data</h3>
-          <p>Your data is stored in the cloud. Sign in to access it.</p>
-          <button class="btn btn-primary" onclick="showAuthModal('signin')">Sign In</button>
-        </div>`;
-      }
+    // loadAll uses allSettled — it never throws; individual failures are warned in console.
+    await Storage.loadAll();
+
+    // If the games collection failed to load (rules block unauthenticated reads)
+    // and the user isn't signed in, show a sign-in prompt in the players tab.
+    if (!user && !State.games.length && !State.players.length) {
+      const c = $('#players-container');
+      if (c) c.innerHTML = `<div class="empty-state">
+        <h3>Sign in to view data</h3>
+        <p>Your data is stored in the cloud. Sign in to access it.</p>
+        <button class="btn btn-primary" onclick="showAuthModal('signin')">Sign In</button>
+      </div>`;
     }
 
     if (user) {
