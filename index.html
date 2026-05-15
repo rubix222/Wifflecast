@@ -271,6 +271,22 @@
     text-shadow: 0 2px 6px rgba(0,0,0,0.6);
     opacity: 0;
   }
+  #anim-fielder {
+    display: none;
+    position: absolute;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: #16a34a;
+    border: 2px solid #fff;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 24px;
+    text-align: center;
+    will-change: transform;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.3);
+  }
 
   .modal-backdrop {
     position: fixed; inset: 0;
@@ -2079,6 +2095,7 @@
 <!-- Play animation overlay — sits above live game, below modals; not wiped by rerenders -->
 <div id="play-anim-overlay">
   <div id="anim-ball">⚾</div>
+  <div id="anim-fielder"></div>
   <div id="anim-banner"></div>
 </div>
 
@@ -5898,10 +5915,27 @@ function _svgToScreen(svgEl, sx, sy) {
   return { x: s.x, y: s.y };
 }
 
+// Returns { initials, startSvg } for the given player id in context of game g,
+// or null if fid is falsy.  Position P → starts at MOUND; CF → starts at CF_HOME.
+function _getFielderInfo(fid, g) {
+  if (!fid || !g) return null;
+  const player   = State.getPlayer(fid);
+  const name     = player?.name || '?';
+  const initials = name.split(/\s+/).map(w => w[0]?.toUpperCase() || '').join('').slice(0, 2);
+  const positions = fieldingPositions(g) || {};
+  const pos = positions[fid];
+  let startSvg;
+  if (pos === 'P')  startSvg = FIELD.MOUND;
+  else if (pos === 'CF') startSvg = FIELD.CF_HOME;
+  else startSvg = FIELD.SECOND; // fallback for any other position
+  return { initials, startSvg };
+}
+
 function _runAnim(item) {
-  const overlay  = document.getElementById('play-anim-overlay');
-  const ballEl   = document.getElementById('anim-ball');
-  const bannerEl = document.getElementById('anim-banner');
+  const overlay    = document.getElementById('play-anim-overlay');
+  const ballEl     = document.getElementById('anim-ball');
+  const fielderEl  = document.getElementById('anim-fielder');
+  const bannerEl   = document.getElementById('anim-banner');
   if (!overlay || !ballEl || !bannerEl) { _nextAnim(); return; }
 
   const holdMs = item.big ? 1600 : 1200;
@@ -5915,6 +5949,11 @@ function _runAnim(item) {
   bannerEl.style.transition = 'none';
   bannerEl.style.transform  = 'translate(-50%, -50%) scale(0.8)';
   ballEl.style.display      = 'none';
+  if (fielderEl) {
+    fielderEl.style.display     = 'none';
+    fielderEl.style.transition  = 'none';
+    fielderEl.textContent       = item.fielderInfo?.initials || '';
+  }
   overlay.style.display     = 'block';
 
   // Defer ALL coordinate lookups to the next animation frame.
@@ -5974,6 +6013,37 @@ function _runAnim(item) {
       }
     }
 
+    // ── Fielder animation (OUT / ERR_REACH) ───────────────────
+    // Fielder starts at their position, then sprints to the play location
+    // at the same moment the ball leaves the plate (phase1Dur into the anim).
+    if (fielderEl && ctm && item.fielderInfo && item.toSvg) {
+      const fi      = item.fielderInfo;
+      const fStart  = sc(fi.startSvg.x, fi.startSvg.y);
+      const fEnd    = sc(item.toSvg.x,  item.toSvg.y);
+      const runDur  = item.phase2Dur || 450; // match ball phase-2 duration
+      const startDelay = item.viaSvg ? (item.phase1Dur || 350) : 0;
+
+      // Place fielder at start position immediately
+      fielderEl.style.cssText = `
+        display:block; position:absolute;
+        width:28px; height:28px; border-radius:50%;
+        background:#16a34a; border:2px solid #fff;
+        color:#fff; font-size:10px; font-weight:800;
+        line-height:24px; text-align:center;
+        will-change:transform;
+        filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+        left:${fStart.x - 14}px; top:${fStart.y - 14}px;
+        transform:translate(0,0); transition:none; opacity:1;`;
+
+      const dx = fEnd.x - fStart.x, dy = fEnd.y - fStart.y;
+      setTimeout(() => {
+        requestAnimationFrame(() => {
+          fielderEl.style.transition = `transform ${runDur}ms ease-out`;
+          fielderEl.style.transform  = `translate(${dx}px,${dy}px)`;
+        });
+      }, startDelay);
+    }
+
     // ── Banner appears when ball arrives ──────────────────────
     setTimeout(() => {
       bannerEl.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out';
@@ -5984,10 +6054,14 @@ function _runAnim(item) {
     // ── Fade everything out ───────────────────────────────────
     const totalVisible = ballFlightMs + holdMs;
     setTimeout(() => {
-      ballEl.style.transition   = `opacity ${fadeMs}ms`;
-      ballEl.style.opacity      = '0';
-      bannerEl.style.transition = `opacity ${fadeMs}ms`;
-      bannerEl.style.opacity    = '0';
+      ballEl.style.transition     = `opacity ${fadeMs}ms`;
+      ballEl.style.opacity        = '0';
+      bannerEl.style.transition   = `opacity ${fadeMs}ms`;
+      bannerEl.style.opacity      = '0';
+      if (fielderEl) {
+        fielderEl.style.transition = `opacity ${fadeMs}ms`;
+        fielderEl.style.opacity    = '0';
+      }
     }, totalVisible);
 
     // ── Done — advance queue ──────────────────────────────────
@@ -6006,7 +6080,7 @@ function _detectAndQueueAnims(newG, prev) {
     // New plate appearance(s)
     events.slice(prev.eventsLen).forEach(ev => {
       if (ev.type !== 'pa_end') return;
-      const anim = _buildOutcomeAnim(ev);
+      const anim = _buildOutcomeAnim(ev, newG);
       if (anim) _queueAnim(anim);
     });
     return; // don't also show pitch-count animations
@@ -6037,7 +6111,7 @@ function _detectAndQueueAnims(newG, prev) {
   }
 }
 
-function _buildOutcomeAnim(ev) {
+function _buildOutcomeAnim(ev, g) {
   const raw = ev.location; // {x,y} in 0-400 SVG space, or null
   // Small random jitter makes the ball feel organic and masks minor coord drift
   const j  = () => (Math.random() - 0.5) * 14;
@@ -6061,12 +6135,20 @@ function _buildOutcomeAnim(ev) {
     case 'HR':  return { text: 'HOME RUN! 🎆',  color: '#fde68a', big: true,
                          fromSvg: FIELD.MOUND,  viaSvg: FIELD.HOME,
                          toSvg: loc || { x: 200, y: 18 }, phase1Dur: 350, phase2Dur: 920 };
-    case 'OUT': return { text: 'Out!',           color: '#fb923c',
-                         fromSvg: FIELD.MOUND,  viaSvg: FIELD.HOME,
-                         toSvg: loc || FIELD.SECOND, phase1Dur: 350, phase2Dur: 450 };
-    case 'ERR_REACH': return { text: 'Error!',  color: '#c084fc',
-                         fromSvg: FIELD.MOUND,  viaSvg: FIELD.HOME,
-                         toSvg: loc || FIELD.SECOND, phase1Dur: 350, phase2Dur: 450 };
+    case 'OUT': {
+      const dest = loc || FIELD.SECOND;
+      return { text: 'Out!', color: '#fb923c',
+               fromSvg: FIELD.MOUND, viaSvg: FIELD.HOME,
+               toSvg: dest, phase1Dur: 350, phase2Dur: 450,
+               fielderInfo: _getFielderInfo(ev.fielderId, g) };
+    }
+    case 'ERR_REACH': {
+      const dest = loc || FIELD.SECOND;
+      return { text: 'Error! 😬', color: '#c084fc',
+               fromSvg: FIELD.MOUND, viaSvg: FIELD.HOME,
+               toSvg: dest, phase1Dur: 350, phase2Dur: 450,
+               fielderInfo: _getFielderInfo(ev.errorById, g) };
+    }
     default: return null;
   }
 }
