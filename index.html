@@ -1073,6 +1073,20 @@
   }
   .detail-tabs button.active { background: #166534; color: #fff; border-color: #166534; }
 
+  /* Player stat columns — 3-section horizontal scroll layout */
+  .player-stat-cols {
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+  }
+  .player-stat-col {
+    flex: 1 1 170px;
+    min-width: 170px;
+  }
+  .player-stat-col .stat-section-title { margin-top: 0; margin-bottom: 8px; }
+
   .stat-row-lg {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
@@ -1842,8 +1856,7 @@
     </div>
     <div id="stats-players-section">
       <div class="players-subnav">
-        <button class="active" data-pview="roster" onclick="setPlayersView('roster')">Roster</button>
-        <button data-pview="batting" onclick="setPlayersView('batting')">Batting</button>
+        <button class="active" data-pview="batting" onclick="setPlayersView('batting')">Batting</button>
         <button data-pview="pitching" onclick="setPlayersView('pitching')">Pitching</button>
       </div>
       <div id="players-container"></div>
@@ -2667,30 +2680,72 @@ const fmt = {
   },
 };
 
-// Shared batting stat blocks — used on both the Stats tab and Home page
-function renderPlayerStatBlocks(s) {
-  return `
-    <div class="stat-row-lg">
-      <div class="stat-lg hi"><div class="stat-label">AVG</div><div class="stat-value">${fmt.avg(s.AVG)}</div></div>
-      <div class="stat-lg hi"><div class="stat-label">SLG</div><div class="stat-value">${fmt.avg(s.SLG)}</div></div>
-    </div>
-    <div class="stat-row-lg" style="margin-top:8px">
-      <div class="stat-lg"><div class="stat-label">PA</div><div class="stat-value">${s.PA}</div></div>
-      <div class="stat-lg"><div class="stat-label">AB</div><div class="stat-value">${s.AB}</div></div>
-      <div class="stat-lg"><div class="stat-label">H</div><div class="stat-value">${s.H}</div></div>
-      <div class="stat-lg"><div class="stat-label">1B</div><div class="stat-value">${s.singles}</div></div>
-      <div class="stat-lg"><div class="stat-label">2B</div><div class="stat-value">${s.doubles}</div></div>
-      <div class="stat-lg"><div class="stat-label">3B</div><div class="stat-value">${s.triples}</div></div>
-      <div class="stat-lg"><div class="stat-label">HR</div><div class="stat-value">${s.hrs}</div></div>
-      <div class="stat-lg"><div class="stat-label">R</div><div class="stat-value">${s.R}</div></div>
-      <div class="stat-lg"><div class="stat-label">RBI</div><div class="stat-value">${s.RBI}</div></div>
-      <div class="stat-lg"><div class="stat-label">BB</div><div class="stat-value">${s.BB}</div></div>
-      <div class="stat-lg"><div class="stat-label">K</div><div class="stat-value">${s.K_bat}</div></div>
-      <div class="stat-lg"><div class="stat-label">KL</div><div class="stat-value">${s.K_looking}</div></div>
-      <div class="stat-lg"><div class="stat-label">KS</div><div class="stat-value">${s.K_swinging}</div></div>
-      <div class="stat-lg"><div class="stat-label">KF</div><div class="stat-value">${s.K_foul}</div></div>
-      <div class="stat-lg"><div class="stat-label">E</div><div class="stat-value">${s.E}</div></div>
+// Shared 3-section stat columns — used on both the Stats tab (modal) and Home page
+function renderPlayerStatColumns(s) {
+  const bat = `
+    <div class="player-stat-col">
+      <div class="stat-section-title">Batting</div>
+      <div class="stat-row-lg">
+        <div class="stat-lg hi"><div class="stat-label">AVG</div><div class="stat-value">${fmt.avg(s.AVG)}</div></div>
+        <div class="stat-lg hi"><div class="stat-label">SLG</div><div class="stat-value">${fmt.avg(s.SLG)}</div></div>
+      </div>
+      <div class="stat-row-lg" style="margin-top:8px">
+        <div class="stat-lg"><div class="stat-label">PA</div><div class="stat-value">${s.PA}</div></div>
+        <div class="stat-lg"><div class="stat-label">AB</div><div class="stat-value">${s.AB}</div></div>
+        <div class="stat-lg"><div class="stat-label">H</div><div class="stat-value">${s.H}</div></div>
+        <div class="stat-lg"><div class="stat-label">1B</div><div class="stat-value">${s.singles}</div></div>
+        <div class="stat-lg"><div class="stat-label">2B</div><div class="stat-value">${s.doubles}</div></div>
+        <div class="stat-lg"><div class="stat-label">3B</div><div class="stat-value">${s.triples}</div></div>
+        <div class="stat-lg"><div class="stat-label">HR</div><div class="stat-value">${s.hrs}</div></div>
+        <div class="stat-lg"><div class="stat-label">R</div><div class="stat-value">${s.R}</div></div>
+        <div class="stat-lg"><div class="stat-label">RBI</div><div class="stat-value">${s.RBI}</div></div>
+        <div class="stat-lg"><div class="stat-label">BB</div><div class="stat-value">${s.BB}</div></div>
+        <div class="stat-lg"><div class="stat-label">K</div><div class="stat-value">${s.K_bat}</div></div>
+        <div class="stat-lg"><div class="stat-label">KL</div><div class="stat-value">${s.K_looking}</div></div>
+        <div class="stat-lg"><div class="stat-label">KS</div><div class="stat-value">${s.K_swinging}</div></div>
+        <div class="stat-lg"><div class="stat-label">KF</div><div class="stat-value">${s.K_foul}</div></div>
+      </div>
     </div>`;
+  const pit = `
+    <div class="player-stat-col">
+      <div class="stat-section-title">Pitching</div>
+      <div class="stat-row-lg">
+        <div class="stat-lg hi"><div class="stat-label">ERA</div><div class="stat-value">${s.ERA !== null ? s.ERA.toFixed(2) : '—'}</div></div>
+        <div class="stat-lg hi"><div class="stat-label">IP</div><div class="stat-value">${fmt.ip(s.IP)}</div></div>
+      </div>
+      <div class="stat-row-lg" style="margin-top:8px">
+        <div class="stat-lg"><div class="stat-label">GP</div><div class="stat-value">${s.pGP}</div></div>
+        <div class="stat-lg"><div class="stat-label">K</div><div class="stat-value">${s.pK}</div></div>
+        <div class="stat-lg"><div class="stat-label">KL</div><div class="stat-value">${s.pKL}</div></div>
+        <div class="stat-lg"><div class="stat-label">KS</div><div class="stat-value">${s.pKS}</div></div>
+        <div class="stat-lg"><div class="stat-label">KF</div><div class="stat-value">${s.pKF}</div></div>
+        <div class="stat-lg"><div class="stat-label">BB</div><div class="stat-value">${s.pBB}</div></div>
+        <div class="stat-lg"><div class="stat-label">ER</div><div class="stat-value">${s.pER}</div></div>
+      </div>
+      ${s.pGP === 0 ? '<p style="color:#9ca3af;font-size:13px;margin-top:8px;margin-bottom:0">No appearances yet.</p>' : ''}
+    </div>`;
+  const fld = `
+    <div class="player-stat-col">
+      <div class="stat-section-title">Fielding</div>
+      <div class="stat-row-lg">
+        <div class="stat-lg"><div class="stat-label">E</div><div class="stat-value">${s.E}</div></div>
+      </div>
+    </div>`;
+  return `<div class="player-stat-cols">${bat}${pit}${fld}</div>`;
+}
+
+function showPlayerStatsModal(playerId) {
+  const p = State.getPlayer(playerId); if (!p) return;
+  const s = State.computePlayerStats(playerId);
+  const name = p.jerseyNumber ? `#${p.jerseyNumber} ${p.name}` : p.name;
+  Modal.show(`
+    <div class="modal-header">
+      <h3>${escapeHtml(name)}</h3>
+      <button class="btn-icon" onclick="Modal.hide()">✕</button>
+    </div>
+    <div class="modal-body">
+      ${renderPlayerStatColumns(s)}
+    </div>`);
 }
 
 /* ============================================================
@@ -2714,8 +2769,7 @@ function canUserScore() { return isAdmin() || (currentUser && currentUserProfile
 
 // Player view state
 let selectedPlayerId = null;
-let playerDetailTab = 'batting'; // 'batting' | 'pitching'
-let playersView = 'roster';      // 'roster' | 'batting' | 'pitching'
+let playersView = 'batting';     // 'batting' | 'pitching'
 
 // Team view state
 let selectedTeamId = null;
@@ -2768,10 +2822,6 @@ function sortTeamStats(col, which) {
 function setTeamDetailTab(tab) {
   teamDetailTab = tab;
   Render.teams();
-}
-function setPlayerDetailTab(tab) {
-  playerDetailTab = tab;
-  Render.players();
 }
 function sortStats(col, which) {
   const s = which === 'pitching' ? pitchSort : statsSort;
@@ -3129,7 +3179,7 @@ const Render = {
         <div class="home-card">
           <div class="home-section-title">My Player</div>
           <div class="home-player-name">${escapeHtml(myPlayer.jerseyNumber ? '#' + myPlayer.jerseyNumber + ' ' + myPlayer.name : myPlayer.name)}</div>
-          ${renderPlayerStatBlocks(s)}
+          ${renderPlayerStatColumns(s)}
         </div>`;
     } else if (currentUser) {
       playerCard = `
@@ -3480,84 +3530,6 @@ const Render = {
       return;
     }
 
-    // ── ROSTER VIEW ────────────────────────────────────────────────
-    if (playersView === 'roster') {
-      // Auto-select first player if none selected or selection gone
-      if (!selectedPlayerId || !State.getPlayer(selectedPlayerId)) {
-        selectedPlayerId = sorted[0]?.id || null;
-      }
-      const sel = selectedPlayerId ? State.getPlayer(selectedPlayerId) : null;
-      const s   = sel ? State.computePlayerStats(sel.id) : null;
-
-      const listItems = sorted.map(p => {
-        const ps = State.computePlayerStats(p.id);
-        const active = p.id === selectedPlayerId ? 'selected' : '';
-        return `<div class="player-list-item ${active}" onclick="selectPlayer('${p.id}')">
-          <div class="jersey-badge" style="width:28px;height:28px;font-size:12px;">${escapeHtml(p.jerseyNumber || '#')}</div>
-          <div>
-            <div class="pli-name">${escapeHtml(p.name)}</div>
-            <div class="pli-sub">${ps.PA} PA · ${fmt.avg(ps.AVG)}</div>
-          </div>
-        </div>`;
-      }).join('');
-
-      let detailHtml = '<div class="player-detail-empty"><span>← Select a player</span></div>';
-      if (sel && s) {
-        const badge = sel.userId
-          ? '<span class="badge badge-linked">Linked</span>'
-          : sel.invitePending ? '<span class="badge badge-invited">Invited</span>'
-          : '<span class="badge badge-guest">Guest</span>';
-        const canEdit = isAdmin() || (currentUser && sel.userId === currentUser.uid);
-        const actions = isAdmin()
-          ? `<button class="btn-icon" title="Edit" onclick="showPlayerModal('${sel.id}')">✎</button>
-             ${!sel.userId ? sel.invitePending
-               ? `<button class="btn-icon" title="Cancel invite" onclick="cancelInvite('${sel.id}')">✕</button>`
-               : `<button class="btn-icon" title="Invite" onclick="invitePlayer('${sel.id}')">✉</button>`
-             : ''}
-             <button class="btn-icon" title="Delete" onclick="deletePlayer('${sel.id}')">🗑</button>`
-          : canEdit ? `<button class="btn-icon" title="Edit" onclick="showPlayerModal('${sel.id}')">✎</button>` : '';
-
-        const batHtml = renderPlayerStatBlocks(s);
-
-        const pitHtml = `
-          <div class="stat-row-lg">
-            <div class="stat-lg hi"><div class="stat-label">ERA</div><div class="stat-value">${s.ERA !== null ? s.ERA.toFixed(2) : '—'}</div></div>
-            <div class="stat-lg hi"><div class="stat-label">IP</div><div class="stat-value">${fmt.ip(s.IP)}</div></div>
-          </div>
-          <div class="stat-row-lg" style="margin-top:8px">
-            <div class="stat-lg"><div class="stat-label">GP</div><div class="stat-value">${s.pGP}</div></div>
-            <div class="stat-lg"><div class="stat-label">K</div><div class="stat-value">${s.pK}</div></div>
-            <div class="stat-lg"><div class="stat-label">KL</div><div class="stat-value">${s.pKL}</div></div>
-            <div class="stat-lg"><div class="stat-label">KS</div><div class="stat-value">${s.pKS}</div></div>
-            <div class="stat-lg"><div class="stat-label">KF</div><div class="stat-value">${s.pKF}</div></div>
-            <div class="stat-lg"><div class="stat-label">BB</div><div class="stat-value">${s.pBB}</div></div>
-            <div class="stat-lg"><div class="stat-label">ER</div><div class="stat-value">${s.pER}</div></div>
-          </div>
-          ${s.pGP === 0 ? '<p style="color:#9ca3af;font-size:13px;margin:0">No pitching appearances yet.</p>' : ''}`;
-
-        detailHtml = `
-          <div class="detail-player-header">
-            <div class="jersey-badge-lg">${escapeHtml(sel.jerseyNumber || '#')}</div>
-            <div>
-              <div class="detail-player-name">${escapeHtml(sel.name)}${badge}</div>
-              <div class="detail-player-sub">${s.PA} PA</div>
-            </div>
-            <div class="detail-actions">${actions}</div>
-          </div>
-          <div class="detail-tabs">
-            <button class="${playerDetailTab === 'batting' ? 'active' : ''}" onclick="setPlayerDetailTab('batting')">Batting</button>
-            <button class="${playerDetailTab === 'pitching' ? 'active' : ''}" onclick="setPlayerDetailTab('pitching')">Pitching</button>
-          </div>
-          ${playerDetailTab === 'batting' ? batHtml : pitHtml}`;
-      }
-
-      c.innerHTML = `<div class="player-split">
-        <div class="player-list-panel">${listItems}</div>
-        <div class="player-detail-panel">${detailHtml}</div>
-      </div>`;
-      return;
-    }
-
     // ── STATS GRID VIEW (batting or pitching) ──────────────────────
     const which = playersView; // 'batting' | 'pitching'
     const sort  = which === 'pitching' ? pitchSort : statsSort;
@@ -3566,9 +3538,7 @@ const Render = {
       { key: 'PA',    label: 'PA'  },
       { key: 'AB',    label: 'AB'  },
       { key: 'AVG',   label: 'AVG', fmt: v => fmt.avg(v) },
-      { key: 'OBP',   label: 'OBP', fmt: v => fmt.avg(v) },
       { key: 'SLG',   label: 'SLG', fmt: v => fmt.avg(v) },
-      { key: 'OPS',   label: 'OPS', fmt: v => fmt.avg(v) },
       { key: 'H',     label: 'H'   },
       { key: 'singles', label: '1B' },
       { key: 'doubles', label: '2B' },
@@ -3628,7 +3598,7 @@ const Render = {
         const disp = col.fmt ? col.fmt(v) : (v ?? '—');
         return `<td>${disp}</td>`;
       }).join('');
-      return `<tr onclick="selectPlayer('${p.id}');setPlayersView('roster')" style="cursor:pointer" title="View ${escapeHtml(p.name)}'s roster card">
+      return `<tr onclick="showPlayerStatsModal('${p.id}')" style="cursor:pointer" title="View ${escapeHtml(p.name)}'s stats">
         <td><span class="jersey-sm">${escapeHtml(p.jerseyNumber ? '#' + p.jerseyNumber : '')}</span>${escapeHtml(p.name)}</td>
         ${cells}
       </tr>`;
@@ -7006,7 +6976,7 @@ Object.assign(window, {
   showBipOutTypeModal, showBipHitModal, showBipErrorModal,
   askLocation, cancelLocation, confirmLocation, finishHit,
   // Admin mode + player view
-  setPlayersView, selectPlayer, setPlayerDetailTab,
+  setPlayersView, selectPlayer, showPlayerStatsModal,
   setStatsMain, setTeamsView, sortTeamStats,
   selectTeam, setTeamDetailTab,
   switchTab,
