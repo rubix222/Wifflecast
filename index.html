@@ -1099,15 +1099,6 @@
   }
   .stat-scroll-row::-webkit-scrollbar { display: none; }
   .stat-scroll-row .stat-lg { flex: 0 0 auto; min-width: 52px; }
-  .stat-section-label {
-    font-size: 11px;
-    font-weight: 700;
-    color: #9ca3af;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin: 10px 0 4px;
-  }
-  .stat-section-label:first-child { margin-top: 0; }
 
   /* ---------- Sortable stats table ---------- */
   .stats-table-wrap {
@@ -1149,7 +1140,6 @@
   .stats-table td:first-child { text-align: left; font-weight: 600; color: #111827; }
   .stats-table tr:last-child td { border-bottom: none; }
   .stats-table tr:hover td { background: #f9fafb; }
-  .stats-table .jersey-sm { color: #9ca3af; font-size: 11px; font-weight: 500; margin-right: 4px; }
 
   .field-svg.location-mode { cursor: crosshair; }
 
@@ -2687,79 +2677,100 @@ const fmt = {
   },
 };
 
-// Shared scrollable stat rows for a player — used on both Home page and in modal
-function renderPlayerStatRows(s) {
-  const sl = t => `<div class="stat-section-label">${t}</div>`;
-  const tile = (label, value, hi) =>
-    `<div class="stat-lg${hi?' hi':''}"><div class="stat-label">${label}</div><div class="stat-value">${value}</div></div>`;
+// ── Shared stat tile/grid primitives ────────────────────────
+function statTile(label, value, hi) {
+  return `<div class="stat-lg${hi ? ' hi' : ''}"><div class="stat-label">${label}</div><div class="stat-value">${value}</div></div>`;
+}
+
+// Player stat grid rows — shared by home page card, player modal, and stats detail
+function renderPlayerBattingRow(s) {
   return `
-    ${sl('Batting')}
+    <div class="stat-section-title" style="margin-top:0">Batting</div>
     <div class="stat-scroll-row">
-      ${tile('AVG', fmt.avg(s.AVG), true)}
-      ${tile('SLG', fmt.avg(s.SLG), true)}
-      ${tile('PA', s.PA)}
-      ${tile('AB', s.AB)}
-      ${tile('H', s.H)}
-      ${tile('1B', s.singles)}
-      ${tile('2B', s.doubles)}
-      ${tile('3B', s.triples)}
-      ${tile('HR', s.hrs)}
-      ${tile('R', s.R)}
-      ${tile('RBI', s.RBI)}
-      ${tile('BB', s.BB)}
-      ${tile('K', s.K_bat)}
-      ${tile('KL', s.K_looking)}
-      ${tile('KS', s.K_swinging)}
-      ${tile('KF', s.K_foul)}
-    </div>
-    ${sl('Pitching')}
-    <div class="stat-scroll-row">
-      ${tile('ERA', s.ERA !== null ? s.ERA.toFixed(2) : '—', true)}
-      ${tile('IP', fmt.ip(s.IP), true)}
-      ${tile('GP', s.pGP)}
-      ${tile('K', s.pK)}
-      ${tile('KL', s.pKL)}
-      ${tile('KS', s.pKS)}
-      ${tile('KF', s.pKF)}
-      ${tile('BB', s.pBB)}
-      ${tile('ER', s.pER)}
-    </div>
-    ${sl('Fielding')}
-    <div class="stat-scroll-row">
-      ${tile('PO', s.PO)}
-      ${tile('E', s.E)}
+      ${statTile('AVG', fmt.avg(s.AVG), true)}
+      ${statTile('SLG', fmt.avg(s.SLG), true)}
+      ${statTile('PA', s.PA)}
+      ${statTile('AB', s.AB)}
+      ${statTile('H', s.H)}
+      ${statTile('1B', s.singles)}
+      ${statTile('2B', s.doubles)}
+      ${statTile('3B', s.triples)}
+      ${statTile('HR', s.hrs)}
+      ${statTile('R', s.R)}
+      ${statTile('RBI', s.RBI)}
+      ${statTile('BB', s.BB)}
+      ${statTile('K', s.K_bat)}
+      ${statTile('KL', s.K_looking)}
+      ${statTile('KS', s.K_swinging)}
+      ${statTile('KF', s.K_foul)}
     </div>`;
 }
 
-// Shared scrollable stat rows for a team
+function renderPlayerPitchingRow(s) {
+  return `
+    <div class="stat-section-title">Pitching</div>
+    <div class="stat-scroll-row">
+      ${statTile('ERA', s.ERA !== null ? s.ERA.toFixed(2) : '—', true)}
+      ${statTile('IP', fmt.ip(s.IP), true)}
+      ${statTile('GP', s.pGP)}
+      ${statTile('K', s.pK)}
+      ${statTile('KL', s.pKL)}
+      ${statTile('KS', s.pKS)}
+      ${statTile('KF', s.pKF)}
+      ${statTile('BB', s.pBB)}
+      ${statTile('ER', s.pER)}
+    </div>`;
+}
+
+function renderPlayerFieldingRow(s) {
+  return `
+    <div class="stat-section-title">Fielding</div>
+    <div class="stat-scroll-row">
+      ${statTile('PO', s.PO)}
+      ${statTile('E', s.E)}
+    </div>`;
+}
+
+// All three player sections combined
+function renderPlayerStatRows(s) {
+  return renderPlayerBattingRow(s) + renderPlayerPitchingRow(s) + renderPlayerFieldingRow(s);
+}
+
+// Team stat grid rows — shared by home page card and stats detail
+function renderTeamBattingRow(bat) {
+  return `
+    <div class="stat-section-title" style="margin-top:0">Batting</div>
+    <div class="stat-scroll-row">
+      ${statTile('AVG', fmt.avg(bat.AVG), true)}
+      ${statTile('SLG', fmt.avg(bat.SLG), true)}
+      ${statTile('AB', bat.AB)}
+      ${statTile('H', bat.H)}
+      ${statTile('HR', bat.hrs)}
+      ${statTile('R', bat.R)}
+      ${statTile('RBI', bat.RBI)}
+      ${statTile('BB', bat.BB)}
+      ${statTile('K', bat.K)}
+    </div>`;
+}
+
+function renderTeamPitchingRow(pit) {
+  return `
+    <div class="stat-section-title">Pitching</div>
+    <div class="stat-scroll-row">
+      ${statTile('ERA', pit.ERA !== null ? pit.ERA.toFixed(2) : '—', true)}
+      ${statTile('IP', fmt.ip(pit.IP), true)}
+      ${statTile('K', pit.K)}
+      ${statTile('BB', pit.BB)}
+      ${statTile('ER', pit.ER)}
+      ${statTile('H', pit.H)}
+    </div>`;
+}
+
+// Both team sections combined — used on home page and can be called from detail
 function renderTeamStatRows(teamId) {
   const bat = State.computeTeamBattingStats(teamId);
   const pit = State.computeTeamPitchingStats(teamId);
-  const sl = t => `<div class="stat-section-label">${t}</div>`;
-  const tile = (label, value, hi) =>
-    `<div class="stat-lg${hi?' hi':''}"><div class="stat-label">${label}</div><div class="stat-value">${value}</div></div>`;
-  return `
-    ${sl('Batting')}
-    <div class="stat-scroll-row">
-      ${tile('AVG', bat.AB ? fmt.avg(bat.AVG) : '.000', true)}
-      ${tile('SLG', bat.AB ? fmt.avg(bat.SLG) : '.000', true)}
-      ${tile('AB', bat.AB)}
-      ${tile('H', bat.H)}
-      ${tile('HR', bat.hrs)}
-      ${tile('R', bat.R)}
-      ${tile('RBI', bat.RBI)}
-      ${tile('BB', bat.BB)}
-      ${tile('K', bat.K)}
-    </div>
-    ${sl('Pitching')}
-    <div class="stat-scroll-row">
-      ${tile('ERA', pit.ERA !== null ? pit.ERA.toFixed(2) : '—', true)}
-      ${tile('IP', fmt.ip(pit.IP))}
-      ${tile('K', pit.K)}
-      ${tile('BB', pit.BB)}
-      ${tile('ER', pit.ER)}
-      ${tile('H', pit.H)}
-    </div>`;
+  return renderTeamBattingRow(bat) + renderTeamPitchingRow(pit);
 }
 
 function showPlayerStatsModal(playerId) {
@@ -3630,7 +3641,7 @@ const Render = {
         return `<td>${disp}</td>`;
       }).join('');
       return `<tr onclick="showPlayerStatsModal('${p.id}')" style="cursor:pointer" title="View ${escapeHtml(p.name)}'s stats">
-        <td><span class="jersey-sm">${escapeHtml(p.jerseyNumber ? '#' + p.jerseyNumber : '')}</span>${escapeHtml(p.name)}</td>
+        <td>${escapeHtml(p.name)}</td>
         ${cells}
       </tr>`;
     }).join('');
@@ -3777,42 +3788,6 @@ const Render = {
            <button class="btn-icon" title="Delete" onclick="deleteTeam('${sel.id}')">🗑</button>`
         : '';
 
-      const batHtml = `
-        <div class="stat-section-title" style="margin-top:0">Rate</div>
-        <div class="stat-row-lg">
-          <div class="stat-lg hi"><div class="stat-label">AVG</div><div class="stat-value">${fmt.avg(bat.AVG)}</div></div>
-          <div class="stat-lg hi"><div class="stat-label">OBP</div><div class="stat-value">${fmt.avg(bat.OBP)}</div></div>
-          <div class="stat-lg hi"><div class="stat-label">SLG</div><div class="stat-value">${fmt.avg(bat.SLG)}</div></div>
-        </div>
-        <div class="stat-section-title">Counting</div>
-        <div class="stat-row-lg">
-          <div class="stat-lg"><div class="stat-label">PA</div><div class="stat-value">${bat.PA}</div></div>
-          <div class="stat-lg"><div class="stat-label">AB</div><div class="stat-value">${bat.AB}</div></div>
-          <div class="stat-lg"><div class="stat-label">H</div><div class="stat-value">${bat.H}</div></div>
-          <div class="stat-lg"><div class="stat-label">1B</div><div class="stat-value">${bat.singles}</div></div>
-          <div class="stat-lg"><div class="stat-label">2B</div><div class="stat-value">${bat.doubles}</div></div>
-          <div class="stat-lg"><div class="stat-label">3B</div><div class="stat-value">${bat.triples}</div></div>
-          <div class="stat-lg"><div class="stat-label">HR</div><div class="stat-value">${bat.hrs}</div></div>
-          <div class="stat-lg"><div class="stat-label">R</div><div class="stat-value">${bat.R}</div></div>
-          <div class="stat-lg"><div class="stat-label">RBI</div><div class="stat-value">${bat.RBI}</div></div>
-          <div class="stat-lg"><div class="stat-label">BB</div><div class="stat-value">${bat.BB}</div></div>
-          <div class="stat-lg"><div class="stat-label">K</div><div class="stat-value">${bat.K}</div></div>
-        </div>`;
-
-      const pitHtml = `
-        <div class="stat-section-title" style="margin-top:0">Rate</div>
-        <div class="stat-row-lg">
-          <div class="stat-lg hi"><div class="stat-label">ERA</div><div class="stat-value">${pit.ERA !== null ? pit.ERA.toFixed(2) : '—'}</div></div>
-          <div class="stat-lg hi"><div class="stat-label">IP</div><div class="stat-value">${fmt.ip(pit.IP)}</div></div>
-        </div>
-        <div class="stat-section-title">Counting</div>
-        <div class="stat-row-lg">
-          <div class="stat-lg"><div class="stat-label">K</div><div class="stat-value">${pit.K}</div></div>
-          <div class="stat-lg"><div class="stat-label">BB</div><div class="stat-value">${pit.BB}</div></div>
-          <div class="stat-lg"><div class="stat-label">H</div><div class="stat-value">${pit.H}</div></div>
-          <div class="stat-lg"><div class="stat-label">ER</div><div class="stat-value">${pit.ER}</div></div>
-        </div>`;
-
       detailHtml = `
         <div class="detail-player-header">
           <div>
@@ -3830,7 +3805,7 @@ const Render = {
           <button class="${teamDetailTab === 'pitching' ? 'active' : ''}" onclick="setTeamDetailTab('pitching')">Pitching</button>
         </div>
         <div class="detail-tab-body">
-          ${teamDetailTab === 'batting' ? batHtml : pitHtml}
+          ${teamDetailTab === 'batting' ? renderTeamBattingRow(bat) : renderTeamPitchingRow(pit)}
         </div>`;
     }
 
