@@ -2667,6 +2667,32 @@ const fmt = {
   },
 };
 
+// Shared batting stat blocks — used on both the Stats tab and Home page
+function renderPlayerStatBlocks(s) {
+  return `
+    <div class="stat-row-lg">
+      <div class="stat-lg hi"><div class="stat-label">AVG</div><div class="stat-value">${fmt.avg(s.AVG)}</div></div>
+      <div class="stat-lg hi"><div class="stat-label">SLG</div><div class="stat-value">${fmt.avg(s.SLG)}</div></div>
+    </div>
+    <div class="stat-row-lg" style="margin-top:8px">
+      <div class="stat-lg"><div class="stat-label">PA</div><div class="stat-value">${s.PA}</div></div>
+      <div class="stat-lg"><div class="stat-label">AB</div><div class="stat-value">${s.AB}</div></div>
+      <div class="stat-lg"><div class="stat-label">H</div><div class="stat-value">${s.H}</div></div>
+      <div class="stat-lg"><div class="stat-label">1B</div><div class="stat-value">${s.singles}</div></div>
+      <div class="stat-lg"><div class="stat-label">2B</div><div class="stat-value">${s.doubles}</div></div>
+      <div class="stat-lg"><div class="stat-label">3B</div><div class="stat-value">${s.triples}</div></div>
+      <div class="stat-lg"><div class="stat-label">HR</div><div class="stat-value">${s.hrs}</div></div>
+      <div class="stat-lg"><div class="stat-label">R</div><div class="stat-value">${s.R}</div></div>
+      <div class="stat-lg"><div class="stat-label">RBI</div><div class="stat-value">${s.RBI}</div></div>
+      <div class="stat-lg"><div class="stat-label">BB</div><div class="stat-value">${s.BB}</div></div>
+      <div class="stat-lg"><div class="stat-label">K</div><div class="stat-value">${s.K_bat}</div></div>
+      <div class="stat-lg"><div class="stat-label">KL</div><div class="stat-value">${s.K_looking}</div></div>
+      <div class="stat-lg"><div class="stat-label">KS</div><div class="stat-value">${s.K_swinging}</div></div>
+      <div class="stat-lg"><div class="stat-label">KF</div><div class="stat-value">${s.K_foul}</div></div>
+      <div class="stat-lg"><div class="stat-label">E</div><div class="stat-value">${s.E}</div></div>
+    </div>`;
+}
+
 /* ============================================================
    AUTH
    ============================================================ */
@@ -3103,14 +3129,7 @@ const Render = {
         <div class="home-card">
           <div class="home-section-title">My Player</div>
           <div class="home-player-name">${escapeHtml(myPlayer.jerseyNumber ? '#' + myPlayer.jerseyNumber + ' ' + myPlayer.name : myPlayer.name)}</div>
-          <div class="home-player-sub">${s.PA} plate appearances · ${s.AB} AB</div>
-          <div class="home-stat-highlights">
-            <div class="home-stat-hi"><div class="val">${fmt.avg(s.AVG)}</div><div class="lbl">AVG</div></div>
-            <div class="home-stat-hi"><div class="val">${fmt.avg(s.OPS)}</div><div class="lbl">OPS</div></div>
-            <div class="home-stat-hi"><div class="val">${s.hrs}</div><div class="lbl">HR</div></div>
-            <div class="home-stat-hi"><div class="val">${s.RBI}</div><div class="lbl">RBI</div></div>
-            <div class="home-stat-hi"><div class="val">${s.R}</div><div class="lbl">R</div></div>
-          </div>
+          ${renderPlayerStatBlocks(s)}
         </div>`;
     } else if (currentUser) {
       playerCard = `
@@ -3498,41 +3517,14 @@ const Render = {
              <button class="btn-icon" title="Delete" onclick="deletePlayer('${sel.id}')">🗑</button>`
           : canEdit ? `<button class="btn-icon" title="Edit" onclick="showPlayerModal('${sel.id}')">✎</button>` : '';
 
-        const batHtml = `
-          <div class="stat-section-title" style="margin-top:0">Rate</div>
-          <div class="stat-row-lg">
-            <div class="stat-lg hi"><div class="stat-label">AVG</div><div class="stat-value">${fmt.avg(s.AVG)}</div></div>
-            <div class="stat-lg hi"><div class="stat-label">OBP</div><div class="stat-value">${fmt.avg(s.OBP)}</div></div>
-            <div class="stat-lg hi"><div class="stat-label">SLG</div><div class="stat-value">${fmt.avg(s.SLG)}</div></div>
-            <div class="stat-lg hi"><div class="stat-label">OPS</div><div class="stat-value">${fmt.avg(s.OPS)}</div></div>
-          </div>
-          <div class="stat-section-title">Counting</div>
-          <div class="stat-row-lg">
-            <div class="stat-lg"><div class="stat-label">PA</div><div class="stat-value">${s.PA}</div></div>
-            <div class="stat-lg"><div class="stat-label">AB</div><div class="stat-value">${s.AB}</div></div>
-            <div class="stat-lg"><div class="stat-label">H</div><div class="stat-value">${s.H}</div></div>
-            <div class="stat-lg"><div class="stat-label">1B</div><div class="stat-value">${s.singles}</div></div>
-            <div class="stat-lg"><div class="stat-label">2B</div><div class="stat-value">${s.doubles}</div></div>
-            <div class="stat-lg"><div class="stat-label">3B</div><div class="stat-value">${s.triples}</div></div>
-            <div class="stat-lg"><div class="stat-label">HR</div><div class="stat-value">${s.hrs}</div></div>
-            <div class="stat-lg"><div class="stat-label">R</div><div class="stat-value">${s.R}</div></div>
-            <div class="stat-lg"><div class="stat-label">RBI</div><div class="stat-value">${s.RBI}</div></div>
-            <div class="stat-lg"><div class="stat-label">BB</div><div class="stat-value">${s.BB}</div></div>
-            <div class="stat-lg"><div class="stat-label">K</div><div class="stat-value">${s.K_bat}</div></div>
-            <div class="stat-lg"><div class="stat-label">KL</div><div class="stat-value">${s.K_looking}</div></div>
-            <div class="stat-lg"><div class="stat-label">KS</div><div class="stat-value">${s.K_swinging}</div></div>
-            <div class="stat-lg"><div class="stat-label">KF</div><div class="stat-value">${s.K_foul}</div></div>
-            <div class="stat-lg"><div class="stat-label">E</div><div class="stat-value">${s.E}</div></div>
-          </div>`;
+        const batHtml = renderPlayerStatBlocks(s);
 
         const pitHtml = `
-          <div class="stat-section-title" style="margin-top:0">Rate</div>
           <div class="stat-row-lg">
             <div class="stat-lg hi"><div class="stat-label">ERA</div><div class="stat-value">${s.ERA !== null ? s.ERA.toFixed(2) : '—'}</div></div>
             <div class="stat-lg hi"><div class="stat-label">IP</div><div class="stat-value">${fmt.ip(s.IP)}</div></div>
           </div>
-          <div class="stat-section-title">Counting</div>
-          <div class="stat-row-lg">
+          <div class="stat-row-lg" style="margin-top:8px">
             <div class="stat-lg"><div class="stat-label">GP</div><div class="stat-value">${s.pGP}</div></div>
             <div class="stat-lg"><div class="stat-label">K</div><div class="stat-value">${s.pK}</div></div>
             <div class="stat-lg"><div class="stat-label">KL</div><div class="stat-value">${s.pKL}</div></div>
