@@ -2452,7 +2452,8 @@ const State = {
   computePlayerStats(playerId) {
     let AB=0, H=0, R=0, RBI=0, BB=0, HBP=0, SF=0, TB=0, K_bat=0;
     let K_looking=0, K_swinging=0, K_foul=0;
-    let pK=0, pBB=0, pIP_outs=0, pER=0, pKL=0, pKS=0, pKF=0, pH=0;
+    let pK=0, pBB=0, pIP_outs=0, pER=0, pR=0, pKL=0, pKS=0, pKF=0, pH=0;
+    let pBF=0, pPitches=0, pStrikePitches=0;
     let E=0, PO=0; // fielding
     let singles=0, doubles=0, triples=0, hrs=0;
     const pitchedGames = new Set();
@@ -2493,6 +2494,10 @@ const State = {
           // Innings pitched: count outs recorded by this pitcher (K, OUT)
           if (e.outcome === 'K' || e.outcome === 'OUT') pIP_outs++;
           pER += e.earnedRuns || 0;
+          pR += (e.runsScoredBy || []).length;
+          pBF++;
+          pPitches      += e.pitches       || 0;
+          pStrikePitches += e.strikePitches || 0;
           pitchedGames.add(g.id);
         }
         if (e.errorById === playerId) E++;
@@ -2506,16 +2511,24 @@ const State = {
     const OBP = PA ? (H + BB + HBP) / PA : 0;
     const SLG = AB ? TB / AB : 0;
     const OPS = OBP + SLG;
-    const IP = pIP_outs / 3;
-    const ERA  = IP > 0 ? (pER * 9) / IP : null;
+    const IP    = pIP_outs / 3;
+    const ERA   = IP > 0 ? (pER * 9) / IP : null;
     const pWHIP = IP > 0 ? (pBB + pH) / IP : null;
-    const pGP = pitchedGames.size;
+    const pGP   = pitchedGames.size;
+    const pPerIP  = IP > 0      ? pPitches / IP       : null;
+    const pPerBF  = pBF > 0     ? pPitches / pBF      : null;
+    const pSPct   = pPitches > 0 ? pStrikePitches / pPitches : null;
+    const pKPerBF  = pBF > 0    ? pK / pBF            : null;
+    const pKPerInn = IP > 0     ? pK / IP             : null;
+    const pBBPerInn = IP > 0    ? pBB / IP            : null;
     const GP  = battedGames.size;
 
     return {
       GP, AB, H, R, RBI, BB, K_bat, K_looking, K_swinging, K_foul, AVG, OBP, SLG, OPS, PA, TB,
       singles, doubles, triples, hrs,
-      pK, pKL, pKS, pKF, pBB, pER, pH, IP, ERA, pWHIP, E, PO, pGP,
+      pK, pKL, pKS, pKF, pBB, pER, pR, pH, IP, ERA, pWHIP,
+      pBF, pPitches, pStrikePitches, pPerIP, pPerBF, pSPct, pKPerBF, pKPerInn, pBBPerInn,
+      E, PO, pGP,
     };
   },
 
@@ -2567,7 +2580,7 @@ const State = {
   },
 
   computeTeamPitchingStats(teamId) {
-    let outs=0, ER=0, K=0, BB=0, H=0;
+    let outs=0, ER=0, R=0, K=0, BB=0, H=0, BF=0, pitches=0, strikePitches=0;
     this.games.forEach(g => {
       if (g.homeTeamId !== teamId && g.awayTeamId !== teamId) return;
       const pitchingHalf = g.homeTeamId === teamId ? 'top' : 'bottom';
@@ -2578,12 +2591,22 @@ const State = {
         else if (e.outcome === 'BB') BB++;
         else if (['1B','2B','3B','HR'].includes(e.outcome)) H++;
         ER += e.earnedRuns || 0;
+        R  += (e.runsScoredBy || []).length;
+        BF++;
+        pitches       += e.pitches       || 0;
+        strikePitches += e.strikePitches || 0;
       });
     });
-    const IP = outs / 3;
-    const ERA  = IP > 0 ? (ER * 9) / IP : null;
-    const WHIP = IP > 0 ? (BB + H) / IP : null;
-    return { IP, ER, K, BB, H, ERA, WHIP };
+    const IP     = outs / 3;
+    const ERA    = IP > 0        ? (ER * 9) / IP       : null;
+    const WHIP   = IP > 0        ? (BB + H) / IP       : null;
+    const pPerIP  = IP > 0       ? pitches / IP         : null;
+    const pPerBF  = BF > 0       ? pitches / BF         : null;
+    const sPct    = pitches > 0  ? strikePitches / pitches : null;
+    const kPerBF  = BF > 0       ? K / BF               : null;
+    const kPerInn = IP > 0       ? K / IP               : null;
+    const bbPerInn = IP > 0      ? BB / IP              : null;
+    return { IP, ER, R, K, BB, H, ERA, WHIP, pPerIP, pPerBF, sPct, kPerBF, kPerInn, bbPerInn };
   },
 
   computeTeamFieldingStats(teamId) {
@@ -2753,13 +2776,20 @@ const BATTING_COLS = [
   { key: 'K',   label: 'K'   },
 ];
 const PITCH_COLS = [
-  { key: 'ERA',  label: 'ERA',  fmt: v => v !== null ? v.toFixed(2) : '—', nullLow: true },
-  { key: 'WHIP', label: 'WHIP', fmt: v => v !== null ? v.toFixed(2) : '—', nullLow: true },
-  { key: 'IP',   label: 'IP',   fmt: v => fmt.ip(v) },
-  { key: 'K',    label: 'K'    },
-  { key: 'BB',   label: 'BB'   },
-  { key: 'H',    label: 'H'    },
-  { key: 'ER',   label: 'ER'   },
+  { key: 'IP',     label: 'IP',     fmt: v => fmt.ip(v) },
+  { key: 'ERA',    label: 'ERA',    fmt: v => v !== null ? v.toFixed(2) : '—', nullLow: true },
+  { key: 'K',      label: 'K'      },
+  { key: 'BB',     label: 'BB'     },
+  { key: 'H',      label: 'H'      },
+  { key: 'R',      label: 'R'      },
+  { key: 'ER',     label: 'ER'     },
+  { key: 'WHIP',   label: 'WHIP',  fmt: v => v !== null ? v.toFixed(2) : '—', nullLow: true },
+  { key: 'pPerIP', label: 'P/IP',  fmt: v => v !== null ? v.toFixed(1) : '—' },
+  { key: 'pPerBF', label: 'P/BP',  fmt: v => v !== null ? v.toFixed(2) : '—' },
+  { key: 'sPct',   label: 'S%',    fmt: v => v !== null ? (v * 100).toFixed(1) + '%' : '—' },
+  { key: 'kPerBF', label: 'K/BP',  fmt: v => v !== null ? v.toFixed(3) : '—' },
+  { key: 'kPerInn',label: 'K/Inn', fmt: v => v !== null ? v.toFixed(2) : '—' },
+  { key: 'bbPerInn',label:'BB/Inn',fmt: v => v !== null ? v.toFixed(2) : '—' },
 ];
 const FIELD_COLS = [
   { key: 'PO', label: 'PO' },
@@ -2780,7 +2810,9 @@ function playerBattingData(s) {
     R: s.R, RBI: s.RBI, BB: s.BB, K: s.K_bat };
 }
 function playerPitchingData(s) {
-  return { ERA: s.ERA, WHIP: s.pWHIP, IP: s.IP, K: s.pK, BB: s.pBB, H: s.pH, ER: s.pER };
+  return { IP: s.IP, ERA: s.ERA, K: s.pK, BB: s.pBB, H: s.pH, R: s.pR, ER: s.pER,
+    WHIP: s.pWHIP, pPerIP: s.pPerIP, pPerBF: s.pPerBF, sPct: s.pSPct,
+    kPerBF: s.pKPerBF, kPerInn: s.pKPerInn, bbPerInn: s.pBBPerInn };
 }
 function playerFieldingData(s) {
   return { PO: s.PO, E: s.E };
@@ -2791,7 +2823,9 @@ function teamBattingData(bs, gp = 0) {
     R: bs.R, RBI: bs.RBI, BB: bs.BB, K: bs.K };
 }
 function teamPitchingData(ps) {
-  return { ERA: ps.ERA, WHIP: ps.WHIP, IP: ps.IP, K: ps.K, BB: ps.BB, H: ps.H, ER: ps.ER };
+  return { IP: ps.IP, ERA: ps.ERA, K: ps.K, BB: ps.BB, H: ps.H, R: ps.R, ER: ps.ER,
+    WHIP: ps.WHIP, pPerIP: ps.pPerIP, pPerBF: ps.pPerBF, sPct: ps.sPct,
+    kPerBF: ps.kPerBF, kPerInn: ps.kPerInn, bbPerInn: ps.bbPerInn };
 }
 
 // ── Shared stat tile/grid primitives ────────────────────────
@@ -3041,7 +3075,7 @@ let selectedTeamId = null;
 let selectedGameId = null;
 let showFinishedGames = false;
 let statsSort    = { col: 'AVG', dir: -1 };
-let pitchSort    = { col: 'IP',  dir: -1 };
+let pitchSort    = { col: 'ERA', dir:  1 };
 let fieldSort    = { col: 'PO',  dir: -1 };
 let teamBatSort    = { col: 'AVG', dir: -1 };
 let teamPitSort    = { col: 'ERA', dir:  1 };
@@ -6392,6 +6426,7 @@ async function applyPaEnd(g, ev) {
     earnedRuns: 0,
     runsScoredBy: [],
     pitches: (g.balls || 0) + (g.strikes || 0) + (g.fouls || 0) + (['BB','K'].includes(ev.outcome) ? 0 : 1),
+    strikePitches: (g.strikes || 0) + (g.fouls || 0) + (['BB','K'].includes(ev.outcome) ? 0 : 1),
   };
 
   const newBases = { 1: g.bases[1], 2: g.bases[2], 3: g.bases[3] };
