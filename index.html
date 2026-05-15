@@ -885,6 +885,31 @@
     stroke-width: 3;
     paint-order: stroke;
   }
+  .field-svg .batter-marker { pointer-events: none; }
+  .field-svg .batter-marker .batter-circle {
+    fill: rgba(194, 65, 12, 0.82);   /* orange — batting team colour */
+    stroke: rgba(255,255,255,0.9);
+    stroke-width: 1.5;
+  }
+  .field-svg .batter-marker text.pos {
+    fill: #fff;
+    font-size: 11px;
+    font-weight: 800;
+    text-anchor: middle;
+    dominant-baseline: central;
+  }
+  .field-svg .batter-marker text.name {
+    fill: #1f2937;
+    font-size: 11px;
+    font-weight: 600;
+    text-anchor: middle;
+  }
+  .field-svg .batter-marker text.name.bg {
+    fill: none;
+    stroke: #fff;
+    stroke-width: 3;
+    paint-order: stroke;
+  }
   .field-svg .runner-tag {
     pointer-events: none;
   }
@@ -2538,7 +2563,8 @@ const State = {
       events: [],
 
       isOver: false,
-      ...(data.tournamentId   ? { tournamentId: data.tournamentId }     : {}),
+      ...(data.tournamentId   ? { tournamentId: data.tournamentId,
+                                  tournamentName: this.getTournament(data.tournamentId)?.name || null } : {}),
       ...(data.isChampionship ? { isChampionship: true }               : {}),
       ...(data.deRound        ? { deRound: data.deRound }              : {}),
     };
@@ -3792,7 +3818,7 @@ const Render = {
       const statusLabel = g.status === 'completed' ? `Final ${g.score.away}–${g.score.home}`
         : g.status === 'in_progress' ? 'In Progress'
         : 'Not Started';
-      const eventName = g.tournamentId ? State.getTournament(g.tournamentId)?.name : null;
+      const eventName = g.tournamentId ? (State.getTournament(g.tournamentId)?.name || g.tournamentName || null) : null;
       return `<tr>
         <td style="white-space:nowrap">${escapeHtml(away?.name||'?')} @ ${escapeHtml(home?.name||'?')}${eventName ? ` <span class="muted small">📋 ${escapeHtml(eventName)}</span>` : ''}</td>
         <td class="muted small" style="white-space:nowrap">${date}</td>
@@ -4193,7 +4219,7 @@ const Render = {
       const active = g.id === selectedGameId ? 'selected' : '';
 
       // Event badge (tournament-linked games)
-      const eventName = g.tournamentId ? State.getTournament(g.tournamentId)?.name : null;
+      const eventName = g.tournamentId ? (State.getTournament(g.tournamentId)?.name || g.tournamentName || null) : null;
       const eventBadge = eventName
         ? `<div style="font-size:11px;color:#0369a1;margin-top:2px">📋 ${escapeHtml(eventName)}</div>`
         : '';
@@ -4483,7 +4509,7 @@ function openGame(id) {
     } else {
       const detail = $('#games-detail'); if (!detail) return;
       const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
-      const eventName = g.tournamentId ? State.getTournament(g.tournamentId)?.name : null;
+      const eventName = g.tournamentId ? (State.getTournament(g.tournamentId)?.name || g.tournamentName || null) : null;
       detail.innerHTML = `
         <div class="inline-game-header">
           <h3>${escapeHtml(away?.name||'?')} @ ${escapeHtml(home?.name||'?')}</h3>
@@ -5065,7 +5091,7 @@ function showSetupModal(gameId) {
   const g = State.getGame(gameId); if (!g) return;
   const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
   if (!home || !away) { toast('Game has missing teams', 'error'); return; }
-  const eventName = g.tournamentId ? State.getTournament(g.tournamentId)?.name : null;
+  const eventName = g.tournamentId ? (State.getTournament(g.tournamentId)?.name || g.tournamentName || null) : null;
   Modal.show(`
     <div class="modal-header">
       <div>
@@ -5579,7 +5605,7 @@ function liveGameHTML(g, home, away) {
           <div>${escapeHtml(away.name)} @ ${escapeHtml(home.name)}
             <span class="game-card-status status-${g.status}" style="margin-left:6px;font-size:11px">${isCompleted ? 'Final' : g.status.replace('_',' ')}</span>
           </div>
-          ${g.tournamentId ? `<div style="font-size:11px;color:#0369a1;font-weight:500;margin-top:1px">📋 ${escapeHtml(State.getTournament(g.tournamentId)?.name || '')}</div>` : ''}
+          ${g.tournamentId ? `<div style="font-size:11px;color:#0369a1;font-weight:500;margin-top:1px">📋 ${escapeHtml(State.getTournament(g.tournamentId)?.name || g.tournamentName || '')}</div>` : ''}
         </div>
         ${isCompleted && isAdmin() ? `
         <div style="display:flex;gap:6px;flex-shrink:0">
@@ -6290,6 +6316,8 @@ function drawField(overrideBases = null) {
   const cfId = Object.keys(fieldingPos).find(pid => fieldingPos[pid] === 'CF');
   const pitcher = pitcherId ? State.getPlayer(pitcherId) : null;
   const cf = cfId ? State.getPlayer(cfId) : null;
+  const batterId = isCompleted ? null : currentBatterId(g);
+  const batter = batterId ? State.getPlayer(batterId) : null;
 
   const fielderMarker = (pid, player, pos, cx, cy) => {
     if (!pid || !player) return '';
@@ -6359,6 +6387,13 @@ function drawField(overrideBases = null) {
       <!-- Fielder markers -->
       ${isCompleted ? '' : fielderMarker(pitcherId, pitcher, 'P',  FIELD.MOUND.x,   FIELD.MOUND.y)}
       ${isCompleted ? '' : fielderMarker(cfId,      cf,      'CF', FIELD.CF_HOME.x, FIELD.CF_HOME.y)}
+      <!-- Batter marker (orange circle, just below home plate) -->
+      ${batter ? `<g class="batter-marker" transform="translate(${FIELD.HOME.x},${FIELD.HOME.y + 26})">
+        <circle class="batter-circle" cx="0" cy="0" r="14"/>
+        <text class="pos" x="0" y="0">🏏</text>
+        <text class="name bg" y="22">${escapeHtml(batter.name)}</text>
+        <text class="name"    y="22">${escapeHtml(batter.name)}</text>
+      </g>` : ''}
       <!-- Locate-mode instruction banner overlaid at top of field -->
       ${instrOverlay}
     </svg>
@@ -7846,6 +7881,12 @@ async function migrateGames() {
     if (g.currentInning=== undefined) { g.currentInning= 1;                             changed = true; }
     if (g.currentHalf  === undefined) { g.currentHalf  = 'top';                         changed = true; }
     if (g.events       === undefined) { g.events       = [];                             changed = true; }
+    // Backfill tournamentName so games show their event name without requiring
+    // the tournaments collection to be readable (important for public/unauth users).
+    if (g.tournamentId && !g.tournamentName) {
+      const t = State.getTournament(g.tournamentId);
+      if (t?.name) { g.tournamentName = t.name; changed = true; }
+    }
     if (changed) saves.push(Storage.saveGame(g));
   });
   if (saves.length) await Promise.all(saves);
