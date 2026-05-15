@@ -2682,95 +2682,99 @@ function statTile(label, value, hi) {
   return `<div class="stat-lg${hi ? ' hi' : ''}"><div class="stat-label">${label}</div><div class="stat-value">${value}</div></div>`;
 }
 
-// Player stat grid rows — shared by home page card, player modal, and stats detail
+// ── Shared stat grid primitives ─────────────────────────────
+// Row functions return ONLY the tile grid (no label).
+// Callers that need section labels (home page, modal) add them via
+// renderPlayerStatRows / renderTeamStatRows.
+// The stats-tab detail uses the raw row functions inside its own tabs.
+
 function renderPlayerBattingRow(s) {
-  return `
-    <div class="stat-section-title" style="margin-top:0">Batting</div>
-    <div class="stat-scroll-row">
-      ${statTile('AVG', fmt.avg(s.AVG), true)}
-      ${statTile('SLG', fmt.avg(s.SLG), true)}
-      ${statTile('PA', s.PA)}
-      ${statTile('AB', s.AB)}
-      ${statTile('H', s.H)}
-      ${statTile('1B', s.singles)}
-      ${statTile('2B', s.doubles)}
-      ${statTile('3B', s.triples)}
-      ${statTile('HR', s.hrs)}
-      ${statTile('R', s.R)}
-      ${statTile('RBI', s.RBI)}
-      ${statTile('BB', s.BB)}
-      ${statTile('K', s.K_bat)}
-      ${statTile('KL', s.K_looking)}
-      ${statTile('KS', s.K_swinging)}
-      ${statTile('KF', s.K_foul)}
-    </div>`;
+  return `<div class="stat-row-lg">
+    ${statTile('AVG', fmt.avg(s.AVG), true)}
+    ${statTile('SLG', fmt.avg(s.SLG), true)}
+    ${statTile('PA', s.PA)}
+    ${statTile('AB', s.AB)}
+    ${statTile('H', s.H)}
+    ${statTile('1B', s.singles)}
+    ${statTile('2B', s.doubles)}
+    ${statTile('3B', s.triples)}
+    ${statTile('HR', s.hrs)}
+    ${statTile('R', s.R)}
+    ${statTile('RBI', s.RBI)}
+    ${statTile('BB', s.BB)}
+    ${statTile('K', s.K_bat)}
+    ${statTile('KL', s.K_looking)}
+    ${statTile('KS', s.K_swinging)}
+    ${statTile('KF', s.K_foul)}
+  </div>`;
 }
 
 function renderPlayerPitchingRow(s) {
-  return `
-    <div class="stat-section-title">Pitching</div>
-    <div class="stat-scroll-row">
-      ${statTile('ERA', s.ERA !== null ? s.ERA.toFixed(2) : '—', true)}
-      ${statTile('IP', fmt.ip(s.IP), true)}
-      ${statTile('GP', s.pGP)}
-      ${statTile('K', s.pK)}
-      ${statTile('KL', s.pKL)}
-      ${statTile('KS', s.pKS)}
-      ${statTile('KF', s.pKF)}
-      ${statTile('BB', s.pBB)}
-      ${statTile('ER', s.pER)}
-    </div>`;
+  return `<div class="stat-row-lg">
+    ${statTile('ERA', s.ERA !== null ? s.ERA.toFixed(2) : '—', true)}
+    ${statTile('IP', fmt.ip(s.IP), true)}
+    ${statTile('GP', s.pGP)}
+    ${statTile('K', s.pK)}
+    ${statTile('KL', s.pKL)}
+    ${statTile('KS', s.pKS)}
+    ${statTile('KF', s.pKF)}
+    ${statTile('BB', s.pBB)}
+    ${statTile('ER', s.pER)}
+  </div>`;
 }
 
 function renderPlayerFieldingRow(s) {
-  return `
-    <div class="stat-section-title">Fielding</div>
-    <div class="stat-scroll-row">
-      ${statTile('PO', s.PO)}
-      ${statTile('E', s.E)}
-    </div>`;
+  return `<div class="stat-row-lg">
+    ${statTile('PO', s.PO)}
+    ${statTile('E', s.E)}
+  </div>`;
 }
 
-// All three player sections combined
+// All three sections with labels — for home page card and player modal
 function renderPlayerStatRows(s) {
-  return renderPlayerBattingRow(s) + renderPlayerPitchingRow(s) + renderPlayerFieldingRow(s);
-}
-
-// Team stat grid rows — shared by home page card and stats detail
-function renderTeamBattingRow(bat) {
   return `
     <div class="stat-section-title" style="margin-top:0">Batting</div>
-    <div class="stat-scroll-row">
-      ${statTile('AVG', fmt.avg(bat.AVG), true)}
-      ${statTile('SLG', fmt.avg(bat.SLG), true)}
-      ${statTile('AB', bat.AB)}
-      ${statTile('H', bat.H)}
-      ${statTile('HR', bat.hrs)}
-      ${statTile('R', bat.R)}
-      ${statTile('RBI', bat.RBI)}
-      ${statTile('BB', bat.BB)}
-      ${statTile('K', bat.K)}
-    </div>`;
+    ${renderPlayerBattingRow(s)}
+    <div class="stat-section-title">Pitching</div>
+    ${renderPlayerPitchingRow(s)}
+    <div class="stat-section-title">Fielding</div>
+    ${renderPlayerFieldingRow(s)}`;
+}
+
+function renderTeamBattingRow(bat) {
+  return `<div class="stat-row-lg">
+    ${statTile('AVG', fmt.avg(bat.AVG), true)}
+    ${statTile('SLG', fmt.avg(bat.SLG), true)}
+    ${statTile('AB', bat.AB)}
+    ${statTile('H', bat.H)}
+    ${statTile('HR', bat.hrs)}
+    ${statTile('R', bat.R)}
+    ${statTile('RBI', bat.RBI)}
+    ${statTile('BB', bat.BB)}
+    ${statTile('K', bat.K)}
+  </div>`;
 }
 
 function renderTeamPitchingRow(pit) {
-  return `
-    <div class="stat-section-title">Pitching</div>
-    <div class="stat-scroll-row">
-      ${statTile('ERA', pit.ERA !== null ? pit.ERA.toFixed(2) : '—', true)}
-      ${statTile('IP', fmt.ip(pit.IP), true)}
-      ${statTile('K', pit.K)}
-      ${statTile('BB', pit.BB)}
-      ${statTile('ER', pit.ER)}
-      ${statTile('H', pit.H)}
-    </div>`;
+  return `<div class="stat-row-lg">
+    ${statTile('ERA', pit.ERA !== null ? pit.ERA.toFixed(2) : '—', true)}
+    ${statTile('IP', fmt.ip(pit.IP), true)}
+    ${statTile('K', pit.K)}
+    ${statTile('BB', pit.BB)}
+    ${statTile('ER', pit.ER)}
+    ${statTile('H', pit.H)}
+  </div>`;
 }
 
-// Both team sections combined — used on home page and can be called from detail
+// Both team sections with labels — for home page card
 function renderTeamStatRows(teamId) {
   const bat = State.computeTeamBattingStats(teamId);
   const pit = State.computeTeamPitchingStats(teamId);
-  return renderTeamBattingRow(bat) + renderTeamPitchingRow(pit);
+  return `
+    <div class="stat-section-title" style="margin-top:0">Batting</div>
+    ${renderTeamBattingRow(bat)}
+    <div class="stat-section-title">Pitching</div>
+    ${renderTeamPitchingRow(pit)}`;
 }
 
 function showPlayerStatsModal(playerId) {
