@@ -1088,6 +1088,26 @@
   .stat-lg .stat-label { font-size: 10px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
   .stat-lg .stat-value { font-size: 17px; font-weight: 700; color: #111827; margin-top: 2px; }
   .stat-lg.hi .stat-value { color: #166534; }
+  .stat-scroll-row {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 6px;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .stat-scroll-row::-webkit-scrollbar { display: none; }
+  .stat-scroll-row .stat-lg { flex: 0 0 auto; min-width: 52px; }
+  .stat-section-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 10px 0 4px;
+  }
+  .stat-section-label:first-child { margin-top: 0; }
 
   /* ---------- Sortable stats table ---------- */
   .stats-table-wrap {
@@ -2410,7 +2430,7 @@ const State = {
     let AB=0, H=0, R=0, RBI=0, BB=0, HBP=0, SF=0, TB=0, K_bat=0;
     let K_looking=0, K_swinging=0, K_foul=0;
     let pK=0, pBB=0, pIP_outs=0, pER=0, pKL=0, pKS=0, pKF=0;
-    let E=0; // errors
+    let E=0, PO=0; // fielding
     let singles=0, doubles=0, triples=0, hrs=0;
     const pitchedGames = new Set();
 
@@ -2450,6 +2470,7 @@ const State = {
           pitchedGames.add(g.id);
         }
         if (e.errorById === playerId) E++;
+        if (e.fielderId === playerId && e.outcome === 'OUT') PO++;
         if (e.runsScoredBy && e.runsScoredBy.includes(playerId)) R++;
       });
     });
@@ -2466,7 +2487,7 @@ const State = {
     return {
       AB, H, R, RBI, BB, K_bat, K_looking, K_swinging, K_foul, AVG, OBP, SLG, OPS, PA, TB,
       singles, doubles, triples, hrs,
-      pK, pKL, pKS, pKF, pBB, pER, IP, ERA, E, pGP,
+      pK, pKL, pKS, pKF, pBB, pER, IP, ERA, E, PO, pGP,
     };
   },
 
@@ -2666,72 +2687,79 @@ const fmt = {
   },
 };
 
-// Returns the content for the currently active player stat tab
-function renderPlayerTabContent(tab, s) {
-  if (tab === 'pitching') return `
-    <div class="stat-row-lg">
-      <div class="stat-lg hi"><div class="stat-label">ERA</div><div class="stat-value">${s.ERA !== null ? s.ERA.toFixed(2) : '—'}</div></div>
-      <div class="stat-lg hi"><div class="stat-label">IP</div><div class="stat-value">${fmt.ip(s.IP)}</div></div>
-    </div>
-    <div class="stat-row-lg" style="margin-top:8px">
-      <div class="stat-lg"><div class="stat-label">GP</div><div class="stat-value">${s.pGP}</div></div>
-      <div class="stat-lg"><div class="stat-label">K</div><div class="stat-value">${s.pK}</div></div>
-      <div class="stat-lg"><div class="stat-label">KL</div><div class="stat-value">${s.pKL}</div></div>
-      <div class="stat-lg"><div class="stat-label">KS</div><div class="stat-value">${s.pKS}</div></div>
-      <div class="stat-lg"><div class="stat-label">KF</div><div class="stat-value">${s.pKF}</div></div>
-      <div class="stat-lg"><div class="stat-label">BB</div><div class="stat-value">${s.pBB}</div></div>
-      <div class="stat-lg"><div class="stat-label">ER</div><div class="stat-value">${s.pER}</div></div>
-    </div>
-    ${s.pGP === 0 ? '<p style="color:#9ca3af;font-size:13px;margin-top:8px;margin-bottom:0">No appearances yet.</p>' : ''}`;
-  if (tab === 'fielding') return `
-    <div class="stat-row-lg">
-      <div class="stat-lg"><div class="stat-label">E</div><div class="stat-value">${s.E}</div></div>
-    </div>`;
-  // batting (default)
+// Shared scrollable stat rows for a player — used on both Home page and in modal
+function renderPlayerStatRows(s) {
+  const sl = t => `<div class="stat-section-label">${t}</div>`;
+  const tile = (label, value, hi) =>
+    `<div class="stat-lg${hi?' hi':''}"><div class="stat-label">${label}</div><div class="stat-value">${value}</div></div>`;
   return `
-    <div class="stat-row-lg">
-      <div class="stat-lg hi"><div class="stat-label">AVG</div><div class="stat-value">${fmt.avg(s.AVG)}</div></div>
-      <div class="stat-lg hi"><div class="stat-label">SLG</div><div class="stat-value">${fmt.avg(s.SLG)}</div></div>
+    ${sl('Batting')}
+    <div class="stat-scroll-row">
+      ${tile('AVG', fmt.avg(s.AVG), true)}
+      ${tile('SLG', fmt.avg(s.SLG), true)}
+      ${tile('PA', s.PA)}
+      ${tile('AB', s.AB)}
+      ${tile('H', s.H)}
+      ${tile('1B', s.singles)}
+      ${tile('2B', s.doubles)}
+      ${tile('3B', s.triples)}
+      ${tile('HR', s.hrs)}
+      ${tile('R', s.R)}
+      ${tile('RBI', s.RBI)}
+      ${tile('BB', s.BB)}
+      ${tile('K', s.K_bat)}
+      ${tile('KL', s.K_looking)}
+      ${tile('KS', s.K_swinging)}
+      ${tile('KF', s.K_foul)}
     </div>
-    <div class="stat-row-lg" style="margin-top:8px">
-      <div class="stat-lg"><div class="stat-label">PA</div><div class="stat-value">${s.PA}</div></div>
-      <div class="stat-lg"><div class="stat-label">AB</div><div class="stat-value">${s.AB}</div></div>
-      <div class="stat-lg"><div class="stat-label">H</div><div class="stat-value">${s.H}</div></div>
-      <div class="stat-lg"><div class="stat-label">1B</div><div class="stat-value">${s.singles}</div></div>
-      <div class="stat-lg"><div class="stat-label">2B</div><div class="stat-value">${s.doubles}</div></div>
-      <div class="stat-lg"><div class="stat-label">3B</div><div class="stat-value">${s.triples}</div></div>
-      <div class="stat-lg"><div class="stat-label">HR</div><div class="stat-value">${s.hrs}</div></div>
-      <div class="stat-lg"><div class="stat-label">R</div><div class="stat-value">${s.R}</div></div>
-      <div class="stat-lg"><div class="stat-label">RBI</div><div class="stat-value">${s.RBI}</div></div>
-      <div class="stat-lg"><div class="stat-label">BB</div><div class="stat-value">${s.BB}</div></div>
-      <div class="stat-lg"><div class="stat-label">K</div><div class="stat-value">${s.K_bat}</div></div>
-      <div class="stat-lg"><div class="stat-label">KL</div><div class="stat-value">${s.K_looking}</div></div>
-      <div class="stat-lg"><div class="stat-label">KS</div><div class="stat-value">${s.K_swinging}</div></div>
-      <div class="stat-lg"><div class="stat-label">KF</div><div class="stat-value">${s.K_foul}</div></div>
+    ${sl('Pitching')}
+    <div class="stat-scroll-row">
+      ${tile('ERA', s.ERA !== null ? s.ERA.toFixed(2) : '—', true)}
+      ${tile('IP', fmt.ip(s.IP), true)}
+      ${tile('GP', s.pGP)}
+      ${tile('K', s.pK)}
+      ${tile('KL', s.pKL)}
+      ${tile('KS', s.pKS)}
+      ${tile('KF', s.pKF)}
+      ${tile('BB', s.pBB)}
+      ${tile('ER', s.pER)}
+    </div>
+    ${sl('Fielding')}
+    <div class="stat-scroll-row">
+      ${tile('PO', s.PO)}
+      ${tile('E', s.E)}
     </div>`;
 }
 
-// Shared tabbed player stats widget — used on both Home page and in modal
-function renderPlayerStatTabs(s, playerId) {
-  const tabs = ['batting', 'pitching', 'fielding'];
-  const tabBtns = tabs.map(t =>
-    `<button class="${playerStatsTab === t ? 'active' : ''}" data-pstab="${t}" onclick="setPlayerStatsTab('${t}','${playerId}')">${t[0].toUpperCase()+t.slice(1)}</button>`
-  ).join('');
+// Shared scrollable stat rows for a team
+function renderTeamStatRows(teamId) {
+  const bat = State.computeTeamBattingStats(teamId);
+  const pit = State.computeTeamPitchingStats(teamId);
+  const sl = t => `<div class="stat-section-label">${t}</div>`;
+  const tile = (label, value, hi) =>
+    `<div class="stat-lg${hi?' hi':''}"><div class="stat-label">${label}</div><div class="stat-value">${value}</div></div>`;
   return `
-    <div class="detail-tabs">${tabBtns}</div>
-    <div id="player-stats-content" data-pid="${playerId}">
-      ${renderPlayerTabContent(playerStatsTab, s)}
+    ${sl('Batting')}
+    <div class="stat-scroll-row">
+      ${tile('AVG', bat.AB ? fmt.avg(bat.AVG) : '.000', true)}
+      ${tile('SLG', bat.AB ? fmt.avg(bat.SLG) : '.000', true)}
+      ${tile('AB', bat.AB)}
+      ${tile('H', bat.H)}
+      ${tile('HR', bat.hrs)}
+      ${tile('R', bat.R)}
+      ${tile('RBI', bat.RBI)}
+      ${tile('BB', bat.BB)}
+      ${tile('K', bat.K)}
+    </div>
+    ${sl('Pitching')}
+    <div class="stat-scroll-row">
+      ${tile('ERA', pit.ERA !== null ? pit.ERA.toFixed(2) : '—', true)}
+      ${tile('IP', fmt.ip(pit.IP))}
+      ${tile('K', pit.K)}
+      ${tile('BB', pit.BB)}
+      ${tile('ER', pit.ER)}
+      ${tile('H', pit.H)}
     </div>`;
-}
-
-function setPlayerStatsTab(tab, playerId) {
-  playerStatsTab = tab;
-  const s = State.computePlayerStats(playerId);
-  // Update tab button active states (works for both modal and home page)
-  $$('[data-pstab]').forEach(b => b.classList.toggle('active', b.dataset.pstab === tab));
-  // Swap content in place
-  const content = $('#player-stats-content');
-  if (content) content.innerHTML = renderPlayerTabContent(tab, s);
 }
 
 function showPlayerStatsModal(playerId) {
@@ -2744,7 +2772,7 @@ function showPlayerStatsModal(playerId) {
       <button class="btn-icon" onclick="Modal.hide()">✕</button>
     </div>
     <div class="modal-body">
-      ${renderPlayerStatTabs(s, playerId)}
+      ${renderPlayerStatRows(s)}
     </div>`);
 }
 
@@ -2770,7 +2798,6 @@ function canUserScore() { return isAdmin() || (currentUser && currentUserProfile
 // Player view state
 let selectedPlayerId = null;
 let playersView    = 'batting';  // 'batting' | 'pitching'
-let playerStatsTab = 'batting';  // 'batting' | 'pitching' | 'fielding'
 
 // Team view state
 let selectedTeamId = null;
@@ -3180,7 +3207,7 @@ const Render = {
         <div class="home-card">
           <div class="home-section-title">My Player</div>
           <div class="home-player-name">${escapeHtml(myPlayer.jerseyNumber ? '#' + myPlayer.jerseyNumber + ' ' + myPlayer.name : myPlayer.name)}</div>
-          ${renderPlayerStatTabs(s, myPid)}
+          ${renderPlayerStatRows(s)}
         </div>`;
     } else if (currentUser) {
       playerCard = `
@@ -3207,9 +3234,12 @@ const Render = {
         <div class="home-section-title">My Teams</div>
         ${myTeams.length ? myTeams.map(t => {
           const ts = State.computeTeamStats(t.id);
-          return `<div class="home-team-chip" onclick="setStatsMain('teams');selectTeam('${t.id}');setTeamsView('detail');switchTab('stats')">
-            <strong>${escapeHtml(t.name)}</strong>
-            <span style="color:#6b7280;font-size:13px">${ts.wins}-${ts.losses}${ts.ties ? '-'+ts.ties : ''}</span>
+          return `<div style="margin-bottom:16px">
+            <div class="home-team-chip" onclick="setStatsMain('teams');selectTeam('${t.id}');setTeamsView('detail');switchTab('stats')" style="margin-bottom:8px">
+              <strong>${escapeHtml(t.name)}</strong>
+              <span style="color:#6b7280;font-size:13px">${ts.wins}-${ts.losses}${ts.ties ? '-'+ts.ties : ''}</span>
+            </div>
+            ${renderTeamStatRows(t.id)}
           </div>`;
         }).join('') : '<p style="color:#6b7280;font-size:14px;margin:0">No teams yet.</p>'}
       </div>`;
@@ -6977,7 +7007,7 @@ Object.assign(window, {
   showBipOutTypeModal, showBipHitModal, showBipErrorModal,
   askLocation, cancelLocation, confirmLocation, finishHit,
   // Admin mode + player view
-  setPlayersView, selectPlayer, showPlayerStatsModal, setPlayerStatsTab,
+  setPlayersView, selectPlayer, showPlayerStatsModal,
   setStatsMain, setTeamsView, sortTeamStats,
   selectTeam, setTeamDetailTab,
   switchTab,
