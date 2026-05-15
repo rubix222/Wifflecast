@@ -6867,6 +6867,224 @@ function buildRecapText(g) {
   return lines.join('\n');
 }
 
+/* Per-pitcher stats computed from game events (for recap email) */
+function buildGamePitcherStats(g) {
+  const paEvents = (g.events||[]).filter(e => e.type === 'pa_end' && e.pitcherId);
+  const map = {};
+  paEvents.forEach(e => {
+    if (!map[e.pitcherId]) map[e.pitcherId] = { outs:0, H:0, K:0, BB:0, BF:0 };
+    const s = map[e.pitcherId];
+    s.BF++;
+    if (['1B','2B','3B','HR'].includes(e.outcome)) s.H++;
+    if (e.outcome === 'K')   { s.K++; s.outs++; }
+    else if (e.outcome === 'OUT') s.outs++;
+    else if (e.outcome === 'BB')  s.BB++;
+    // hits (1B/2B/3B/HR) are not outs
+  });
+  return Object.entries(map).map(([pid, s]) => {
+    const p = State.getPlayer(pid);
+    const full = Math.floor(s.outs / 3), rem = s.outs % 3;
+    const ipStr = rem === 0 ? String(full) : `${full}.${rem}`;
+    return { name: p?.name || '?', H: s.H, K: s.K, BB: s.BB, BF: s.BF, outs: s.outs, ipStr, ipVal: s.outs / 3 };
+  }).sort((a, b) => b.ipVal - a.ipVal);
+}
+
+/* Build a nicely formatted HTML email recap */
+function buildRecapHtml(g, recipientName) {
+  const home = State.getTeam(g.homeTeamId);
+  const away = State.getTeam(g.awayTeamId);
+  if (!home || !away) return '<p>Game data unavailable.</p>';
+
+  const esc = escapeHtml;
+  const date = new Date(g.createdAt).toLocaleDateString('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
+  });
+
+  const awayScore = g.score?.away ?? 0;
+  const homeScore = g.score?.home ?? 0;
+  const awayWon = awayScore > homeScore;
+  const homeWon = homeScore > awayScore;
+
+  // ── Line score ──────────────────────────────────────────────
+  const ls = g.lineScore || [];
+  const innings = Math.max(g.numInnings || 3, ls.length);
+  const inns = Array.from({length: innings}, (_, i) => i + 1);
+  const TH = t => `<td style="padding:5px 7px;text-align:center;font-size:11px;font-weight:700;color:#9ca3af;background:#f9fafb">${t}</td>`;
+  const TD = t => `<td style="padding:5px 7px;text-align:center;font-size:12px;color:#374151;border-top:1px solid #f3f4f6">${t}</td>`;
+  const lsTable = `
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden">
+      <tr>
+        <td style="padding:5px 8px;font-size:11px;font-weight:700;color:#9ca3af;background:#f9fafb"></td>
+        ${inns.map(i => TH(i)).join('')}
+        <td style="padding:5px 8px;text-align:center;font-size:11px;font-weight:700;color:#9ca3af;background:#f9fafb;border-left:1px solid #e5e7eb">R</td>
+      </tr>
+      <tr>
+        <td style="padding:5px 8px;font-weight:700;font-size:12px;color:#111827">${esc(away.name)}</td>
+        ${inns.map(i => { const e = ls.find(x => x.inning===i); return TD(e != null ? e.top : '–'); }).join('')}
+        <td style="padding:5px 7px;text-align:center;font-size:13px;font-weight:800;color:${awayWon?'#15803d':'#374151'};border-top:1px solid #f3f4f6;border-left:1px solid #e5e7eb">${awayScore}</td>
+      </tr>
+      <tr>
+        <td style="padding:5px 8px;font-weight:700;font-size:12px;color:#111827;border-top:1px solid #f3f4f6">${esc(home.name)}</td>
+        ${inns.map(i => { const e = ls.find(x => x.inning===i); return TD(e != null ? e.bottom : '–'); }).join('')}
+        <td style="padding:5px 7px;text-align:center;font-size:13px;font-weight:800;color:${homeWon?'#15803d':'#374151'};border-top:1px solid #f3f4f6;border-left:1px solid #e5e7eb">${homeScore}</td>
+      </tr>
+    </table>`;
+
+  // ── Top Performers (batting) ─────────────────────────────────
+  const paEvents = (g.events||[]).filter(e => e.type === 'pa_end');
+  const pids = [...new Set(paEvents.map(e => e.batterId).filter(Boolean))];
+  const batters = pids.map(pid => {
+    const p = State.getPlayer(pid); if (!p) return null;
+    const evs = paEvents.filter(e => e.batterId === pid);
+    const H = evs.filter(e => ['1B','2B','3B','HR'].includes(e.outcome)).length;
+    const AB = evs.filter(e => e.outcome !== 'BB').length;
+    const HR = evs.filter(e => e.outcome === 'HR').length;
+    const RBI = evs.reduce((s, e) => s + (e.rbi||0), 0);
+    const BB = evs.filter(e => e.outcome === 'BB').length;
+    const K  = evs.filter(e => e.outcome === 'K').length;
+    return { name: p.name, H, AB, HR, RBI, BB, K };
+  }).filter(Boolean).filter(p => p.H > 0 || p.HR > 0 || p.RBI > 0);
+  batters.sort((a, b) => (b.H + b.HR*2 + b.RBI) - (a.H + a.HR*2 + a.RBI));
+
+  const SSTATTH = t => `<th style="padding:6px 10px;font-size:11px;font-weight:700;color:#9ca3af;text-align:center;background:#f3f4f6;white-space:nowrap">${t}</th>`;
+  const SSTATTD = (t, bold, color) => `<td style="padding:6px 10px;font-size:12px;text-align:center;color:${color||'#374151'};font-weight:${bold?700:400};white-space:nowrap">${t}</td>`;
+
+  let battingSection = '';
+  if (batters.length) {
+    const rows = batters.slice(0, 6).map((b, i) => `
+      <tr style="background:${i%2?'#ffffff':'#f9fafb'}">
+        <td style="padding:6px 10px;font-size:13px;font-weight:700;color:#111827">${esc(b.name)}</td>
+        ${SSTATTD(`${b.H}-for-${b.AB}`, true, b.H>0?'#15803d':'#374151')}
+        ${SSTATTD(b.HR||'–', b.HR>0, b.HR>0?'#7c3aed':'#374151')}
+        ${SSTATTD(b.RBI||'–', b.RBI>0)}
+        ${SSTATTD(b.BB||'–')}
+        ${SSTATTD(b.K||'–')}
+      </tr>`).join('');
+    battingSection = `
+      <tr><td style="padding:0 24px 20px">
+        <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">Top Performers</div>
+        <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden">
+          <thead><tr style="background:#f3f4f6">
+            <th style="padding:6px 10px;font-size:11px;font-weight:700;color:#9ca3af;text-align:left;background:#f3f4f6">Player</th>
+            ${SSTATTH('H/AB')}${SSTATTH('HR')}${SSTATTH('RBI')}${SSTATTH('BB')}${SSTATTH('K')}
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </td></tr>`;
+  }
+
+  // ── Pitching Highlights ──────────────────────────────────────
+  const pitchers = buildGamePitcherStats(g);
+  let pitchingSection = '';
+  if (pitchers.length) {
+    const rows = pitchers.map((p, i) => `
+      <tr style="background:${i%2?'#ffffff':'#f9fafb'}">
+        <td style="padding:6px 10px;font-size:13px;font-weight:700;color:#111827">${esc(p.name)}</td>
+        ${SSTATTD(p.ipStr, true)}
+        ${SSTATTD(p.K||'–', p.K>0, p.K>0?'#dc2626':'#374151')}
+        ${SSTATTD(p.BB||'–')}
+        ${SSTATTD(p.H||'–')}
+      </tr>`).join('');
+    pitchingSection = `
+      <tr><td style="padding:0 24px 20px">
+        <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">Pitching</div>
+        <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden">
+          <thead><tr style="background:#f3f4f6">
+            <th style="padding:6px 10px;font-size:11px;font-weight:700;color:#9ca3af;text-align:left;background:#f3f4f6">Pitcher</th>
+            ${SSTATTH('IP')}${SSTATTH('K')}${SSTATTH('BB')}${SSTATTH('H')}
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </td></tr>`;
+  }
+
+  // ── Game Awards ──────────────────────────────────────────────
+  const accolades = computeGameAccolades(g);
+  let awardsSection = '';
+  if (accolades.length) {
+    const perRow = Math.min(accolades.length, 4);
+    const pct = Math.floor(100 / perRow);
+    const cards = accolades.slice(0, 8).map(a => `
+      <td width="${pct}%" align="center" valign="top" style="padding:4px">
+        <div style="background:#f0fdf4;border:1px solid #dcfce7;border-radius:8px;padding:12px 6px;text-align:center">
+          <div style="font-size:22px;line-height:1;margin-bottom:4px">${a.emoji}</div>
+          <div style="font-size:10px;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px">${esc(a.label)}</div>
+          <div style="font-size:12px;font-weight:700;color:#111827">${esc(a.player.name)}</div>
+          <div style="font-size:11px;color:#6b7280;margin-top:2px">${a.detail||''}</div>
+        </div>
+      </td>`).join('');
+    awardsSection = `
+      <tr><td style="padding:0 24px 20px">
+        <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">Game Awards</div>
+        <table width="100%" cellpadding="0" cellspacing="0"><tr>${cards}</tr></table>
+      </td></tr>`;
+  }
+
+  const greeting = recipientName
+    ? `<tr><td style="padding:20px 24px 4px;font-size:14px;color:#374151">Hi <strong>${esc(recipientName)}</strong>, here's your game recap.</td></tr>`
+    : '';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WiffleCast Game Recap</title></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:24px 0">
+<tr><td align="center" style="padding:0 12px">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;width:100%;max-width:600px;border:1px solid #e5e7eb">
+
+  <!-- HEADER -->
+  <tr><td style="background:#14532d;padding:28px 24px;text-align:center">
+    <div style="font-size:36px;line-height:1;margin-bottom:8px">⚾</div>
+    <div style="color:#ffffff;font-size:20px;font-weight:700">WiffleCast Game Recap</div>
+    <div style="color:#86efac;font-size:13px;margin-top:6px">${date}</div>
+  </td></tr>
+
+  ${greeting}
+
+  <!-- SCORE BANNER -->
+  <tr><td style="background:#f0fdf4;padding:28px 16px;border-bottom:2px solid #dcfce7">
+    <table width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td width="43%" align="center" valign="top" style="padding:0 8px">
+          <div style="font-size:14px;font-weight:700;color:#15803d;margin-bottom:8px;line-height:1.2">${esc(away.name)}</div>
+          <div style="font-size:52px;font-weight:800;line-height:1;color:${awayWon?'#15803d':'#9ca3af'}">${awayScore}</div>
+          <div style="margin-top:8px;min-height:22px">${awayWon?'<span style="display:inline-block;background:#15803d;color:#fff;font-size:10px;font-weight:700;padding:3px 10px;border-radius:12px;letter-spacing:0.07em">WINNER</span>':''}</div>
+        </td>
+        <td width="14%" align="center" valign="top" style="padding-top:18px">
+          <div style="font-size:18px;color:#d1d5db">@</div>
+        </td>
+        <td width="43%" align="center" valign="top" style="padding:0 8px">
+          <div style="font-size:14px;font-weight:700;color:#15803d;margin-bottom:8px;line-height:1.2">${esc(home.name)}</div>
+          <div style="font-size:52px;font-weight:800;line-height:1;color:${homeWon?'#15803d':'#9ca3af'}">${homeScore}</div>
+          <div style="margin-top:8px;min-height:22px">${homeWon?'<span style="display:inline-block;background:#15803d;color:#fff;font-size:10px;font-weight:700;padding:3px 10px;border-radius:12px;letter-spacing:0.07em">WINNER</span>':''}</div>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+
+  <!-- LINE SCORE -->
+  <tr><td style="padding:20px 24px">
+    <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">Line Score</div>
+    ${lsTable}
+  </td></tr>
+
+  ${battingSection}
+  ${pitchingSection}
+  ${awardsSection}
+
+  <!-- FOOTER -->
+  <tr><td style="background:#f9fafb;padding:16px 24px;text-align:center;border-top:1px solid #e5e7eb">
+    <div style="font-size:12px;color:#9ca3af">Tracked with <strong style="color:#6b7280">WiffleCast</strong></div>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
+}
+
 /* ============================================================
    EMAILJS — recap delivery
    ============================================================ */
@@ -6893,10 +7111,23 @@ function showEmailSetupModal() {
       <p class="help-text" style="margin-bottom:12px">Enter your <a href="https://www.emailjs.com/" target="_blank">EmailJS</a> credentials. These are saved locally and never sent to any server.</p>
       <label class="form-label">Service ID</label>
       <input class="form-input" id="ejs-service" placeholder="service_xxxxxxx" value="${escapeHtml(cfg.serviceId || '')}" />
-      <label class="form-label">Template ID</label>
-      <input class="form-input" id="ejs-template" placeholder="template_xxxxxxx" value="${escapeHtml(cfg.templateId || '')}" />
       <label class="form-label">Public Key</label>
       <input class="form-input" id="ejs-key" placeholder="your_public_key" value="${escapeHtml(cfg.publicKey || '')}" />
+
+      <div style="margin-top:16px;margin-bottom:6px;font-size:13px;font-weight:700;color:#374151;border-top:1px solid #e5e7eb;padding-top:14px">Invite Template</div>
+      <p class="help-text" style="margin-bottom:8px">Used when inviting a player by email. Variables: <code>{{to_email}}</code>, <code>{{to_name}}</code>, <code>{{message}}</code></p>
+      <label class="form-label">Invite Template ID</label>
+      <input class="form-input" id="ejs-template" placeholder="template_xxxxxxx" value="${escapeHtml(cfg.templateId || '')}" />
+
+      <div style="margin-top:16px;margin-bottom:6px;font-size:13px;font-weight:700;color:#374151;border-top:1px solid #e5e7eb;padding-top:14px">Recap Template</div>
+      <p class="help-text" style="margin-bottom:8px">Used for game recap emails. Create a <strong>separate</strong> template in EmailJS with these settings:</p>
+      <ul class="help-text" style="margin:0 0 10px;padding-left:18px;line-height:1.8">
+        <li>Subject: <code>{{subject}}</code></li>
+        <li>Content type: <strong>HTML</strong></li>
+        <li>Body: <code>{{{html_message}}}</code> &nbsp;(triple braces = raw HTML)</li>
+      </ul>
+      <label class="form-label">Recap Template ID</label>
+      <input class="form-input" id="ejs-recap-template" placeholder="template_xxxxxxx" value="${escapeHtml(cfg.recapTemplateId || '')}" />
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="Modal.hide()">Cancel</button>
@@ -6905,11 +7136,12 @@ function showEmailSetupModal() {
 }
 
 function _saveEmailSetup() {
-  const serviceId  = document.getElementById('ejs-service')?.value.trim();
-  const templateId = document.getElementById('ejs-template')?.value.trim();
-  const publicKey  = document.getElementById('ejs-key')?.value.trim();
-  if (!serviceId || !templateId || !publicKey) { toast('All three fields are required', 'error'); return; }
-  saveEmailConfig({ serviceId, templateId, publicKey });
+  const serviceId        = document.getElementById('ejs-service')?.value.trim();
+  const templateId       = document.getElementById('ejs-template')?.value.trim();
+  const publicKey        = document.getElementById('ejs-key')?.value.trim();
+  const recapTemplateId  = document.getElementById('ejs-recap-template')?.value.trim() || '';
+  if (!serviceId || !publicKey) { toast('Service ID and Public Key are required', 'error'); return; }
+  saveEmailConfig({ serviceId, templateId, publicKey, recapTemplateId });
   toast('Email settings saved', 'success');
   Modal.hide();
 }
@@ -6917,17 +7149,20 @@ function _saveEmailSetup() {
 async function sendRecapEmails(gameId) {
   const cfg = getEmailConfig();
   if (!cfg) { showEmailSetupModal(); return; }
+  if (!cfg.recapTemplateId) {
+    toast('No recap template configured — open email settings and add a Recap Template ID.', 'error');
+    showEmailSetupModal();
+    return;
+  }
   const g = State.getGame(gameId); if (!g) return;
   const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
   const allPids = [...new Set([...(home?.playerIds || []), ...(away?.playerIds || [])])];
   const players = allPids.map(pid => State.getPlayer(pid)).filter(p => p?.email);
   if (!players.length) { toast('No players have email addresses on file', 'error'); return; }
 
-  try {
-    emailjs.init(cfg.publicKey);
-  } catch (e) { toast('EmailJS init failed: ' + e.message, 'error'); return; }
+  try { emailjs.init(cfg.publicKey); } catch (e) { toast('EmailJS init failed: ' + e.message, 'error'); return; }
 
-  const recap = buildRecapText(g);
+  const plainText = buildRecapText(g);
   const subject = away.name + ' @ ' + home.name + ' — WiffleCast Recap';
   let sent = 0, failed = 0;
   const btn = document.getElementById('btn-send-recap');
@@ -6935,11 +7170,12 @@ async function sendRecapEmails(gameId) {
 
   for (const p of players) {
     try {
-      await emailjs.send(cfg.serviceId, cfg.templateId, {
+      await emailjs.send(cfg.serviceId, cfg.recapTemplateId, {
         to_email: p.email,
-        to_name: p.name || p.email,
+        to_name:  p.name || p.email,
         subject,
-        message: recap,
+        message:      plainText,
+        html_message: buildRecapHtml(g, p.name || ''),
       });
       sent++;
     } catch (e) {
@@ -6955,7 +7191,7 @@ async function sendRecapEmails(gameId) {
 /* Auto-send recap to all users linked to players in the game when a game finishes */
 async function autoSendRecapEmails(gameId) {
   const cfg = getEmailConfig();
-  if (!cfg) return; // EmailJS not configured — skip silently
+  if (!cfg || !cfg.recapTemplateId) return; // recap template not configured — skip silently
   const g = State.getGame(gameId); if (!g) return;
   const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
   const allPids = new Set([...(home?.playerIds || []), ...(away?.playerIds || [])]);
@@ -6965,16 +7201,17 @@ async function autoSendRecapEmails(gameId) {
     .map(u => ({ email: u.email, name: u.name || u.email }));
   if (!recipients.length) return;
   try { emailjs.init(cfg.publicKey); } catch (e) { return; }
-  const recap = buildRecapText(g);
+  const plainText = buildRecapText(g);
   const subject = away.name + ' @ ' + home.name + ' — WiffleCast Recap';
   let sent = 0, failed = 0;
   for (const r of recipients) {
     try {
-      await emailjs.send(cfg.serviceId, cfg.templateId, {
-        to_email: r.email,
-        to_name: r.name,
+      await emailjs.send(cfg.serviceId, cfg.recapTemplateId, {
+        to_email:     r.email,
+        to_name:      r.name,
         subject,
-        message: recap,
+        message:      plainText,
+        html_message: buildRecapHtml(g, r.name),
       });
       sent++;
     } catch (e) {
