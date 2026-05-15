@@ -3436,20 +3436,11 @@ const Render = {
     let playerCard = '';
     if (myPlayer) {
       const s = State.computePlayerStats(myPid);
-      const pv = homePlayerView;
-      const pTabBtn = (v, label) =>
-        `<button class="${pv===v?'active':''}" onclick="setHomePlayerView('${v}')">${label}</button>`;
-      const pSection = pv === 'pitching' ? renderStatTableRow(PITCH_COLS,   playerPitchingData(s))
-                     : pv === 'fielding' ? renderStatTableRow(FIELD_COLS,   playerFieldingData(s))
-                     :                     renderStatTableRow(BATTING_COLS,  playerBattingData(s));
       playerCard = `
         <div class="home-card">
           <div class="home-section-title">My Player</div>
           <div class="home-player-name">${escapeHtml(myPlayer.jerseyNumber ? '#' + myPlayer.jerseyNumber + ' ' + myPlayer.name : myPlayer.name)}</div>
-          <div class="players-subnav" style="margin-bottom:8px">
-            ${pTabBtn('batting','Batting')}${pTabBtn('pitching','Pitching')}${pTabBtn('fielding','Fielding')}
-          </div>
-          ${pSection}
+          ${renderPlayerStatTable(s)}
         </div>`;
     } else if (currentUser) {
       playerCard = `
