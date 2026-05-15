@@ -2975,9 +2975,7 @@ function renderHomeTeamsSection(teams, view) {
   const trs = teamData.map(row => {
     const d = row[view];
     const tds = cols.map(c => `<td>${c.fmt ? c.fmt(d[c.key]) : (d[c.key] ?? '—')}</td>`).join('');
-    return `<tr onclick="selectTeam('${row.t.id}');setTeamsView('${view}');switchTab('stats')" style="cursor:pointer">
-      <td>${escapeHtml(row.t.name)}</td>${tds}
-    </tr>`;
+    return `<tr><td>${escapeHtml(row.t.name)}</td>${tds}</tr>`;
   }).join('');
   return `<div class="stats-table-wrap"><table class="stats-table">
     <thead><tr><th onclick="sortHomeTeams('name','${view}')">Team${nameSortArr}</th>${cols.map(thArr).join('')}</tr></thead>
