@@ -4227,7 +4227,8 @@ const Render = {
         : g.status === 'completed' ? 'Final'
         : g.status.replace('_', ' ');
 
-      return `<div class="player-list-item game-list-item ${active}" onclick="selectGame('${g.id}')">
+      const _gameClickAttr = (isSetup && !canUserScore()) ? 'style="cursor:default;opacity:0.6"' : 'onclick="selectGame(\'' + g.id + '\')"';
+      return `<div class="player-list-item game-list-item ${active}" ${_gameClickAttr}>`
         <div style="width:100%">
           <div style="display:flex;justify-content:space-between;align-items:center">
             <span class="game-card-status status-${g.status}" style="font-size:11px">${statusLabel}</span>
