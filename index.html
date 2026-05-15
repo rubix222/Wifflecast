@@ -1880,6 +1880,7 @@
         <button class="active" data-tview="batting" onclick="setTeamsView('batting')">Batting</button>
         <button data-tview="pitching" onclick="setTeamsView('pitching')">Pitching</button>
         <button data-tview="fielding" onclick="setTeamsView('fielding')">Fielding</button>
+        <button data-tview="record" onclick="setTeamsView('record')">Record</button>
       </div>
       <div id="teams-container"></div>
     </div>
@@ -2565,7 +2566,7 @@ const State = {
   },
 
   computeTeamFieldingStats(teamId) {
-    let E = 0;
+    let E = 0, PO = 0;
     this.games.forEach(g => {
       if (g.homeTeamId !== teamId && g.awayTeamId !== teamId) return;
       // The team fields during the opposite half from when they bat
@@ -2573,9 +2574,10 @@ const State = {
       (g.events || []).forEach(e => {
         if (e.type !== 'pa_end' || e.half !== fieldingHalf) return;
         if (e.errorById) E++;
+        if (e.outcome === 'OUT' || e.outcome === 'K') PO++;
       });
     });
-    return { E };
+    return { E, PO };
   },
 
   // Hit locations across all games for a player
@@ -2738,9 +2740,6 @@ const PLAYER_FIELD_COLS = [
   { key: 'E',  label: 'E'  },
 ];
 const TEAM_BATTING_COLS = [
-  { key: 'GP',  label: 'GP' },
-  { key: 'W',   label: 'W'  },
-  { key: 'L',   label: 'L'  },
   { key: 'AVG', label: 'AVG', fmt: v => fmt.avg(v) },
   { key: 'OBP', label: 'OBP', fmt: v => fmt.avg(v) },
   { key: 'SLG', label: 'SLG', fmt: v => fmt.avg(v) },
@@ -2753,9 +2752,6 @@ const TEAM_BATTING_COLS = [
   { key: 'K',   label: 'K'  },
 ];
 const TEAM_PITCH_COLS = [
-  { key: 'GP',  label: 'GP' },
-  { key: 'W',   label: 'W'  },
-  { key: 'L',   label: 'L'  },
   { key: 'ERA', label: 'ERA', fmt: v => v !== null ? v.toFixed(2) : '—', nullLow: true },
   { key: 'IP',  label: 'IP',  fmt: v => fmt.ip(v) },
   { key: 'K',   label: 'K'  },
@@ -2764,7 +2760,15 @@ const TEAM_PITCH_COLS = [
   { key: 'ER',  label: 'ER' },
 ];
 const TEAM_FIELD_COLS = [
-  { key: 'E', label: 'E' },
+  { key: 'PO', label: 'PO' },
+  { key: 'E',  label: 'E'  },
+];
+const TEAM_RECORD_COLS = [
+  { key: 'GP', label: 'GP' },
+  { key: 'W',  label: 'W'  },
+  { key: 'L',  label: 'L'  },
+  { key: 'RF', label: 'RF' },
+  { key: 'RA', label: 'RA' },
 ];
 
 // ── Shared stat tile/grid primitives ────────────────────────
@@ -2897,13 +2901,15 @@ function renderTeamStatTable(teamId) {
   const bat = State.computeTeamBattingStats(teamId);
   const pit = State.computeTeamPitchingStats(teamId);
   const fld = State.computeTeamFieldingStats(teamId);
-  const batData = { GP: ts.gamesPlayed, W: ts.wins, L: ts.losses,
-    AVG: bat.AVG, OBP: bat.OBP, SLG: bat.SLG,
+  const batData = { AVG: bat.AVG, OBP: bat.OBP, SLG: bat.SLG,
     AB: bat.AB, H: bat.H, HR: bat.hrs, R: bat.R, RBI: bat.RBI, BB: bat.BB, K: bat.K };
-  const pitData = { GP: ts.gamesPlayed, W: ts.wins, L: ts.losses,
-    ERA: pit.ERA, IP: pit.IP, K: pit.K, BB: pit.BB, H: pit.H, ER: pit.ER };
+  const pitData = { ERA: pit.ERA, IP: pit.IP, K: pit.K, BB: pit.BB, H: pit.H, ER: pit.ER };
+  const recData = { GP: ts.gamesPlayed, W: ts.wins, L: ts.losses,
+    RF: ts.runsFor, RA: ts.runsAgainst };
   return `
-    <div class="stat-section-title" style="margin-top:0">Batting</div>
+    <div class="stat-section-title" style="margin-top:0">Record</div>
+    ${renderStatTableRow(TEAM_RECORD_COLS, recData)}
+    <div class="stat-section-title">Batting</div>
     ${renderStatTableRow(TEAM_BATTING_COLS, batData)}
     <div class="stat-section-title">Pitching</div>
     ${renderStatTableRow(TEAM_PITCH_COLS, pitData)}
@@ -2957,10 +2963,11 @@ let showFinishedGames = false;
 let statsSort    = { col: 'AVG', dir: -1 };
 let pitchSort    = { col: 'IP',  dir: -1 };
 let fieldSort    = { col: 'PO',  dir: -1 };
-let teamBatSort  = { col: 'AVG', dir: -1 };
-let teamPitSort  = { col: 'ERA', dir:  1 };
-let teamFieldSort = { col: 'E',  dir: -1 };
-let teamsView     = 'batting'; // 'batting' | 'pitching' | 'fielding'
+let teamBatSort    = { col: 'AVG', dir: -1 };
+let teamPitSort    = { col: 'ERA', dir:  1 };
+let teamFieldSort  = { col: 'PO', dir: -1 };
+let teamRecordSort = { col: 'W',  dir: -1 };
+let teamsView      = 'batting'; // 'batting' | 'pitching' | 'fielding' | 'record'
 
 function setPlayersView(view) {
   playersView = view;
@@ -2984,7 +2991,10 @@ function setTeamsView(view) {
   Render.teams();
 }
 function sortTeamStats(col, which) {
-  const s = which === 'pitching' ? teamPitSort : which === 'fielding' ? teamFieldSort : teamBatSort;
+  const s = which === 'pitching' ? teamPitSort
+          : which === 'fielding' ? teamFieldSort
+          : which === 'record'   ? teamRecordSort
+          : teamBatSort;
   s.dir = s.col === col ? -s.dir : -1;
   s.col = col;
   Render.teams();
@@ -3776,9 +3786,8 @@ const Render = {
       const COLS = TEAM_BATTING_COLS;
       const sort = teamBatSort;
       let rows = sorted.map(t => {
-        const ts = State.computeTeamStats(t.id);
         const bs = State.computeTeamBattingStats(t.id);
-        return { t, d: { GP: ts.gamesPlayed, W: ts.wins, L: ts.losses, AVG: bs.AVG, OBP: bs.OBP, SLG: bs.SLG, AB: bs.AB, H: bs.H, HR: bs.hrs, R: bs.R, RBI: bs.RBI, BB: bs.BB, K: bs.K } };
+        return { t, d: { AVG: bs.AVG, OBP: bs.OBP, SLG: bs.SLG, AB: bs.AB, H: bs.H, HR: bs.hrs, R: bs.R, RBI: bs.RBI, BB: bs.BB, K: bs.K } };
       });
       rows.sort((a, b) => {
         if (sort.col === 'name') return b.t.name.localeCompare(a.t.name) * sort.dir;
@@ -3806,9 +3815,8 @@ const Render = {
       const COLS = TEAM_PITCH_COLS;
       const sort = teamPitSort;
       let rows = sorted.map(t => {
-        const ts = State.computeTeamStats(t.id);
         const ps = State.computeTeamPitchingStats(t.id);
-        return { t, d: { GP: ts.gamesPlayed, W: ts.wins, L: ts.losses, ERA: ps.ERA, IP: ps.IP, K: ps.K, BB: ps.BB, H: ps.H, ER: ps.ER } };
+        return { t, d: { ERA: ps.ERA, IP: ps.IP, K: ps.K, BB: ps.BB, H: ps.H, ER: ps.ER } };
       });
       rows.sort((a, b) => {
         if (sort.col === 'name') return b.t.name.localeCompare(a.t.name) * sort.dir;
@@ -3839,7 +3847,7 @@ const Render = {
       const sort = teamFieldSort;
       let rows = sorted.map(t => {
         const fs = State.computeTeamFieldingStats(t.id);
-        return { t, d: { E: fs.E } };
+        return { t, d: { PO: fs.PO, E: fs.E } };
       });
       rows.sort((a, b) => {
         if (sort.col === 'name') return b.t.name.localeCompare(a.t.name) * sort.dir;
@@ -3855,7 +3863,35 @@ const Render = {
         <thead><tr><th onclick="sortTeamStats('name','fielding')">Team${nameSortArr}</th>${COLS.map(thArr).join('')}</tr></thead>
         <tbody>${rows.map(({ t, d }) => `<tr onclick="selectTeam('${t.id}');setTeamsView('batting')" style="cursor:pointer">
           <td>${escapeHtml(t.name)}</td>
-          ${COLS.map(col => `<td>${d[col.key] ?? '—'}</td>`).join('')}
+          ${COLS.map(col => `<td>${col.fmt ? col.fmt(d[col.key]) : (d[col.key] ?? '—')}</td>`).join('')}
+        </tr>`).join('')}</tbody>
+      </table></div>`;
+      return;
+    }
+
+    // ── RECORD GRID ──
+    if (teamsView === 'record') {
+      const COLS = TEAM_RECORD_COLS;
+      const sort = teamRecordSort;
+      let rows = sorted.map(t => {
+        const ts = State.computeTeamStats(t.id);
+        return { t, d: { GP: ts.gamesPlayed, W: ts.wins, L: ts.losses, RF: ts.runsFor, RA: ts.runsAgainst } };
+      });
+      rows.sort((a, b) => {
+        if (sort.col === 'name') return b.t.name.localeCompare(a.t.name) * sort.dir;
+        return ((b.d[sort.col] ?? 0) - (a.d[sort.col] ?? 0)) * sort.dir;
+      });
+      const thArr = col => {
+        const isSorted = sort.col === col.key;
+        const arr = isSorted ? (sort.dir === -1 ? '▼' : '▲') : '<span style="opacity:0.25">▼</span>';
+        return `<th class="num-col ${isSorted ? 'sorted' : ''}" onclick="sortTeamStats('${col.key}','record')">${col.label}<span class="sort-arr">${arr}</span></th>`;
+      };
+      const nameSortArr = sort.col === 'name' ? (sort.dir === -1 ? '<span class="sort-arr">▼</span>' : '<span class="sort-arr">▲</span>') : '<span class="sort-arr" style="opacity:0.25">▼</span>';
+      c.innerHTML = `<div class="stats-table-wrap"><table class="stats-table">
+        <thead><tr><th onclick="sortTeamStats('name','record')">Team${nameSortArr}</th>${COLS.map(thArr).join('')}</tr></thead>
+        <tbody>${rows.map(({ t, d }) => `<tr onclick="selectTeam('${t.id}');setTeamsView('record')" style="cursor:pointer">
+          <td>${escapeHtml(t.name)}</td>
+          ${COLS.map(col => `<td>${col.fmt ? col.fmt(d[col.key]) : (d[col.key] ?? '—')}</td>`).join('')}
         </tr>`).join('')}</tbody>
       </table></div>`;
       return;
