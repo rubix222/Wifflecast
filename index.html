@@ -2951,18 +2951,36 @@ function renderHomeTeamsSection(teams, view) {
   });
 
   const colsMap = { record: TEAM_RECORD_COLS, batting: BATTING_COLS, pitching: PITCH_COLS, fielding: FIELD_COLS };
-  const dataKey = view; // 'record' | 'batting' | 'pitching' | 'fielding'
-  const cols = colsMap[dataKey] || TEAM_RECORD_COLS;
-  const ths = cols.map(c => `<th class="num-col">${c.label}</th>`).join('');
+  const cols = colsMap[view] || TEAM_RECORD_COLS;
+  const sort = homeTeamSort[view];
+
+  // Sort rows
+  teamData.sort((a, b) => {
+    if (sort.col === 'name') return b.t.name.localeCompare(a.t.name) * sort.dir;
+    let av = a[view][sort.col] ?? null, bv = b[view][sort.col] ?? null;
+    if (av === null) av = sort.dir > 0 ? Infinity : -Infinity;
+    if (bv === null) bv = sort.dir > 0 ? Infinity : -Infinity;
+    return (bv - av) * sort.dir;
+  });
+
+  const thArr = c => {
+    const isSorted = sort.col === c.key;
+    const arr = isSorted ? (sort.dir === -1 ? '▼' : '▲') : '<span style="opacity:0.25">▼</span>';
+    return `<th class="num-col ${isSorted ? 'sorted' : ''}" onclick="sortHomeTeams('${c.key}','${view}')">${c.label}<span class="sort-arr">${arr}</span></th>`;
+  };
+  const nameSortArr = sort.col === 'name'
+    ? (sort.dir === -1 ? '<span class="sort-arr">▼</span>' : '<span class="sort-arr">▲</span>')
+    : '<span class="sort-arr" style="opacity:0.25">▼</span>';
+
   const trs = teamData.map(row => {
-    const d = row[dataKey];
+    const d = row[view];
     const tds = cols.map(c => `<td>${c.fmt ? c.fmt(d[c.key]) : (d[c.key] ?? '—')}</td>`).join('');
     return `<tr onclick="selectTeam('${row.t.id}');setTeamsView('${view}');switchTab('stats')" style="cursor:pointer">
       <td>${escapeHtml(row.t.name)}</td>${tds}
     </tr>`;
   }).join('');
   return `<div class="stats-table-wrap"><table class="stats-table">
-    <thead><tr><th>Team</th>${ths}</tr></thead>
+    <thead><tr><th onclick="sortHomeTeams('name','${view}')">Team${nameSortArr}</th>${cols.map(thArr).join('')}</tr></thead>
     <tbody>${trs}</tbody>
   </table></div>`;
 }
@@ -3003,6 +3021,12 @@ function canUserScore() { return isAdmin() || (currentUser && currentUserProfile
 // Home tab card view state
 let homePlayerView = 'batting'; // 'batting' | 'pitching' | 'fielding'
 let homeTeamsView  = 'record';  // 'record' | 'batting' | 'pitching' | 'fielding'
+const homeTeamSort = {
+  record:   { col: 'W',   dir: -1 },
+  batting:  { col: 'AVG', dir: -1 },
+  pitching: { col: 'ERA', dir:  1 },
+  fielding: { col: 'PO',  dir: -1 },
+};
 
 // Player view state
 let selectedPlayerId = null;
@@ -3046,6 +3070,12 @@ function setTeamsView(view) {
 }
 function setHomePlayerView(view) { homePlayerView = view; Render.home(); }
 function setHomeTeamsView(view)  { homeTeamsView  = view; Render.home(); }
+function sortHomeTeams(col, view) {
+  const s = homeTeamSort[view];
+  s.dir = s.col === col ? -s.dir : -1;
+  s.col = col;
+  Render.home();
+}
 
 function sortTeamStats(col, which) {
   const s = which === 'pitching' ? teamPitSort
@@ -7127,7 +7157,7 @@ Object.assign(window, {
   // Admin mode + player view
   setPlayersView, selectPlayer, showPlayerStatsModal,
   setStatsMain, setTeamsView, sortTeamStats,
-  setHomePlayerView, setHomeTeamsView,
+  setHomePlayerView, setHomeTeamsView, sortHomeTeams,
   selectTeam,
   switchTab,
   sortStats, showCreateMyPlayerModal, submitMyPlayer,
