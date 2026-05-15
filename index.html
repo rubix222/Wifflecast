@@ -5868,6 +5868,7 @@ const FIELD = {
 let _prevGameSnap  = null;   // snapshot before last Firestore push
 const _animQueue   = [];
 let   _animRunning = false;
+let   _foulSide    = 0;      // alternates left/right foul territory
 
 function _snapGame(g) {
   return {
@@ -5889,58 +5890,87 @@ function _nextAnim() {
   _runAnim(_animQueue.shift());
 }
 
+// Convert SVG 0-400 user coords → screen pixels via the CTM.
+// getScreenCTM() correctly accounts for viewBox letterboxing and any CSS transforms.
+function _svgToScreen(svgEl, sx, sy) {
+  const pt = svgEl.createSVGPoint();
+  pt.x = sx; pt.y = sy;
+  const s = pt.matrixTransform(svgEl.getScreenCTM());
+  return { x: s.x, y: s.y };
+}
+
 function _runAnim(item) {
   const overlay  = document.getElementById('play-anim-overlay');
   const ballEl   = document.getElementById('anim-ball');
   const bannerEl = document.getElementById('anim-banner');
   if (!overlay || !ballEl || !bannerEl) { _nextAnim(); return; }
 
-  // Convert SVG 0-400 coords → screen pixels using the live field SVG
-  const svgEl   = document.getElementById('field-svg');
-  const svgRect = svgEl ? svgEl.getBoundingClientRect() : null;
-  const showBall = !!(svgRect && svgRect.width > 0 && item.fromSvg && item.toSvg);
+  const svgEl    = document.getElementById('field-svg');
+  const ctm      = svgEl ? svgEl.getScreenCTM() : null;
+  const showBall = !!(ctm && item.fromSvg && item.toSvg);
+  const sc       = (sx, sy) => _svgToScreen(svgEl, sx, sy);
 
-  const toScreen = (sx, sy) => ({
-    x: svgRect.left + (sx / 400) * svgRect.width,
-    y: svgRect.top  + (sy / 400) * svgRect.height,
-  });
-
-  const ballDur  = item.ballDur || 650;
-  const holdMs   = item.big ? 1600 : 1200;
-  const fadeMs   = 300;
+  const holdMs = item.big ? 1600 : 1200;
+  const fadeMs = 300;
 
   // ── Ball setup ──────────────────────────────────────────────
   if (showBall) {
-    const from = toScreen(item.fromSvg.x, item.fromSvg.y);
+    const from = sc(item.fromSvg.x, item.fromSvg.y);
     ballEl.style.cssText = `
       position:absolute; font-size:18px; line-height:1;
       will-change:transform; filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));
       left:${from.x - 9}px; top:${from.y - 9}px;
-      transform:translate(0,0) scale(1);
-      transition:none; opacity:1; display:block;`;
+      transform:translate(0,0) scale(1); transition:none; opacity:1; display:block;`;
   } else {
     ballEl.style.display = 'none';
   }
 
   // ── Banner setup ─────────────────────────────────────────────
-  bannerEl.innerHTML  = item.text;
-  bannerEl.style.color     = item.color || '#fff';
-  bannerEl.style.fontSize  = item.big ? '34px' : '24px';
-  bannerEl.style.opacity   = '0';
+  bannerEl.innerHTML        = item.text;
+  bannerEl.style.color      = item.color || '#fff';
+  bannerEl.style.fontSize   = item.big ? '34px' : '24px';
+  bannerEl.style.opacity    = '0';
   bannerEl.style.transition = 'none';
   bannerEl.style.transform  = 'translate(-50%, -50%) scale(0.8)';
+  overlay.style.display     = 'block';
 
-  overlay.style.display = 'block';
-
-  // ── Kick off ball travel ──────────────────────────────────────
+  // ── Ball travel (one or two segments) ────────────────────────
+  let ballFlightMs = 0;
   if (showBall) {
-    const to = toScreen(item.toSvg.x, item.toSvg.y);
-    const from = toScreen(item.fromSvg.x, item.fromSvg.y);
-    const dx = to.x - from.x, dy = to.y - from.y;
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      ballEl.style.transition = `transform ${ballDur}ms ease-in, opacity 0.25s`;
-      ballEl.style.transform  = `translate(${dx}px,${dy}px) scale(0.7)`;
-    }));
+    const from = sc(item.fromSvg.x, item.fromSvg.y);
+
+    if (item.viaSvg) {
+      // Two-segment path: fromSvg → viaSvg → toSvg
+      const p1Dur = item.phase1Dur || 380;
+      const p2Dur = item.phase2Dur || 340;
+      ballFlightMs = p1Dur + p2Dur;
+
+      const via = sc(item.viaSvg.x, item.viaSvg.y);
+      const to  = sc(item.toSvg.x,  item.toSvg.y);
+      const dx1 = via.x - from.x, dy1 = via.y - from.y;
+      const dx2 = to.x  - from.x, dy2 = to.y  - from.y;
+
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        // Phase 1: mound → plate
+        ballEl.style.transition = `transform ${p1Dur}ms ease-in`;
+        ballEl.style.transform  = `translate(${dx1}px,${dy1}px) scale(0.85)`;
+        // Phase 2: plate → foul territory (runs from current state)
+        setTimeout(() => {
+          ballEl.style.transition = `transform ${p2Dur}ms ease-out`;
+          ballEl.style.transform  = `translate(${dx2}px,${dy2}px) scale(0.7)`;
+        }, p1Dur);
+      }));
+    } else {
+      // Single-segment path
+      const ballDur = item.ballDur || 650;
+      ballFlightMs  = ballDur;
+      const to  = sc(item.toSvg.x, item.toSvg.y);
+      const dx  = to.x - from.x, dy = to.y - from.y;
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        ballEl.style.transition = `transform ${ballDur}ms ease-in, opacity 0.25s`;
+        ballEl.style.transform  = `translate(${dx}px,${dy}px) scale(0.7)`;
+      }));
+    }
   }
 
   // ── Banner appears when ball arrives ─────────────────────────
@@ -5948,10 +5978,10 @@ function _runAnim(item) {
     bannerEl.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out';
     bannerEl.style.opacity    = '1';
     bannerEl.style.transform  = 'translate(-50%, -50%) scale(1)';
-  }, showBall ? ballDur : 0);
+  }, ballFlightMs);
 
   // ── Fade everything out ───────────────────────────────────────
-  const totalVisible = (showBall ? ballDur : 0) + holdMs;
+  const totalVisible = ballFlightMs + holdMs;
   setTimeout(() => {
     ballEl.style.transition   = `opacity ${fadeMs}ms`;
     ballEl.style.opacity      = '0';
@@ -5969,9 +5999,8 @@ function _runAnim(item) {
 function _detectAndQueueAnims(newG, prev) {
   if (!newG || !prev) return;
   const events = newG.events || [];
-  const evLen  = events.length;
 
-  if (evLen > prev.eventsLen) {
+  if (events.length > prev.eventsLen) {
     // New plate appearance(s)
     events.slice(prev.eventsLen).forEach(ev => {
       if (ev.type !== 'pa_end') return;
@@ -5981,16 +6010,29 @@ function _detectAndQueueAnims(newG, prev) {
     return; // don't also show pitch-count animations
   }
 
-  // Individual pitch count changes
-  const dBalls   = (newG.balls   || 0) - prev.balls;
-  const dStrikes = (newG.strikes || 0) - prev.strikes;
+  // Individual pitch count changes.
+  // A foul with < 2 strikes increments BOTH fouls and strikes — subtract the
+  // foul-caused bump so we don't fire a duplicate Strike animation.
   const dFouls   = (newG.fouls   || 0) - prev.fouls;
+  const rawDS    = (newG.strikes || 0) - prev.strikes;
+  const dStrikes = Math.max(0, rawDS - dFouls);  // pure strike presses only
+  const dBalls   = (newG.balls   || 0) - prev.balls;
+
   for (let i = 0; i < dBalls;   i++)
-    _queueAnim({ text: 'Ball',      color: '#fbbf24', fromSvg: FIELD.MOUND, toSvg: { x: 200, y: 368 } });
+    _queueAnim({ text: 'Ball', color: '#fbbf24', fromSvg: FIELD.MOUND, toSvg: { x: 200, y: 368 } });
   for (let i = 0; i < dStrikes; i++)
     _queueAnim({ text: 'Strike ⚡', color: '#f87171', fromSvg: FIELD.MOUND, toSvg: FIELD.HOME });
-  for (let i = 0; i < dFouls;   i++)
-    _queueAnim({ text: 'Foul Ball', color: '#fb923c', fromSvg: FIELD.MOUND, toSvg: { x: 165, y: 345 } });
+  for (let i = 0; i < dFouls;   i++) {
+    // Ball travels to plate then deflects into foul territory (alternates sides)
+    const goRight = (_foulSide++ % 2 === 0);
+    _queueAnim({
+      text: 'Foul!', color: '#fb923c',
+      fromSvg:  FIELD.MOUND,
+      viaSvg:   FIELD.HOME,
+      toSvg:    goRight ? { x: 338, y: 352 } : { x: 62, y: 352 },
+      phase1Dur: 380, phase2Dur: 340,
+    });
+  }
 }
 
 function _buildOutcomeAnim(ev) {
