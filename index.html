@@ -244,13 +244,41 @@
   .empty-state p { margin: 0 0 14px; font-size: 14px; }
 
   /* ---------- Modal ---------- */
+  /* Play animation overlay — z-index above live game (100) but below modals (200) */
+  #play-anim-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    z-index: 150;
+    pointer-events: none;
+  }
+  #anim-ball {
+    position: absolute;
+    font-size: 18px;
+    line-height: 1;
+    will-change: transform;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+  }
+  #anim-banner {
+    position: absolute;
+    left: 50%; top: 44%;
+    transform: translate(-50%, -50%) scale(1);
+    background: rgba(0, 0, 0, 0.78);
+    border-radius: 16px;
+    padding: 14px 30px;
+    font-weight: 800;
+    white-space: nowrap;
+    letter-spacing: 0.3px;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.6);
+    opacity: 0;
+  }
+
   .modal-backdrop {
     position: fixed; inset: 0;
     background: rgba(17, 24, 39, 0.55);
     display: none;
     align-items: center;
     justify-content: center;
-    z-index: 100;
+    z-index: 200;
     padding: 16px;
   }
   .modal-backdrop.show { display: flex; }
@@ -2047,6 +2075,12 @@
 </nav>
 
 <div id="live-game-overlay" class="live-game-overlay"></div>
+
+<!-- Play animation overlay — sits above live game, below modals; not wiped by rerenders -->
+<div id="play-anim-overlay">
+  <div id="anim-ball">⚾</div>
+  <div id="anim-banner"></div>
+</div>
 
 <div id="modal-backdrop" class="modal-backdrop">
   <div id="modal" class="modal">
@@ -5183,11 +5217,13 @@ async function redoPlay() {
 }
 
 function renderLiveGame(gameId, watchOnly = false) {
-  if (gameId !== _lastLiveGameId) {
+  const isNewGame = gameId !== _lastLiveGameId;
+  if (isNewGame) {
     _undoStack.length = 0;
     _redoStack.length = 0;
+    _liveTab = 'score';
+    _prevGameSnap = null;
   }
-  _liveTab = 'score';
   _lastLiveGameId = gameId;
   LiveGameId = gameId;
   LiveGameWatchOnly = watchOnly;
@@ -5203,6 +5239,8 @@ function renderLiveGame(gameId, watchOnly = false) {
   }
   drawField();
   attachPitchHandlers();
+  // Initialise animation snapshot when opening a new game
+  if (isNewGame) _prevGameSnap = _snapGame(g);
 }
 
 function exitLiveGame() {
@@ -5655,7 +5693,14 @@ function pitcherGameStats(g, pitcherId) {
 }
 
 function rerenderLive() {
-  if (LiveGameId) renderLiveGame(LiveGameId);
+  if (!LiveGameId) return;
+  const g = State.getGame(LiveGameId);
+  // Detect changes and queue animations (watch-only mode only)
+  if (g && _prevGameSnap && LiveGameWatchOnly) {
+    _detectAndQueueAnims(g, _prevGameSnap);
+  }
+  _prevGameSnap = g ? _snapGame(g) : null;
+  renderLiveGame(LiveGameId, LiveGameWatchOnly); // preserve watch-only flag
 }
 
 function renderBatterRow(g) {
@@ -5816,6 +5861,152 @@ const FIELD = {
   MOUND:   { x: 200, y: 244 },   // pitcher's rubber centre (754,1067) −8 half-radius
   CF_HOME: { x: 200, y:  53 },   // deep centre field (−3× r=16 from previous)
 };
+
+/* ============================================================
+   LIVE PLAY ANIMATIONS  (watch mode only)
+   ============================================================ */
+let _prevGameSnap  = null;   // snapshot before last Firestore push
+const _animQueue   = [];
+let   _animRunning = false;
+
+function _snapGame(g) {
+  return {
+    eventsLen: (g?.events || []).length,
+    balls:   g?.balls   || 0,
+    strikes: g?.strikes || 0,
+    fouls:   g?.fouls   || 0,
+  };
+}
+
+function _queueAnim(item) {
+  _animQueue.push(item);
+  if (!_animRunning) _nextAnim();
+}
+
+function _nextAnim() {
+  if (!_animQueue.length) { _animRunning = false; return; }
+  _animRunning = true;
+  _runAnim(_animQueue.shift());
+}
+
+function _runAnim(item) {
+  const overlay  = document.getElementById('play-anim-overlay');
+  const ballEl   = document.getElementById('anim-ball');
+  const bannerEl = document.getElementById('anim-banner');
+  if (!overlay || !ballEl || !bannerEl) { _nextAnim(); return; }
+
+  // Convert SVG 0-400 coords → screen pixels using the live field SVG
+  const svgEl   = document.getElementById('field-svg');
+  const svgRect = svgEl ? svgEl.getBoundingClientRect() : null;
+  const showBall = !!(svgRect && svgRect.width > 0 && item.fromSvg && item.toSvg);
+
+  const toScreen = (sx, sy) => ({
+    x: svgRect.left + (sx / 400) * svgRect.width,
+    y: svgRect.top  + (sy / 400) * svgRect.height,
+  });
+
+  const ballDur  = item.ballDur || 650;
+  const holdMs   = item.big ? 1600 : 1200;
+  const fadeMs   = 300;
+
+  // ── Ball setup ──────────────────────────────────────────────
+  if (showBall) {
+    const from = toScreen(item.fromSvg.x, item.fromSvg.y);
+    ballEl.style.cssText = `
+      position:absolute; font-size:18px; line-height:1;
+      will-change:transform; filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));
+      left:${from.x - 9}px; top:${from.y - 9}px;
+      transform:translate(0,0) scale(1);
+      transition:none; opacity:1; display:block;`;
+  } else {
+    ballEl.style.display = 'none';
+  }
+
+  // ── Banner setup ─────────────────────────────────────────────
+  bannerEl.innerHTML  = item.text;
+  bannerEl.style.color     = item.color || '#fff';
+  bannerEl.style.fontSize  = item.big ? '34px' : '24px';
+  bannerEl.style.opacity   = '0';
+  bannerEl.style.transition = 'none';
+  bannerEl.style.transform  = 'translate(-50%, -50%) scale(0.8)';
+
+  overlay.style.display = 'block';
+
+  // ── Kick off ball travel ──────────────────────────────────────
+  if (showBall) {
+    const to = toScreen(item.toSvg.x, item.toSvg.y);
+    const from = toScreen(item.fromSvg.x, item.fromSvg.y);
+    const dx = to.x - from.x, dy = to.y - from.y;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      ballEl.style.transition = `transform ${ballDur}ms ease-in, opacity 0.25s`;
+      ballEl.style.transform  = `translate(${dx}px,${dy}px) scale(0.7)`;
+    }));
+  }
+
+  // ── Banner appears when ball arrives ─────────────────────────
+  setTimeout(() => {
+    bannerEl.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out';
+    bannerEl.style.opacity    = '1';
+    bannerEl.style.transform  = 'translate(-50%, -50%) scale(1)';
+  }, showBall ? ballDur : 0);
+
+  // ── Fade everything out ───────────────────────────────────────
+  const totalVisible = (showBall ? ballDur : 0) + holdMs;
+  setTimeout(() => {
+    ballEl.style.transition   = `opacity ${fadeMs}ms`;
+    ballEl.style.opacity      = '0';
+    bannerEl.style.transition = `opacity ${fadeMs}ms`;
+    bannerEl.style.opacity    = '0';
+  }, totalVisible);
+
+  // ── Done — advance queue ──────────────────────────────────────
+  setTimeout(() => {
+    overlay.style.display = 'none';
+    _nextAnim();
+  }, totalVisible + fadeMs + 50);
+}
+
+function _detectAndQueueAnims(newG, prev) {
+  if (!newG || !prev) return;
+  const events = newG.events || [];
+  const evLen  = events.length;
+
+  if (evLen > prev.eventsLen) {
+    // New plate appearance(s)
+    events.slice(prev.eventsLen).forEach(ev => {
+      if (ev.type !== 'pa_end') return;
+      const anim = _buildOutcomeAnim(ev);
+      if (anim) _queueAnim(anim);
+    });
+    return; // don't also show pitch-count animations
+  }
+
+  // Individual pitch count changes
+  const dBalls   = (newG.balls   || 0) - prev.balls;
+  const dStrikes = (newG.strikes || 0) - prev.strikes;
+  const dFouls   = (newG.fouls   || 0) - prev.fouls;
+  for (let i = 0; i < dBalls;   i++)
+    _queueAnim({ text: 'Ball',      color: '#fbbf24', fromSvg: FIELD.MOUND, toSvg: { x: 200, y: 368 } });
+  for (let i = 0; i < dStrikes; i++)
+    _queueAnim({ text: 'Strike ⚡', color: '#f87171', fromSvg: FIELD.MOUND, toSvg: FIELD.HOME });
+  for (let i = 0; i < dFouls;   i++)
+    _queueAnim({ text: 'Foul Ball', color: '#fb923c', fromSvg: FIELD.MOUND, toSvg: { x: 165, y: 345 } });
+}
+
+function _buildOutcomeAnim(ev) {
+  const loc = ev.location; // {x,y} in 0-400 SVG space, or null
+  switch (ev.outcome) {
+    case 'BB':        return { text: 'Walk! 🥊',        color: '#4ade80', fromSvg: FIELD.MOUND, toSvg: { x: 200, y: 368 } };
+    case 'K':         return { text: 'Strikeout! 🔥',   color: '#f87171', fromSvg: FIELD.MOUND, toSvg: FIELD.HOME };
+    case '1B':        return { text: 'Single! 🎯',      color: '#4ade80', fromSvg: FIELD.HOME,  toSvg: loc || FIELD.FIRST };
+    case '2B':        return { text: 'Double! 💥',      color: '#4ade80', fromSvg: FIELD.HOME,  toSvg: loc || FIELD.SECOND };
+    case '3B':        return { text: 'Triple! 🚀',      color: '#67e8f9', fromSvg: FIELD.HOME,  toSvg: loc || FIELD.THIRD };
+    case 'HR':        return { text: 'HOME RUN! 🎆',    color: '#fde68a', fromSvg: FIELD.HOME,  toSvg: loc || { x: 200, y: 18 }, big: true, ballDur: 950 };
+    case 'OUT':       return { text: 'Out!',            color: '#fb923c', fromSvg: FIELD.HOME,  toSvg: loc || FIELD.SECOND };
+    case 'ERR_REACH': return { text: 'Error!',          color: '#c084fc', fromSvg: FIELD.HOME,  toSvg: loc || FIELD.SECOND };
+    default: return null;
+  }
+}
 
 let __fieldClickMode = null;
 let __bipStep = null;
