@@ -3516,6 +3516,17 @@ const Render = {
         </div>`;
     }
 
+    // Not signed in — show only the welcome card
+    if (!currentUser) {
+      c.innerHTML = `
+        <div style="padding-top:8px">
+          <div class="home-grid">
+            ${playerCard}
+          </div>
+        </div>`;
+      return;
+    }
+
     // My teams
     const myTeams = myPlayer
       ? State.teams.filter(t => t.playerIds && t.playerIds.includes(myPid))
@@ -3536,7 +3547,7 @@ const Render = {
     const recent = [...State.games]
       .filter(g => {
         if (g.status !== 'completed' && g.status !== 'in_progress') return false;
-        if (!myPid) return true; // not linked, show all
+        if (!myPid) return true; // signed in but not linked, show all
         return (g.homeBattingOrder || []).includes(myPid) ||
                (g.awayBattingOrder || []).includes(myPid);
       })
