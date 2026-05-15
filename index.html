@@ -2507,13 +2507,14 @@ const State = {
     const SLG = AB ? TB / AB : 0;
     const OPS = OBP + SLG;
     const IP = pIP_outs / 3;
-    const ERA = IP > 0 ? (pER * 9) / IP : null;
+    const ERA  = IP > 0 ? (pER * 9) / IP : null;
+    const pWHIP = IP > 0 ? (pBB + pH) / IP : null;
     const pGP = pitchedGames.size;
 
     return {
       AB, H, R, RBI, BB, K_bat, K_looking, K_swinging, K_foul, AVG, OBP, SLG, OPS, PA, TB,
       singles, doubles, triples, hrs,
-      pK, pKL, pKS, pKF, pBB, pER, pH, IP, ERA, E, PO, pGP,
+      pK, pKL, pKS, pKF, pBB, pER, pH, IP, ERA, pWHIP, E, PO, pGP,
     };
   },
 
@@ -2579,7 +2580,9 @@ const State = {
       });
     });
     const IP = outs / 3;
-    return { IP, ER, K, BB, H, ERA: IP > 0 ? (ER * 9) / IP : null };
+    const ERA  = IP > 0 ? (ER * 9) / IP : null;
+    const WHIP = IP > 0 ? (BB + H) / IP : null;
+    return { IP, ER, K, BB, H, ERA, WHIP };
   },
 
   computeTeamFieldingStats(teamId) {
@@ -2748,12 +2751,13 @@ const BATTING_COLS = [
   { key: 'K',   label: 'K'   },
 ];
 const PITCH_COLS = [
-  { key: 'ERA', label: 'ERA', fmt: v => v !== null ? v.toFixed(2) : '—', nullLow: true },
-  { key: 'IP',  label: 'IP',  fmt: v => fmt.ip(v) },
-  { key: 'K',   label: 'K'   },
-  { key: 'BB',  label: 'BB'  },
-  { key: 'H',   label: 'H'   },
-  { key: 'ER',  label: 'ER'  },
+  { key: 'ERA',  label: 'ERA',  fmt: v => v !== null ? v.toFixed(2) : '—', nullLow: true },
+  { key: 'WHIP', label: 'WHIP', fmt: v => v !== null ? v.toFixed(2) : '—', nullLow: true },
+  { key: 'IP',   label: 'IP',   fmt: v => fmt.ip(v) },
+  { key: 'K',    label: 'K'    },
+  { key: 'BB',   label: 'BB'   },
+  { key: 'H',    label: 'H'    },
+  { key: 'ER',   label: 'ER'   },
 ];
 const FIELD_COLS = [
   { key: 'PO', label: 'PO' },
@@ -2774,7 +2778,7 @@ function playerBattingData(s) {
     R: s.R, RBI: s.RBI, BB: s.BB, K: s.K_bat };
 }
 function playerPitchingData(s) {
-  return { ERA: s.ERA, IP: s.IP, K: s.pK, BB: s.pBB, H: s.pH, ER: s.pER };
+  return { ERA: s.ERA, WHIP: s.pWHIP, IP: s.IP, K: s.pK, BB: s.pBB, H: s.pH, ER: s.pER };
 }
 function playerFieldingData(s) {
   return { PO: s.PO, E: s.E };
@@ -2785,7 +2789,7 @@ function teamBattingData(bs) {
     R: bs.R, RBI: bs.RBI, BB: bs.BB, K: bs.K };
 }
 function teamPitchingData(ps) {
-  return { ERA: ps.ERA, IP: ps.IP, K: ps.K, BB: ps.BB, H: ps.H, ER: ps.ER };
+  return { ERA: ps.ERA, WHIP: ps.WHIP, IP: ps.IP, K: ps.K, BB: ps.BB, H: ps.H, ER: ps.ER };
 }
 
 // ── Shared stat tile/grid primitives ────────────────────────
@@ -2931,24 +2935,9 @@ function renderTeamStatTable(teamId) {
     ${renderStatTableRow(FIELD_COLS, fld)}`;
 }
 
-// Renders all 4 stat sections for a list of teams as combined tables
-// (one row per team per section) — used on the home page My Teams card.
-function renderHomeTeamsTables(teams) {
+// Shared helper: renders one section table (one row per team) for the home page.
+function renderHomeTeamsSection(teams, view) {
   if (!teams.length) return '<p style="color:#6b7280;font-size:14px;margin:0">No teams yet.</p>';
-
-  const makeSection = (cols, rowData) => {
-    const ths = cols.map(c => `<th class="num-col">${c.label}</th>`).join('');
-    const trs = rowData.map(({ t, d }) => {
-      const tds = cols.map(c => `<td>${c.fmt ? c.fmt(d[c.key]) : (d[c.key] ?? '—')}</td>`).join('');
-      return `<tr onclick="selectTeam('${t.id}');setTeamsView('record');switchTab('stats')" style="cursor:pointer">
-        <td>${escapeHtml(t.name)}</td>${tds}
-      </tr>`;
-    }).join('');
-    return `<div class="stats-table-wrap"><table class="stats-table">
-      <thead><tr><th>Team</th>${ths}</tr></thead>
-      <tbody>${trs}</tbody>
-    </table></div>`;
-  };
 
   const teamData = teams.map(t => {
     const ts  = State.computeTeamStats(t.id);
@@ -2963,15 +2952,20 @@ function renderHomeTeamsTables(teams) {
     };
   });
 
-  return `
-    <div class="stat-section-title" style="margin-top:0">Record</div>
-    ${makeSection(TEAM_RECORD_COLS, teamData.map(r => ({ t: r.t, d: r.record })))}
-    <div class="stat-section-title">Batting</div>
-    ${makeSection(BATTING_COLS, teamData.map(r => ({ t: r.t, d: r.batting })))}
-    <div class="stat-section-title">Pitching</div>
-    ${makeSection(PITCH_COLS, teamData.map(r => ({ t: r.t, d: r.pitching })))}
-    <div class="stat-section-title">Fielding</div>
-    ${makeSection(FIELD_COLS, teamData.map(r => ({ t: r.t, d: r.fielding })))}`;
+  const colsMap = { record: TEAM_RECORD_COLS, batting: BATTING_COLS, pitching: PITCH_COLS, fielding: FIELD_COLS };
+  const dataKey = view; // 'record' | 'batting' | 'pitching' | 'fielding'
+  const cols = colsMap[dataKey] || TEAM_RECORD_COLS;
+  const ths = cols.map(c => `<th class="num-col">${c.label}</th>`).join('');
+  const trs = teamData.map(({ t, d }) => {
+    const tds = cols.map(c => `<td>${c.fmt ? c.fmt(d[dataKey][c.key]) : (d[dataKey][c.key] ?? '—')}</td>`).join('');
+    return `<tr onclick="selectTeam('${t.id}');setTeamsView('${view}');switchTab('stats')" style="cursor:pointer">
+      <td>${escapeHtml(t.name)}</td>${tds}
+    </tr>`;
+  }).join('');
+  return `<div class="stats-table-wrap"><table class="stats-table">
+    <thead><tr><th>Team</th>${ths}</tr></thead>
+    <tbody>${trs}</tbody>
+  </table></div>`;
 }
 
 function showPlayerStatsModal(playerId) {
@@ -3006,6 +3000,10 @@ function toggleAdminFeatures() {
 }
 function canUserScore() { return isAdmin() || (currentUser && currentUserProfile?.canScore); }
 
+
+// Home tab card view state
+let homePlayerView = 'batting'; // 'batting' | 'pitching' | 'fielding'
+let homeTeamsView  = 'record';  // 'record' | 'batting' | 'pitching' | 'fielding'
 
 // Player view state
 let selectedPlayerId = null;
@@ -3047,6 +3045,9 @@ function setTeamsView(view) {
   $$('#teams-subnav button').forEach(b => b.classList.toggle('active', b.dataset.tview === view));
   Render.teams();
 }
+function setHomePlayerView(view) { homePlayerView = view; Render.home(); }
+function setHomeTeamsView(view)  { homeTeamsView  = view; Render.home(); }
+
 function sortTeamStats(col, which) {
   const s = which === 'pitching' ? teamPitSort
           : which === 'fielding' ? teamFieldSort
@@ -3408,11 +3409,20 @@ const Render = {
     let playerCard = '';
     if (myPlayer) {
       const s = State.computePlayerStats(myPid);
+      const pv = homePlayerView;
+      const pTabBtn = (v, label) =>
+        `<button class="${pv===v?'active':''}" onclick="setHomePlayerView('${v}')">${label}</button>`;
+      const pSection = pv === 'pitching' ? renderStatTableRow(PITCH_COLS,   playerPitchingData(s))
+                     : pv === 'fielding' ? renderStatTableRow(FIELD_COLS,   playerFieldingData(s))
+                     :                     renderStatTableRow(BATTING_COLS,  playerBattingData(s));
       playerCard = `
         <div class="home-card">
           <div class="home-section-title">My Player</div>
           <div class="home-player-name">${escapeHtml(myPlayer.jerseyNumber ? '#' + myPlayer.jerseyNumber + ' ' + myPlayer.name : myPlayer.name)}</div>
-          ${renderPlayerStatTable(s)}
+          <div class="players-subnav" style="margin-bottom:8px">
+            ${pTabBtn('batting','Batting')}${pTabBtn('pitching','Pitching')}${pTabBtn('fielding','Fielding')}
+          </div>
+          ${pSection}
         </div>`;
     } else if (currentUser) {
       playerCard = `
@@ -3434,10 +3444,16 @@ const Render = {
     const myTeams = myPlayer
       ? State.teams.filter(t => t.playerIds && t.playerIds.includes(myPid))
       : [];
+    const tv = homeTeamsView;
+    const tTabBtn = (v, label) =>
+      `<button class="${tv===v?'active':''}" onclick="setHomeTeamsView('${v}')">${label}</button>`;
     const teamsCard = `
       <div class="home-card">
         <div class="home-section-title">My Teams</div>
-        ${renderHomeTeamsTables(myTeams)}
+        <div class="players-subnav" style="margin-bottom:8px">
+          ${tTabBtn('record','Record')}${tTabBtn('batting','Batting')}${tTabBtn('pitching','Pitching')}${tTabBtn('fielding','Fielding')}
+        </div>
+        ${renderHomeTeamsSection(myTeams, tv)}
       </div>`;
 
     // Recent games — filtered to current player's games when linked
@@ -7112,6 +7128,7 @@ Object.assign(window, {
   // Admin mode + player view
   setPlayersView, selectPlayer, showPlayerStatsModal,
   setStatsMain, setTeamsView, sortTeamStats,
+  setHomePlayerView, setHomeTeamsView,
   selectTeam,
   switchTab,
   sortStats, showCreateMyPlayerModal, submitMyPlayer,
