@@ -5299,10 +5299,15 @@ const _undoStack = [];
 const _redoStack = [];
 
 const _SNAPSHOT_KEYS = [
+  // Core play state
   'bases','outs','balls','strikes','fouls',
   'score','lineScore','events',
   'awayBatterIdx','homeBatterIdx',
-  'currentInning','currentHalf','status','runnerCounter'
+  'currentInning','currentHalf','status','runnerCounter','isOver',
+  // Pitcher rotation state — must be restored so the right pitcher shows after undo
+  'awayPositions','homePositions',
+  'awayPitcherIdx','homePitcherIdx',
+  'awayBattersFaced','homeBattersFaced',
 ];
 
 function captureSnapshot(g) {
@@ -5318,8 +5323,12 @@ async function undoPlay() {
   const g = State.getGame(LiveGameId); if (!g) return;
   const snap = _undoStack.pop();
   _redoStack.push(captureSnapshot(g));
+  _cancelAnim();
   await State.updateGame(g.id, snap);
   renderLiveGame(g.id);
+  // Re-render stat views immediately so player/team stats reflect the reverted events
+  Render.players();
+  Render.teams();
   toast('Undone');
 }
 
@@ -5329,8 +5338,12 @@ async function redoPlay() {
   const g = State.getGame(LiveGameId); if (!g) return;
   const snap = _redoStack.pop();
   _undoStack.push(captureSnapshot(g));
+  _cancelAnim();
   await State.updateGame(g.id, snap);
   renderLiveGame(g.id);
+  // Re-render stat views immediately so player/team stats reflect the re-applied events
+  Render.players();
+  Render.teams();
   toast('Redone');
 }
 
