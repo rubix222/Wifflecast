@@ -6280,6 +6280,8 @@ function _detectAndQueueAnims(newG, prev) {
 
   // ── 2. Game finished ────────────────────────────────────────
   if (gameJustFinished) {
+    const prevHalf = prev.currentHalf === 'top' ? 'Top' : 'Bottom';
+    _queueAnim({ text: `End of ${prevHalf} ${ordinal(prev.currentInning)}`, color: '#60a5fa', holdMs: 1400 });
     const away   = State.getTeam(newG.awayTeamId);
     const home   = State.getTeam(newG.homeTeamId);
     const winner = newG.score.away > newG.score.home ? away
@@ -6293,6 +6295,8 @@ function _detectAndQueueAnims(newG, prev) {
 
   // ── 3. Inning / half change ──────────────────────────────────
   if (inningChanged) {
+    const prevHalf = prev.currentHalf === 'top' ? 'Top' : 'Bottom';
+    _queueAnim({ text: `End of ${prevHalf} ${ordinal(prev.currentInning)}`, color: '#60a5fa', holdMs: 1400 });
     const halfLabel = newG.currentHalf === 'top' ? '▲ Top' : '▼ Bottom';
     _queueAnim({
       text: `${halfLabel} of the ${ordinal(newG.currentInning)}`,
@@ -7188,6 +7192,10 @@ function ensureLineScore(g) {
 
 async function postPlayCheck(g) {
   if (g.outs >= 3) {
+    if (!LiveGameWatchOnly) {
+      const halfLabel = g.currentHalf === 'top' ? 'Top' : 'Bottom';
+      _queueAnim({ text: `End of ${halfLabel} ${ordinal(g.currentInning)}`, color: '#60a5fa', holdMs: 1400 });
+    }
     await endHalfInningInternal(g);
     return;
   }
@@ -7262,6 +7270,16 @@ async function endHalfInningInternal(g) {
 }
 
 async function finishGame(g, _reason) {
+  if (!LiveGameWatchOnly) {
+    const away   = State.getTeam(g.awayTeamId);
+    const home   = State.getTeam(g.homeTeamId);
+    const winner = g.score.away > g.score.home ? away
+                 : g.score.home > g.score.away ? home : null;
+    _queueAnim({
+      text: winner ? `${winner.name} wins! 🏆` : "It's a tie! 🏁",
+      color: '#fde68a', big: true, holdMs: 2400,
+    });
+  }
   await State.updateGame(g.id, { status: 'completed', isOver: true });
   autoSendRecapEmails(g.id);
   Render.games();
