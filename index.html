@@ -1388,6 +1388,34 @@
   .play-entry.clickable { cursor: pointer; }
   .play-entry.clickable:hover { background: #f0fdf4; }
   .play-entry.selected { background: #dcfce7 !important; border-left: 3px solid #166534 !important; padding-left: 8px; }
+  .play-count { font-size: 11px; color: #9ca3af; margin-left: 4px; }
+  .play-fielder { font-size: 12px; color: #6b7280; }
+  .play-extras { font-size: 11px; color: #6b7280; display: block; margin-top: 1px; padding-left: 2px; }
+  .play-inning-end {
+    color: #9ca3af;
+    background: transparent;
+    border-top: none;
+    border-bottom: 1px dashed #e5e7eb;
+    font-size: 10px;
+    font-style: italic;
+    letter-spacing: 0.4px;
+    font-weight: 500;
+    text-transform: none;
+    padding: 2px 0 3px;
+  }
+  .play-game-end {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: #1f2937;
+    background: #fef3c7;
+    border: 1px solid #fde68a;
+    border-radius: 6px;
+    padding: 4px 0;
+    margin: 4px 0 0;
+    letter-spacing: 0.5px;
+    pointer-events: none;
+  }
   .replay-banner {
     background: #fef3c7;
     border: 1px solid #fde68a;
@@ -5820,18 +5848,75 @@ function renderPlayLog(g) {
   const isCompleted = g.status === 'completed';
   const parts = [];
   let lastKey = null;
+
   events.slice(-60).forEach(e => {
     const key = e.inning + '-' + e.half;
+
     if (key !== lastKey) {
+      // Close out the previous half-inning with an "End of" separator
+      if (lastKey !== null) {
+        const [prevInn, prevHalf] = lastKey.split('-');
+        const prevLabel = prevHalf === 'top' ? 'Top' : 'Bottom';
+        parts.push(`<li class="play-inning-break play-inning-end">— End of ${prevLabel} ${ordinal(parseInt(prevInn))} —</li>`);
+      }
       parts.push(`<li class="play-inning-break">${e.half === 'top' ? 'Top' : 'Bottom'} ${ordinal(e.inning)}</li>`);
       lastKey = key;
     }
-    const batter = State.getPlayer(e.batterId);
-    const desc = describeOutcome(e);
-    const handler = '';
-    const scorerTag = isAdmin() && e.scoredByName ? ` <span class="play-scorer" title="Scored by ${escapeHtml(e.scoredByName)}">✎${escapeHtml(e.scoredByName)}</span>` : '';
-    parts.push(`<li class="play-entry${isCompleted ? ' clickable' : ''}" ${handler}>${escapeHtml(batter?.name || '?')} — ${desc}${scorerTag}</li>`);
+
+    const batter   = State.getPlayer(e.batterId);
+    const desc     = describeOutcome(e);
+
+    // Count: shown as "2-1" (balls-strikes) with optional foul count
+    let countStr = '';
+    if (e.countBalls !== undefined) {
+      let c = `${e.countBalls}-${e.countStrikes}`;
+      if (e.countFouls) c += ` ${e.countFouls}F`;
+      countStr = `<span class="play-count">${c}</span>`;
+    }
+
+    // Fielder name for outs and errors
+    let fielderStr = '';
+    if (e.outcome === 'OUT' && e.fielderId) {
+      const f = State.getPlayer(e.fielderId);
+      if (f) fielderStr = ` <span class="play-fielder">→ ${escapeHtml(f.name)}</span>`;
+    } else if (e.outcome === 'ERR_REACH' && e.errorById) {
+      const f = State.getPlayer(e.errorById);
+      if (f) fielderStr = ` <span class="play-fielder">(err: ${escapeHtml(f.name)})</span>`;
+    }
+
+    // Extra detail line: DP, tag play
+    const extraParts = [];
+    if (e.doublePlay)              extraParts.push('Double play');
+    else if (e.dpAttempted)        extraParts.push('DP attempted — runner safe');
+    if (e.sacFly && !e.sacFlyOut) extraParts.push('Runner tagged up and scored');
+    else if (e.sacFlyOut)         extraParts.push('Runner tagged up — thrown out');
+    const extrasStr = extraParts.length
+      ? `<span class="play-extras">${extraParts.join(' · ')}</span>`
+      : '';
+
+    const scorerTag  = isAdmin() && e.scoredByName
+      ? ` <span class="play-scorer" title="Scored by ${escapeHtml(e.scoredByName)}">✎${escapeHtml(e.scoredByName)}</span>`
+      : '';
+    const tsAttr = isCompleted ? `data-ts="${e.ts}"` : '';
+
+    parts.push(`<li class="play-entry${isCompleted ? ' clickable' : ''}" ${tsAttr}>${escapeHtml(batter?.name || '?')} — ${desc}${fielderStr} ${countStr}${scorerTag}${extrasStr}</li>`);
   });
+
+  // Close out the last half-inning
+  if (lastKey !== null) {
+    const [lastInn, lastHalf] = lastKey.split('-');
+    const lastLabel = lastHalf === 'top' ? 'Top' : 'Bottom';
+    if (isCompleted) {
+      const away  = State.getTeam(g.awayTeamId);
+      const home  = State.getTeam(g.homeTeamId);
+      const winner = g.score.away > g.score.home ? away
+                   : g.score.home > g.score.away ? home : null;
+      const gameEndText = winner ? `🏆 ${escapeHtml(winner.name)} wins! ${g.score.away}–${g.score.home}` : `🏁 Final — Tie ${g.score.away}–${g.score.home}`;
+      parts.push(`<li class="play-inning-break play-inning-end">— End of ${lastLabel} ${ordinal(parseInt(lastInn))} —</li>`);
+      parts.push(`<li class="play-game-end">${gameEndText}</li>`);
+    }
+  }
+
   return parts.join('');
 }
 
@@ -6978,6 +7063,9 @@ async function applyPaEnd(g, ev) {
     dpAttempted: !!ev.dpAttempted,
     sacFly: !!(ev.sacFlyScored || ev.sacFlyOut),
     sacFlyOut: !!ev.sacFlyOut,
+    countBalls:   g.balls   || 0,
+    countStrikes: g.strikes || 0,
+    countFouls:   g.fouls   || 0,
     rbi: 0,
     earnedRuns: 0,
     runsScoredBy: [],
