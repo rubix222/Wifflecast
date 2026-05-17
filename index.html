@@ -6050,6 +6050,7 @@ const FIELD = {
 let _prevGameSnap  = null;   // snapshot before last Firestore push
 const _animQueue   = [];
 let   _animRunning = false;
+let   _animGen     = 0;   // incremented on every cancel; stale callbacks check this
 
 function _snapGame(g) {
   if (!g) return null;
@@ -6080,6 +6081,7 @@ function _nextAnim() {
 
 // Immediately abort any running/queued animation (used by scorer on new action).
 function _cancelAnim() {
+  _animGen++;           // invalidate all pending setTimeout / rAF callbacks
   _animQueue.length = 0;
   _animRunning = false;
   const overlay   = document.getElementById('play-anim-overlay');
@@ -6124,6 +6126,9 @@ function _runAnim(item) {
   const bannerEl   = document.getElementById('anim-banner');
   if (!overlay || !ballEl || !bannerEl) { _nextAnim(); return; }
 
+  const myGen = _animGen;   // capture generation — if _cancelAnim fires, myGen != _animGen
+  const alive = () => _animGen === myGen;  // guard for stale callbacks
+
   const holdMs = item.holdMs ?? (item.big ? 1600 : 1200);
   const fadeMs = 300;
 
@@ -6146,6 +6151,7 @@ function _runAnim(item) {
   // This ensures we query the FRESH #field-svg that renderLiveGame()
   // rebuilds synchronously after _runAnim is called.
   requestAnimationFrame(() => {
+    if (!alive()) return;   // cancelled before first frame
     const svgEl  = document.getElementById('field-svg');
     const ctm    = svgEl ? svgEl.getScreenCTM() : null;
     const hasBall = !!(ctm && item.fromSvg && item.toSvg);
@@ -6182,9 +6188,11 @@ function _runAnim(item) {
         const dx1 = via.x - from.x, dy1 = via.y - from.y;
         const dx2 = to.x  - from.x, dy2 = to.y  - from.y;
         requestAnimationFrame(() => {
+          if (!alive()) return;
           ballEl.style.transition = `transform ${p1Dur}ms ease-in`;
           ballEl.style.transform  = `translate(${dx1}px,${dy1}px) scale(0.85)`;
           setTimeout(() => {
+            if (!alive()) return;
             ballEl.style.transition = `transform ${p2Dur}ms ease-out`;
             ballEl.style.transform  = `translate(${dx2}px,${dy2}px) scale(0.7)`;
           }, p1Dur);
@@ -6195,6 +6203,7 @@ function _runAnim(item) {
         const to  = sc(item.toSvg.x, item.toSvg.y);
         const dx  = to.x - from.x, dy = to.y - from.y;
         requestAnimationFrame(() => {
+          if (!alive()) return;
           ballEl.style.transition = `transform ${ballDur}ms ease-in, opacity 0.25s`;
           ballEl.style.transform  = `translate(${dx}px,${dy}px) scale(0.7)`;
         });
@@ -6225,7 +6234,9 @@ function _runAnim(item) {
 
       const dx = fEnd.x - fStart.x, dy = fEnd.y - fStart.y;
       setTimeout(() => {
+        if (!alive()) return;
         requestAnimationFrame(() => {
+          if (!alive()) return;
           fielderEl.style.transition = `transform ${runDur}ms ease-out`;
           fielderEl.style.transform  = `translate(${dx}px,${dy}px)`;
         });
@@ -6234,6 +6245,7 @@ function _runAnim(item) {
 
     // ── Banner appears when ball arrives ──────────────────────
     setTimeout(() => {
+      if (!alive()) return;
       bannerEl.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out';
       bannerEl.style.opacity    = '1';
       bannerEl.style.transform  = 'translate(-50%, -50%) scale(1)';
@@ -6242,6 +6254,7 @@ function _runAnim(item) {
     // ── Fade everything out ───────────────────────────────────
     const totalVisible = ballFlightMs + holdMs;
     setTimeout(() => {
+      if (!alive()) return;
       ballEl.style.transition     = `opacity ${fadeMs}ms`;
       ballEl.style.opacity        = '0';
       bannerEl.style.transition   = `opacity ${fadeMs}ms`;
@@ -6254,6 +6267,7 @@ function _runAnim(item) {
 
     // ── Done — advance queue ──────────────────────────────────
     setTimeout(() => {
+      if (!alive()) return;
       overlay.style.display = 'none';
       _nextAnim();
     }, totalVisible + fadeMs + 50);
