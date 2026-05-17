@@ -935,6 +935,7 @@
     stroke-width: 3.5;
     r: 21;
   }
+  .spray-toggle-btn { padding:2px 6px; font-size:11px; margin-left:6px; vertical-align:middle; }
   .badge { display:inline-block; font-size:10px; font-weight:700; padding:2px 7px; border-radius:10px; text-transform:uppercase; letter-spacing:0.4px; margin-left:6px; }
   .badge-guest { background:#f3f4f6; color:#6b7280; }
   .badge-invited { background:#fef3c7; color:#92400e; }
@@ -3653,7 +3654,10 @@ const Render = {
       playerCard = `
         <div class="home-card">
           <div class="home-section-title">My Player</div>
-          <div class="home-player-name">${escapeHtml(myPlayer.jerseyNumber ? '#' + myPlayer.jerseyNumber + ' ' + myPlayer.name : myPlayer.name)}</div>
+          <div class="home-player-name" style="display:flex;align-items:center;gap:8px">
+            <span>${escapeHtml(myPlayer.jerseyNumber ? '#' + myPlayer.jerseyNumber + ' ' + myPlayer.name : myPlayer.name)}</span>
+            <button class="btn-icon" title="Edit name/number" onclick="showPlayerModal('${myPid}')" style="font-size:13px;padding:2px 5px">✎</button>
+          </div>
           ${renderPlayerStatTable(s)}
         </div>`;
     } else if (currentUser) {
@@ -3825,7 +3829,7 @@ const Render = {
         <td><span class="muted small">${playerCount} player${playerCount !== 1 ? 's' : ''}</span></td>
         <td style="white-space:nowrap">
           <button class="btn-icon" title="Edit" onclick="showTeamModal('${t.id}')">✎</button>
-          <button class="btn-icon" title="Delete" onclick="deleteTeam('${t.id}')">🗑</button>
+          ${isAdmin() ? `<button class="btn-icon" title="Delete" onclick="deleteTeam('${t.id}')">🗑</button>` : ''}
         </td>
       </tr>`;
     }).join('');
@@ -4060,8 +4064,10 @@ const Render = {
         const disp = col.fmt ? col.fmt(d[col.key]) : (d[col.key] ?? '—');
         return `<td>${disp}</td>`;
       }).join('');
+      const canEditPlayer = isAdmin() || currentUserProfile?.playerId === p.id;
+      const editBtn = canEditPlayer ? ` <button class="btn-icon" title="Edit" onclick="event.stopPropagation();showPlayerModal('${p.id}')" style="font-size:12px;padding:1px 4px">✎</button>` : '';
       return `<tr onclick="showPlayerStatsModal('${p.id}')" style="cursor:pointer" title="View ${escapeHtml(p.name)}'s stats">
-        <td>${escapeHtml(p.name)}</td>
+        <td>${escapeHtml(p.name)}${editBtn}</td>
         ${cells}
       </tr>`;
     }).join('');
@@ -4093,6 +4099,12 @@ const Render = {
     }
 
     const sorted = [...State.teams].sort((a, b) => a.name.localeCompare(b.name));
+    const myPid = currentUserProfile?.playerId;
+    const teamNameCell = (t) => {
+      const canEdit = isAdmin() || (myPid && (t.playerIds || []).includes(myPid));
+      const editBtn = canEdit ? ` <button class="btn-icon" title="Edit team" onclick="event.stopPropagation();showTeamModal('${t.id}')" style="font-size:12px;padding:1px 4px">✎</button>` : '';
+      return `<td>${escapeHtml(t.name)}${editBtn}</td>`;
+    };
 
     // ── BATTING GRID ──
     if (teamsView === 'batting') {
@@ -4113,7 +4125,7 @@ const Render = {
       c.innerHTML = `<div class="stats-table-wrap"><table class="stats-table">
         <thead><tr><th onclick="sortTeamStats('name','batting')">Team${nameSortArr}</th>${COLS.map(thArr).join('')}</tr></thead>
         <tbody>${rows.map(({ t, d }) => `<tr onclick="selectTeam('${t.id}');setTeamsView('batting')" style="cursor:pointer">
-          <td>${escapeHtml(t.name)}</td>
+          ${teamNameCell(t)}
           ${COLS.map(col => `<td>${col.fmt ? col.fmt(d[col.key]) : (d[col.key] ?? '—')}</td>`).join('')}
         </tr>`).join('')}</tbody>
       </table></div>`;
@@ -4141,7 +4153,7 @@ const Render = {
       c.innerHTML = `<div class="stats-table-wrap"><table class="stats-table">
         <thead><tr><th onclick="sortTeamStats('name','pitching')">Team${nameSortArr}</th>${COLS.map(thArr).join('')}</tr></thead>
         <tbody>${rows.map(({ t, d }) => `<tr onclick="selectTeam('${t.id}');setTeamsView('batting')" style="cursor:pointer">
-          <td>${escapeHtml(t.name)}</td>
+          ${teamNameCell(t)}
           ${COLS.map(col => `<td>${col.fmt ? col.fmt(d[col.key]) : (d[col.key] ?? '—')}</td>`).join('')}
         </tr>`).join('')}</tbody>
       </table></div>`;
@@ -4166,7 +4178,7 @@ const Render = {
       c.innerHTML = `<div class="stats-table-wrap"><table class="stats-table">
         <thead><tr><th onclick="sortTeamStats('name','fielding')">Team${nameSortArr}</th>${COLS.map(thArr).join('')}</tr></thead>
         <tbody>${rows.map(({ t, d }) => `<tr onclick="selectTeam('${t.id}');setTeamsView('batting')" style="cursor:pointer">
-          <td>${escapeHtml(t.name)}</td>
+          ${teamNameCell(t)}
           ${COLS.map(col => `<td>${col.fmt ? col.fmt(d[col.key]) : (d[col.key] ?? '—')}</td>`).join('')}
         </tr>`).join('')}</tbody>
       </table></div>`;
@@ -4194,7 +4206,7 @@ const Render = {
       c.innerHTML = `<div class="stats-table-wrap"><table class="stats-table">
         <thead><tr><th onclick="sortTeamStats('name','record')">Team${nameSortArr}</th>${COLS.map(thArr).join('')}</tr></thead>
         <tbody>${rows.map(({ t, d }) => `<tr onclick="selectTeam('${t.id}');setTeamsView('record')" style="cursor:pointer">
-          <td>${escapeHtml(t.name)}</td>
+          ${teamNameCell(t)}
           ${COLS.map(col => `<td>${col.fmt ? col.fmt(d[col.key]) : (d[col.key] ?? '—')}</td>`).join('')}
         </tr>`).join('')}</tbody>
       </table></div>`;
@@ -4334,6 +4346,7 @@ document.addEventListener('keydown', (e) => {
    ============================================================ */
 function showPlayerModal(id = null) {
   const editing = id ? State.getPlayer(id) : null;
+  const isSelfEdit = !isAdmin() && currentUserProfile?.playerId === id;
   Modal.show(`
     <div class="modal-header">
       <h3>${editing ? 'Edit player' : 'Add player'}</h3>
@@ -4349,6 +4362,7 @@ function showPlayerModal(id = null) {
           <label for="player-jersey">Jersey number <span class="muted small">(optional)</span></label>
           <input id="player-jersey" maxlength="4" value="${escapeHtml(editing?.jerseyNumber || '')}" />
         </div>
+        ${isSelfEdit ? '<p class="muted small" style="margin:4px 0 0 0">Name and number changes don\'t affect existing game stats.</p>' : ''}
       </div>
       <div class="modal-footer">
         <button type="button" class="btn" onclick="Modal.hide()">Cancel</button>
@@ -4358,6 +4372,7 @@ function showPlayerModal(id = null) {
 }
 async function submitPlayer(e, id) {
   e.preventDefault();
+  if (!isAdmin() && currentUserProfile?.playerId !== id) { toast('Not authorized', 'error'); return; }
   const data = { name: $('#player-name').value, jerseyNumber: $('#player-jersey').value };
   if (!data.name.trim()) return;
   if (id) await State.updatePlayer(id, data);
@@ -4399,12 +4414,16 @@ async function deletePlayer(id) {
 function showTeamModal(id = null) {
   const editing = id ? State.getTeam(id) : null;
   if (State.players.length < 2) { toast('Add at least 2 players first', 'error'); return; }
+  // Non-admin team members can open the modal for their own team
+  const myPid = currentUserProfile?.playerId;
+  const isMember = myPid && (editing?.playerIds || []).includes(myPid);
+  if (id && !isAdmin() && !isMember) { toast('Not authorized', 'error'); return; }
   const selected = new Set(editing?.playerIds || []);
   const playerOptions = [...State.players]
     .sort((a, b) => a.name.localeCompare(b.name))
     .map(p => `
       <label class="player-picker-item">
-        <input type="checkbox" value="${p.id}" ${selected.has(p.id) ? 'checked' : ''} />
+        <input type="checkbox" value="${p.id}" ${selected.has(p.id) ? 'checked' : ''} ${!isAdmin() ? 'disabled' : ''}/>
         <span class="jersey-badge" style="width:24px; height:24px; font-size:11px;">${escapeHtml(p.jerseyNumber || '#')}</span>
         <span>${escapeHtml(p.name)}</span>
       </label>`).join('');
@@ -4420,7 +4439,11 @@ function showTeamModal(id = null) {
           <input id="team-name" required autofocus value="${escapeHtml(editing?.name || '')}" />
         </div>
         <div class="form-group">
-          <label>Roster <span class="muted small">(select 2 or more players)</span></label>
+          <label for="team-color">Team color</label>
+          <input type="color" id="team-color" value="${editing?.color || '#166534'}" style="width:48px;height:36px;padding:2px;cursor:pointer;border-radius:6px;border:1px solid #d1d5db" />
+        </div>
+        <div class="form-group">
+          <label>Roster <span class="muted small">(select 2 or more players${!isAdmin() ? ' — only admins can change roster' : ''})</span></label>
           <div class="player-picker" id="team-player-picker">${playerOptions}</div>
         </div>
       </div>
@@ -4432,9 +4455,17 @@ function showTeamModal(id = null) {
 }
 async function submitTeam(e, id) {
   e.preventDefault();
-  const checked = $$('#team-player-picker input[type=checkbox]:checked').map(cb => cb.value);
+  const existingTeam = id ? State.getTeam(id) : null;
+  const myPid = currentUserProfile?.playerId;
+  const isMember = myPid && (existingTeam?.playerIds || []).includes(myPid);
+  if (!isAdmin() && !isMember) { toast('Not authorized', 'error'); return; }
+  const color = $('#team-color').value;
+  // Non-admins keep existing roster; admins can change it
+  const checked = isAdmin()
+    ? $$('#team-player-picker input[type=checkbox]:checked').map(cb => cb.value)
+    : (existingTeam?.playerIds || []);
   if (checked.length < 2) { toast('Pick at least 2 players', 'error'); return; }
-  const data = { name: $('#team-name').value, playerIds: checked };
+  const data = { name: $('#team-name').value, playerIds: checked, color };
   if (!data.name.trim()) return;
   if (id) await State.updateTeam(id, data);
   else    await State.addTeam(data);
@@ -5293,6 +5324,7 @@ async function startGame(gameId) {
 let LiveGameId = null;
 let _lastLiveGameId = null;
 let LiveGameWatchOnly = false;
+let _sprayChartVisible = false;
 let _scoringHeartbeat = null;
 let _selectedPlayTs = null;
 const _undoStack = [];
@@ -5354,6 +5386,7 @@ function renderLiveGame(gameId, watchOnly = false) {
     _redoStack.length = 0;
     _liveTab = 'score';
     _prevGameSnap = null;
+    _sprayChartVisible = false;
   }
   _lastLiveGameId = gameId;
   LiveGameId = gameId;
@@ -5797,10 +5830,11 @@ function renderMatchupStrip(g) {
   const pitcher = State.getPlayer(pitcherId);
   const bn = batter  ? `<span class="matchup-num">#${escapeHtml(batter.jerseyNumber  || '-')}</span> ${escapeHtml(batter.name)}`  : '?';
   const pn = pitcher ? `<span class="matchup-num">#${escapeHtml(pitcher.jerseyNumber || '-')}</span> ${escapeHtml(pitcher.name)}` : '?';
+  const sprayBtn = batterId ? `<button class="btn btn-sm spray-toggle-btn" onclick="toggleSprayChart()" title="Spray chart">📍</button>` : '';
   return `
     <div class="lg-matchup-strip">
       <div class="lg-matchup-side">
-        <div class="lg-matchup-label">At bat</div>
+        <div class="lg-matchup-label">At bat ${sprayBtn}</div>
         <div class="lg-matchup-name">${bn}</div>
         <div class="lg-matchup-stats">${batterId ? batterMatchupStats(g, batterId) : '—'}</div>
       </div>
@@ -5851,11 +5885,13 @@ function renderBatterRow(g) {
   const nameEl = canScore
     ? `<span class="player-name batter-skip-btn" onclick="showSkipBatterModal()" title="Click to skip this batter">${escapeHtml(batter?.name || '?')} <span style="font-size:10px;color:#9ca3af">⏭</span></span>`
     : `<span class="player-name">${escapeHtml(batter?.name || '?')}</span>`;
+  const sprayBtn = batterId ? `<button class="btn btn-sm spray-toggle-btn" onclick="toggleSprayChart()" title="Spray chart">📍</button>` : '';
   return `
     <div class="at-bat-row">
       <div>
         <span class="player-num">#${escapeHtml(batter?.jerseyNumber || '-')}</span>
         ${nameEl}
+        ${sprayBtn}
         <div class="game-stats">${batterId ? batterGameStats(g, batterId) : ''}</div>
       </div>
     </div>
@@ -6440,6 +6476,23 @@ let __bipStep = null;
 let __bipKind = null;
 let __bipDetail = null;
 
+function toggleSprayChart() {
+  _sprayChartVisible = !_sprayChartVisible;
+  drawField();
+}
+
+function getSprayData(playerId) {
+  const results = [];
+  for (const g of State.games) {
+    for (const e of (g.events || [])) {
+      if (e.type === 'pa_end' && e.batterId === playerId && e.location) {
+        results.push({ x: e.location.x, y: e.location.y, outcome: e.outcome });
+      }
+    }
+  }
+  return results.slice(-50);
+}
+
 function drawField(overrideBases = null) {
   const g = State.getGame(LiveGameId);
   if (!g) return;
@@ -6459,7 +6512,13 @@ function drawField(overrideBases = null) {
   const batterId = isCompleted ? null : currentBatterId(g);
   const batter = batterId ? State.getPlayer(batterId) : null;
 
-  const fielderMarker = (pid, player, pos, cx, cy) => {
+  // Team colors for fielder/batter circles
+  const fieldingTeam = State.getTeam(fieldingTeamId(g));
+  const battingTeam  = State.getTeam(battingTeamId(g));
+  const fielderFill  = fieldingTeam?.color || '#0f0f0f';
+  const batterFill   = battingTeam?.color  || '#c2410c';
+
+  const fielderMarker = (pid, player, pos, cx, cy, fillColor) => {
     if (!pid || !player) return '';
     const gloveMode = __fieldClickMode && __fieldClickMode.needFielder;
     if (gloveMode) {
@@ -6476,7 +6535,7 @@ function drawField(overrideBases = null) {
     } else {
       // Normal mode: simple circle + position label + name
       return `<g class="fielder" data-pid="${pid}" data-pos="${pos}" transform="translate(${cx},${cy})">
-        <circle class="fielder-circle" cx="0" cy="0" r="16"/>
+        <circle class="fielder-circle" cx="0" cy="0" r="16" fill="${fillColor}" fill-opacity="0.85"/>
         <text class="pos" x="0" y="0">${pos}</text>
         <text class="name bg" y="26">${escapeHtml(player.name)}</text>
         <text class="name" y="26">${escapeHtml(player.name)}</text>
@@ -6497,6 +6556,16 @@ function drawField(overrideBases = null) {
         <text x="0" y="3">${ini}</text>
       </g>`
   };
+
+  // Spray chart dots
+  const sprayDots = (() => {
+    if (!_sprayChartVisible || !batterId) return '';
+    const SPRAY_COLORS = { '1B': '#4ade80', '2B': '#60a5fa', '3B': '#67e8f9', 'HR': '#fde68a', 'OUT': '#fb923c', 'ERR_REACH': '#c084fc' };
+    return getSprayData(batterId).map(d => {
+      const color = SPRAY_COLORS[d.outcome] || '#94a3b8';
+      return `<circle cx="${d.x}" cy="${d.y}" r="5" fill="${color}" fill-opacity="0.65" stroke="#fff" stroke-width="1" stroke-opacity="0.5" pointer-events="none"/>`;
+    }).join('');
+  })();
 
   // Instruction overlay rendered inside the SVG — never affects DOM layout
   const instrText = __bipStep === 'locate'
@@ -6525,15 +6594,17 @@ function drawField(overrideBases = null) {
       ${sq(FIELD.SECOND.x, FIELD.SECOND.y, bases && bases[2])}
       ${sq(FIELD.THIRD.x,  FIELD.THIRD.y,  bases && bases[3])}
       <!-- Fielder markers -->
-      ${isCompleted ? '' : fielderMarker(pitcherId, pitcher, 'P',  FIELD.MOUND.x,   FIELD.MOUND.y)}
-      ${isCompleted ? '' : fielderMarker(cfId,      cf,      'CF', FIELD.CF_HOME.x, FIELD.CF_HOME.y)}
-      <!-- Batter marker (orange circle, just below home plate) -->
+      ${isCompleted ? '' : fielderMarker(pitcherId, pitcher, 'P',  FIELD.MOUND.x,   FIELD.MOUND.y,   fielderFill)}
+      ${isCompleted ? '' : fielderMarker(cfId,      cf,      'CF', FIELD.CF_HOME.x, FIELD.CF_HOME.y, fielderFill)}
+      <!-- Batter marker (team color circle, just below home plate) -->
       ${batter ? `<g class="batter-marker" transform="translate(${FIELD.HOME.x},${FIELD.HOME.y + 26})">
-        <circle class="batter-circle" cx="0" cy="0" r="14"/>
+        <circle class="batter-circle" cx="0" cy="0" r="14" fill="${batterFill}" fill-opacity="0.85"/>
         <text class="pos" x="0" y="0">🏏</text>
         <text class="name bg" y="22">${escapeHtml(batter.name)}</text>
         <text class="name"    y="22">${escapeHtml(batter.name)}</text>
       </g>` : ''}
+      <!-- Spray chart BIP dots -->
+      ${sprayDots}
       <!-- Locate-mode instruction banner overlaid at top of field -->
       ${instrOverlay}
     </svg>
@@ -8160,6 +8231,7 @@ Object.assign(window, {
   selectTeam,
   switchTab,
   sortStats, showCreateMyPlayerModal, submitMyPlayer,
+  toggleSprayChart,
 });
 </script>
 </body>
