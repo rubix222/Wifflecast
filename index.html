@@ -1287,6 +1287,8 @@
     letter-spacing: 0.4px;
   }
   .at-bat-row .player-name { font-weight: 600; color: #111827; }
+  .at-bat-row .batter-skip-btn { cursor: pointer; border-bottom: 1px dashed #d1d5db; }
+  .at-bat-row .batter-skip-btn:hover { color: #6b7280; }
   .at-bat-row .player-num { color: #6b7280; font-size: 12px; margin-right: 4px; }
   .at-bat-row .game-stats { font-size: 11px; color: #6b7280; margin-top: 2px; }
 
@@ -2691,7 +2693,8 @@ const State = {
     const pKPerInn = IP > 0     ? pK / IP             : null;
     const pBBPerInn = IP > 0    ? pBB / IP            : null;
     const GP  = battedGames.size;
-    const fGP = fieldedGames.size;
+    // Fielding GP = same as batting GP — everyone who bats also fields in wiffleball
+    const fGP = battedGames.size;
 
     return {
       GP, AB, H, R, RBI, BB, K_bat, K_looking, K_swinging, K_foul, AVG, OBP, SLG, OPS, PA, TB,
@@ -5831,11 +5834,15 @@ function rerenderLive() {
 function renderBatterRow(g) {
   const batterId = currentBatterId(g);
   const batter = State.getPlayer(batterId);
+  const canScore = !LiveGameWatchOnly && canUserScore();
+  const nameEl = canScore
+    ? `<span class="player-name batter-skip-btn" onclick="showSkipBatterModal()" title="Click to skip this batter">${escapeHtml(batter?.name || '?')} <span style="font-size:10px;color:#9ca3af">⏭</span></span>`
+    : `<span class="player-name">${escapeHtml(batter?.name || '?')}</span>`;
   return `
     <div class="at-bat-row">
       <div>
         <span class="player-num">#${escapeHtml(batter?.jerseyNumber || '-')}</span>
-        <span class="player-name">${escapeHtml(batter?.name || '?')}</span>
+        ${nameEl}
         <div class="game-stats">${batterId ? batterGameStats(g, batterId) : ''}</div>
       </div>
     </div>
@@ -7303,6 +7310,33 @@ async function finishGame(g, _reason) {
   }
 }
 
+function showSkipBatterModal() {
+  const g = State.getGame(LiveGameId); if (!g) return;
+  const batter = State.getPlayer(currentBatterId(g));
+  Modal.show(`
+    <div class="modal-header"><h3>Skip Batter?</h3></div>
+    <div class="modal-body" style="padding:16px">
+      <p style="margin:0;font-size:15px">Skip <strong>${escapeHtml(batter?.name || '?')}</strong> and move to the next batter?</p>
+      <p style="margin:8px 0 0;font-size:13px;color:#6b7280">No stats will be recorded for this plate appearance.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="Modal.hide()">Cancel</button>
+      <button class="btn btn-primary" onclick="skipBatter()">Skip</button>
+    </div>`);
+}
+
+async function skipBatter() {
+  Modal.hide();
+  const g = State.getGame(LiveGameId); if (!g) return;
+  if (!assertScoringLock(g.id)) return;
+  _cancelAnim();
+  _undoStack.push(captureSnapshot(g));
+  _redoStack.length = 0;
+  const idxKey = battingIdxKey(g);
+  await State.updateGame(g.id, { [idxKey]: g[idxKey] + 1, balls: 0, strikes: 0, fouls: 0 });
+  renderLiveGame(g.id);
+}
+
 async function endHalfInning(gameId) {
   if (!assertScoringLock(gameId)) return;
   if (!confirm('End this half-inning early? The current at-bat will be discarded.')) return;
@@ -8095,7 +8129,7 @@ Object.assign(window, {
   showNewGameModal, openGame, selectGame, deselectGame, deleteGame, openGameForScoring, showSetupModal,
   submitPlayer, submitTeam, submitNewGame,
   startGame, setPosition, moveBatter,
-  endHalfInning, endGameEarly,
+  endHalfInning, endGameEarly, showSkipBatterModal, skipBatter,
   showEditScoreModal, reopenGame, _esAdj, _esSave,
   showRecapModal, _copyRecap, _shareRecap, sendRecapEmails, autoSendRecapEmails, showEmailSetupModal, _saveEmailSetup, _toggleEmailSetup,
   showNewTournamentModal, submitNewTournament, showTournamentModal, submitTournament, selectTournament, tournamentBack,
