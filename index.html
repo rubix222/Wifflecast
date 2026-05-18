@@ -1238,6 +1238,10 @@
   .stats-table tr:last-child td { border-bottom: none; }
   .stats-table tr:hover td { background: #f9fafb; }
   .stats-table tr:hover td:first-child { background: #f9fafb; }
+  .stats-table tr.mine td { background: #f0fdf4; color: #14532d; font-weight: 600; }
+  .stats-table tr.mine td:first-child { background: #f0fdf4; }
+  .stats-table tr.mine:hover td { background: #dcfce7; }
+  .stats-table tr.mine:hover td:first-child { background: #dcfce7; }
   /* Single-row inline tables (home page stat rows) have no name column —
      suppress sticky and the 150px min-width so stat columns stay compact */
   .stats-table--noname th:first-child,
@@ -4112,12 +4116,14 @@ const Render = {
       ${cols.map(thArr).join('')}
     </tr>`;
 
+    const myPid = currentUserProfile?.playerId;
     const tBody = rows.map(({ p, d }) => {
       const cells = cols.map(col => {
         const disp = col.fmt ? col.fmt(d[col.key]) : (d[col.key] ?? '—');
         return `<td>${disp}</td>`;
       }).join('');
-      return `<tr onclick="showPlayerStatsModal('${p.id}')" style="cursor:pointer" title="View ${escapeHtml(p.name)}'s stats">
+      const mine = myPid && p.id === myPid ? ' mine' : '';
+      return `<tr onclick="showPlayerStatsModal('${p.id}')" style="cursor:pointer" class="${mine.trim()}" title="View ${escapeHtml(p.name)}'s stats">
         <td>${escapeHtml(p.name)}</td>
         ${cells}
       </tr>`;
@@ -4156,9 +4162,11 @@ const Render = {
 
     const sorted = [...State.teams].sort((a, b) => a.name.localeCompare(b.name));
     const myPid = currentUserProfile?.playerId;
+    const isMyTeam = (t) => !!(myPid && (t.playerIds || []).includes(myPid));
     const teamNameCell = (t) => {
       return `<td><span style="cursor:pointer;border-bottom:1px dashed #9ca3af" onclick="event.stopPropagation();showTeamStatsModal('${t.id}')">${escapeHtml(t.name)}</span></td>`;
     };
+    const teamRowClass = (t) => isMyTeam(t) ? 'mine' : '';
 
     // ── BATTING GRID ──
     if (teamsView === 'batting') {
@@ -4178,7 +4186,7 @@ const Render = {
       const nameSortArr = sort.col === 'name' ? (sort.dir === -1 ? '<span class="sort-arr">▼</span>' : '<span class="sort-arr">▲</span>') : '<span class="sort-arr" style="opacity:0.25">▼</span>';
       c.innerHTML = `<div class="stats-table-wrap"><table class="stats-table">
         <thead><tr><th onclick="sortTeamStats('name','batting')">Team${nameSortArr}</th>${COLS.map(thArr).join('')}</tr></thead>
-        <tbody>${rows.map(({ t, d }) => `<tr onclick="selectTeam('${t.id}');setTeamsView('batting')" style="cursor:pointer">
+        <tbody>${rows.map(({ t, d }) => `<tr onclick="selectTeam('${t.id}');setTeamsView('batting')" style="cursor:pointer" class="${teamRowClass(t)}">
           ${teamNameCell(t)}
           ${COLS.map(col => `<td>${col.fmt ? col.fmt(d[col.key]) : (d[col.key] ?? '—')}</td>`).join('')}
         </tr>`).join('')}</tbody>
@@ -4206,7 +4214,7 @@ const Render = {
       const nameSortArr = sort.col === 'name' ? (sort.dir === -1 ? '<span class="sort-arr">▼</span>' : '<span class="sort-arr">▲</span>') : '<span class="sort-arr" style="opacity:0.25">▼</span>';
       c.innerHTML = `<div class="stats-table-wrap"><table class="stats-table">
         <thead><tr><th onclick="sortTeamStats('name','pitching')">Team${nameSortArr}</th>${COLS.map(thArr).join('')}</tr></thead>
-        <tbody>${rows.map(({ t, d }) => `<tr onclick="selectTeam('${t.id}');setTeamsView('batting')" style="cursor:pointer">
+        <tbody>${rows.map(({ t, d }) => `<tr onclick="selectTeam('${t.id}');setTeamsView('batting')" style="cursor:pointer" class="${teamRowClass(t)}">
           ${teamNameCell(t)}
           ${COLS.map(col => `<td>${col.fmt ? col.fmt(d[col.key]) : (d[col.key] ?? '—')}</td>`).join('')}
         </tr>`).join('')}</tbody>
@@ -4231,7 +4239,7 @@ const Render = {
       const nameSortArr = sort.col === 'name' ? (sort.dir === -1 ? '<span class="sort-arr">▼</span>' : '<span class="sort-arr">▲</span>') : '<span class="sort-arr" style="opacity:0.25">▼</span>';
       c.innerHTML = `<div class="stats-table-wrap"><table class="stats-table">
         <thead><tr><th onclick="sortTeamStats('name','fielding')">Team${nameSortArr}</th>${COLS.map(thArr).join('')}</tr></thead>
-        <tbody>${rows.map(({ t, d }) => `<tr onclick="selectTeam('${t.id}');setTeamsView('batting')" style="cursor:pointer">
+        <tbody>${rows.map(({ t, d }) => `<tr onclick="selectTeam('${t.id}');setTeamsView('batting')" style="cursor:pointer" class="${teamRowClass(t)}">
           ${teamNameCell(t)}
           ${COLS.map(col => `<td>${col.fmt ? col.fmt(d[col.key]) : (d[col.key] ?? '—')}</td>`).join('')}
         </tr>`).join('')}</tbody>
@@ -4259,7 +4267,7 @@ const Render = {
       const nameSortArr = sort.col === 'name' ? (sort.dir === -1 ? '<span class="sort-arr">▼</span>' : '<span class="sort-arr">▲</span>') : '<span class="sort-arr" style="opacity:0.25">▼</span>';
       c.innerHTML = `<div class="stats-table-wrap"><table class="stats-table">
         <thead><tr><th onclick="sortTeamStats('name','record')">Team${nameSortArr}</th>${COLS.map(thArr).join('')}</tr></thead>
-        <tbody>${rows.map(({ t, d }) => `<tr onclick="selectTeam('${t.id}');setTeamsView('record')" style="cursor:pointer">
+        <tbody>${rows.map(({ t, d }) => `<tr onclick="selectTeam('${t.id}');setTeamsView('record')" style="cursor:pointer" class="${teamRowClass(t)}">
           ${teamNameCell(t)}
           ${COLS.map(col => `<td>${col.fmt ? col.fmt(d[col.key]) : (d[col.key] ?? '—')}</td>`).join('')}
         </tr>`).join('')}</tbody>
