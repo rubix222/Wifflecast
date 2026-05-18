@@ -745,7 +745,15 @@
   .scoreboard .middle .outs {
     margin-top: 5px;
     display: flex;
-    justify-content: center;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+  .scoreboard .middle .outs-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    opacity: 0.75;
   }
   .scoreboard .middle .out-dots {
     display: inline-flex;
@@ -5860,7 +5868,7 @@ function liveGameHTML(g, home, away) {
         </div>
         <div class="middle">
           <div class="inning" id="sb-inning">${isCompleted ? 'FINAL' : inningStr}</div>
-          <div class="outs" id="sb-outs"><span class="out-dots"><span class="out-dot${g.outs >= 1 ? ' on' : ''}"></span><span class="out-dot${g.outs >= 2 ? ' on' : ''}"></span><span class="out-dot${g.outs >= 3 ? ' on' : ''}"></span></span></div>
+          <div class="outs" id="sb-outs"><span class="outs-label">Outs</span><span class="out-dots"><span class="out-dot${g.outs >= 1 ? ' on' : ''}"></span><span class="out-dot${g.outs >= 2 ? ' on' : ''}"></span><span class="out-dot${g.outs >= 3 ? ' on' : ''}"></span></span></div>
         </div>
         <div class="team-side ${battingSide === 'home' && !isCompleted ? 'batting' : ''}">
           <div class="name">${escapeHtml(home.name)}</div>
@@ -6236,7 +6244,7 @@ function selectPlay(ts) {
   const sbInning = $('#sb-inning');
   if (sbInning) sbInning.textContent = (event.half === 'top' ? '▲ Top ' : '▼ Bot ') + event.inning;
   const sbOuts = $('#sb-outs');
-  if (sbOuts) sbOuts.innerHTML = `<span class="out-dots"><span class="out-dot${outs >= 1 ? ' on' : ''}"></span><span class="out-dot${outs >= 2 ? ' on' : ''}"></span><span class="out-dot${outs >= 3 ? ' on' : ''}"></span></span>`;
+  if (sbOuts) sbOuts.innerHTML = `<span class="outs-label">Outs</span><span class="out-dots"><span class="out-dot${outs >= 1 ? ' on' : ''}"></span><span class="out-dot${outs >= 2 ? ' on' : ''}"></span><span class="out-dot${outs >= 3 ? ' on' : ''}"></span></span>`;
 
   const banner = $('#replay-banner');
   if (banner) {
@@ -6258,7 +6266,7 @@ function clearPlaySelection(g) {
   const sbInning = $('#sb-inning');
   if (sbInning) sbInning.textContent = 'FINAL';
   const sbOuts = $('#sb-outs');
-  if (sbOuts) sbOuts.innerHTML = `<span class="out-dots"><span class="out-dot"></span><span class="out-dot"></span><span class="out-dot"></span></span>`;
+  if (sbOuts) sbOuts.innerHTML = `<span class="outs-label">Outs</span><span class="out-dots"><span class="out-dot"></span><span class="out-dot"></span><span class="out-dot"></span></span>`;
   const banner = $('#replay-banner');
   if (banner) banner.style.display = 'none';
 }
