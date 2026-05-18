@@ -277,18 +277,8 @@
   #anim-fielder {
     display: none;
     position: absolute;
-    width: 28px; height: 28px;
-    border-radius: 50%;
-    background: #16a34a;
-    border: 2px solid #fff;
-    color: #fff;
-    font-size: 10px;
-    font-weight: 800;
-    line-height: 24px;
-    text-align: center;
+    overflow: visible;
     will-change: transform;
-    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
-    box-shadow: 0 0 0 2px rgba(255,255,255,0.3);
   }
 
   .modal-backdrop {
@@ -2164,7 +2154,7 @@
 <!-- Play animation overlay — sits above live game, below modals; not wiped by rerenders -->
 <div id="play-anim-overlay">
   <div id="anim-ball">⚾</div>
-  <div id="anim-fielder"></div>
+  <svg id="anim-fielder" xmlns="http://www.w3.org/2000/svg" style="display:none;position:absolute;overflow:visible" width="60" height="60" viewBox="-30 -30 60 60"></svg>
   <div id="anim-banner"></div>
 </div>
 
@@ -6306,16 +6296,18 @@ function _svgToScreen(svgEl, sx, sy) {
 // or null if fid is falsy.  Position P → starts at MOUND; CF → starts at CF_HOME.
 function _getFielderInfo(fid, g) {
   if (!fid || !g) return null;
-  const player   = State.getPlayer(fid);
-  const name     = player?.name || '?';
-  const initials = name.split(/\s+/).map(w => w[0]?.toUpperCase() || '').join('').slice(0, 2);
+  const player    = State.getPlayer(fid);
+  const name      = player?.name || '?';
+  const initials  = name.split(/\s+/).map(w => w[0]?.toUpperCase() || '').join('').slice(0, 2);
   const positions = fieldingPositions(g) || {};
-  const pos = positions[fid];
+  const pos       = positions[fid] || '?';
+  const team      = State.teams.find(t => (t.playerIds || []).includes(fid));
+  const teamColor = team ? _teamColor(team) : '#6b7280';
   let startSvg;
   if (pos === 'P')  startSvg = FIELD.MOUND;
   else if (pos === 'CF') startSvg = FIELD.CF_HOME;
   else startSvg = FIELD.SECOND; // fallback for any other position
-  return { initials, startSvg };
+  return { initials, name, pos, teamColor, startSvg };
 }
 
 function _runAnim(item) {
@@ -6340,9 +6332,19 @@ function _runAnim(item) {
   bannerEl.style.transform  = 'translate(-50%, -50%) scale(0.8)';
   ballEl.style.display      = 'none';
   if (fielderEl) {
-    fielderEl.style.display     = 'none';
-    fielderEl.style.transition  = 'none';
-    fielderEl.textContent       = item.fielderInfo?.initials || '';
+    fielderEl.style.display    = 'none';
+    fielderEl.style.transition = 'none';
+    if (item.fielderInfo) {
+      const fi = item.fielderInfo;
+      fielderEl.innerHTML = `
+        <circle cx="0" cy="0" r="16" style="fill:${fi.teamColor};fill-opacity:0.85;stroke:rgba(255,255,255,0.85);stroke-width:1.5"/>
+        <text x="0" y="1" text-anchor="middle" dominant-baseline="middle"
+              style="font-size:10px;font-weight:800;fill:#fff;font-family:inherit;pointer-events:none">${escapeHtml(fi.pos)}</text>
+        <text x="0" y="26" text-anchor="middle"
+              style="font-size:9px;font-weight:700;fill:#000;stroke:#fff;stroke-width:3;paint-order:stroke fill;font-family:inherit;pointer-events:none">${escapeHtml(fi.name)}</text>`;
+    } else {
+      fielderEl.innerHTML = '';
+    }
   }
   overlay.style.display     = 'block';
 
@@ -6419,16 +6421,13 @@ function _runAnim(item) {
       const runDur  = item.phase2Dur || 450; // match ball phase-2 duration
       const startDelay = item.viaSvg ? (item.phase1Dur || 350) : 0;
 
-      // Place fielder at start position immediately
+      // Place fielder SVG at start position (viewBox is -30 -30 60 60, so circle centre = top-left corner)
       fielderEl.style.cssText = `
         display:block; position:absolute;
-        width:28px; height:28px; border-radius:50%;
-        background:#16a34a; border:2px solid #fff;
-        color:#fff; font-size:10px; font-weight:800;
-        line-height:24px; text-align:center;
+        width:60px; height:60px; overflow:visible;
         will-change:transform;
-        filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5));
-        left:${fStart.x - 14}px; top:${fStart.y - 14}px;
+        filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+        left:${fStart.x - 30}px; top:${fStart.y - 30}px;
         transform:translate(0,0); transition:none; opacity:1;`;
 
       const dx = fEnd.x - fStart.x, dy = fEnd.y - fStart.y;
