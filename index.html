@@ -5828,7 +5828,13 @@ function renderMatchupStrip(g) {
   const pitcherId = currentPitcherId(g);
   const batter  = State.getPlayer(batterId);
   const pitcher = State.getPlayer(pitcherId);
-  const bn = batter  ? `<span class="matchup-num">#${escapeHtml(batter.jerseyNumber  || '-')}</span> ${escapeHtml(batter.name)}`  : '?';
+  const canScore = !LiveGameWatchOnly && canUserScore();
+  const batterName = batter
+    ? `<span class="matchup-num">#${escapeHtml(batter.jerseyNumber || '-')}</span> ${escapeHtml(batter.name)}`
+    : '?';
+  const bn = canScore && batterId
+    ? `<span class="batter-skip-btn" onclick="showSkipBatterModal()" title="Click to skip this batter" style="cursor:pointer;border-bottom:1px dashed #d1d5db">${batterName} <span style="font-size:10px;color:#9ca3af">⏭</span></span>`
+    : batterName;
   const pn = pitcher ? `<span class="matchup-num">#${escapeHtml(pitcher.jerseyNumber || '-')}</span> ${escapeHtml(pitcher.name)}` : '?';
   const sprayBtn = batterId ? `<button class="btn btn-sm spray-toggle-btn" onclick="toggleSprayChart()" title="Spray chart">📍</button>` : '';
   return `
