@@ -3275,9 +3275,8 @@ function showTeamStatsModal(teamId) {
         .join(''))
     : '<span style="color:#6b7280;font-size:13px">No players</span>';
 
-  const colorDot = t.color
-    ? `<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${t.color};margin-right:6px;vertical-align:middle;border:1px solid rgba(0,0,0,0.15)"></span>`
-    : '';
+  const teamColor = _teamColor(t);
+  const colorDot = `<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${teamColor};margin-right:6px;vertical-align:middle;border:1px solid rgba(0,0,0,0.15)"></span>`;
 
   const editBtn = canEdit
     ? `<button class="btn btn-sm" onclick="Modal.hide();showTeamModal('${teamId}')" style="margin-right:8px">✎ Edit</button>`
