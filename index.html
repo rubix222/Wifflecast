@@ -4498,7 +4498,7 @@ function showTeamModal(id = null) {
         </div>
         <div class="form-group">
           <label for="team-color">Team color</label>
-          <input type="color" id="team-color" value="${editing?.color || _randomTeamColor()}" style="width:48px;height:36px;padding:2px;cursor:pointer;border-radius:6px;border:1px solid #d1d5db" />
+          <input type="color" id="team-color" value="${editing ? (editing.color || '#6b7280') : _randomTeamColor()}" style="width:48px;height:36px;padding:2px;cursor:pointer;border-radius:6px;border:1px solid #d1d5db" />
         </div>
         <div class="form-group">
           <label>Roster <span class="muted small">(select 2 or more players${!isAdmin() ? ' — only admins can change roster' : ''})</span></label>
