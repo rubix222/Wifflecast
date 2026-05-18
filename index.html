@@ -3190,7 +3190,7 @@ function renderHomeTeamsSection(teams, view) {
   const trs = teamData.map(row => {
     const d = row[view];
     const tds = cols.map(c => `<td>${c.fmt ? c.fmt(d[c.key]) : (d[c.key] ?? '—')}</td>`).join('');
-    return `<tr><td>${escapeHtml(row.t.name)}</td>${tds}</tr>`;
+    return `<tr style="cursor:pointer" onclick="showTeamStatsModal('${row.t.id}')"><td>${escapeHtml(row.t.name)}</td>${tds}</tr>`;
   }).join('');
   return `<div class="stats-table-wrap"><table class="stats-table">
     <thead><tr><th onclick="sortHomeTeams('name','${view}')">Team${nameSortArr}</th>${cols.map(thArr).join('')}</tr></thead>
@@ -3209,6 +3209,51 @@ function showPlayerStatsModal(playerId) {
     </div>
     <div class="modal-body">
       ${renderPlayerStatTable(s)}
+    </div>`);
+}
+
+function showTeamStatsModal(teamId) {
+  const t = State.getTeam(teamId); if (!t) return;
+  const myPid = currentUserProfile?.playerId;
+  const isMember = myPid && (t.playerIds || []).includes(myPid);
+  const canEdit = isAdmin() || isMember;
+
+  // Roster list
+  const rosterHtml = (t.playerIds || []).length
+    ? (t.playerIds
+        .map(pid => State.getPlayer(pid))
+        .filter(Boolean)
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(p => {
+          const num = p.jerseyNumber ? `<span class="jersey-badge" style="width:22px;height:22px;font-size:11px;margin-right:6px">${escapeHtml(p.jerseyNumber)}</span>` : '';
+          return `<span style="display:inline-flex;align-items:center;margin:3px 6px 3px 0;font-size:13px">${num}${escapeHtml(p.name)}</span>`;
+        })
+        .join(''))
+    : '<span style="color:#6b7280;font-size:13px">No players</span>';
+
+  const colorDot = t.color
+    ? `<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${t.color};margin-right:6px;vertical-align:middle;border:1px solid rgba(0,0,0,0.15)"></span>`
+    : '';
+
+  const editBtn = canEdit
+    ? `<button class="btn btn-sm" onclick="Modal.hide();showTeamModal('${teamId}')" style="margin-right:8px">✎ Edit</button>`
+    : '';
+
+  Modal.show(`
+    <div class="modal-header">
+      <h3>${colorDot}${escapeHtml(t.name)}</h3>
+      <button class="btn-icon" onclick="Modal.hide()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="margin-bottom:12px">
+        <div class="stat-section-title" style="margin-top:0">Roster</div>
+        <div style="line-height:1.8">${rosterHtml}</div>
+      </div>
+      ${renderTeamStatTable(teamId)}
+    </div>
+    <div class="modal-footer">
+      ${editBtn}
+      <button class="btn" onclick="Modal.hide()">Close</button>
     </div>`);
 }
 
@@ -8264,7 +8309,7 @@ Object.assign(window, {
   showBipOutTypeModal, showBipHitModal, showBipErrorModal,
   askLocation, cancelLocation, confirmLocation, finishHit,
   // Admin mode + player view
-  setPlayersView, selectPlayer, showPlayerStatsModal,
+  setPlayersView, selectPlayer, showPlayerStatsModal, showTeamStatsModal,
   setStatsMain, setTeamsView, sortTeamStats,
   setHomePlayerView, setHomeTeamsView, sortHomeTeams,
   selectTeam,
