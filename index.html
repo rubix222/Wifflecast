@@ -2542,7 +2542,7 @@ const State = {
 
   // ---- Team CRUD ----
   async addTeam(data) {
-    const t = { id: uid(), name: data.name.trim(), playerIds: [...(data.playerIds || [])], createdAt: Date.now() };
+    const t = { id: uid(), name: data.name.trim(), playerIds: [...(data.playerIds || [])], color: data.color || null, createdAt: Date.now() };
     this.teams.push(t);
     await Storage.saveTeam(t);
     return t;
@@ -2551,6 +2551,7 @@ const State = {
     const t = this.getTeam(id); if (!t) return;
     t.name = data.name.trim();
     t.playerIds = [...(data.playerIds || [])];
+    if (data.color !== undefined) t.color = data.color;
     await Storage.saveTeam(t);
   },
   async deleteTeam(id) {
@@ -2639,7 +2640,7 @@ const State = {
     let K_looking=0, K_swinging=0, K_foul=0;
     let pK=0, pBB=0, pIP_outs=0, pER=0, pR=0, pKL=0, pKS=0, pKF=0, pH=0;
     let pBF=0, pPitches=0, pStrikePitches=0;
-    let E=0, PO=0; // fielding
+    let E=0, PO=0, dpAttempts=0, dpSuccesses=0, tagAttempts=0, tagSuccesses=0; // fielding
     let singles=0, doubles=0, triples=0, hrs=0;
     const pitchedGames = new Set();
     const battedGames  = new Set();
@@ -2688,6 +2689,8 @@ const State = {
         }
         if (e.errorById === playerId) { E++; fieldedGames.add(g.id); }
         if (e.fielderId === playerId && e.outcome === 'OUT') { PO++; fieldedGames.add(g.id); }
+        if (e.fielderId === playerId && (e.doublePlay || e.dpAttempted)) { dpAttempts++; if (e.doublePlay) dpSuccesses++; fieldedGames.add(g.id); }
+        if (e.fielderId === playerId && e.sacFly) { tagAttempts++; if (e.sacFlyOut) tagSuccesses++; fieldedGames.add(g.id); }
         if (e.runsScoredBy && e.runsScoredBy.includes(playerId)) R++;
       });
     });
@@ -2710,6 +2713,8 @@ const State = {
     const GP  = battedGames.size;
     // Fielding GP = same as batting GP — everyone who bats also fields in wiffleball
     const fGP = battedGames.size;
+    const dpPct  = dpAttempts  > 0 ? dpSuccesses  / dpAttempts  : null;
+    const tagPct = tagAttempts > 0 ? tagSuccesses / tagAttempts : null;
 
     return {
       GP, AB, H, R, RBI, BB, K_bat, K_looking, K_swinging, K_foul, AVG, OBP, SLG, OPS, PA, TB,
@@ -2717,6 +2722,7 @@ const State = {
       pK, pKL, pKS, pKF, pBB, pER, pR, pH, IP, ERA, pWHIP,
       pBF, pPitches, pStrikePitches, pPerIP, pPerBF, pSPct, pKPerBF, pKPerInn, pBBPerInn,
       E, PO, pGP, fGP,
+      dpAttempts, dpSuccesses, dpPct, tagAttempts, tagSuccesses, tagPct,
     };
   },
 
@@ -2798,7 +2804,7 @@ const State = {
   },
 
   computeTeamFieldingStats(teamId) {
-    let E = 0, PO = 0;
+    let E = 0, PO = 0, dpAttempts = 0, dpSuccesses = 0, tagAttempts = 0, tagSuccesses = 0;
     const games = this.games.filter(g => g.homeTeamId === teamId || g.awayTeamId === teamId);
     const GP = games.filter(g => g.status === 'completed').length;
     games.forEach(g => {
@@ -2808,9 +2814,13 @@ const State = {
         if (e.type !== 'pa_end' || e.half !== fieldingHalf) return;
         if (e.errorById) E++;
         if (e.outcome === 'OUT' || e.outcome === 'K') PO++;
+        if (e.doublePlay || e.dpAttempted) { dpAttempts++; if (e.doublePlay) dpSuccesses++; }
+        if (e.sacFly) { tagAttempts++; if (e.sacFlyOut) tagSuccesses++; }
       });
     });
-    return { GP, E, PO };
+    const dpPct  = dpAttempts  > 0 ? dpSuccesses  / dpAttempts  : null;
+    const tagPct = tagAttempts > 0 ? tagSuccesses / tagAttempts : null;
+    return { GP, E, PO, dpAttempts, dpSuccesses, dpPct, tagAttempts, tagSuccesses, tagPct };
   },
 
   // Hit locations across all games for a player
@@ -2982,9 +2992,15 @@ const PITCH_COLS = [
   { key: 'bbPerInn',label:'BB/Inn',fmt: v => v !== null ? v.toFixed(2) : '—' },
 ];
 const FIELD_COLS = [
-  { key: 'GP', label: 'GP' },
-  { key: 'PO', label: 'PO' },
-  { key: 'E',  label: 'E'  },
+  { key: 'GP',         label: 'GP' },
+  { key: 'PO',         label: 'PO' },
+  { key: 'E',          label: 'E'  },
+  { key: 'dpAttempts', label: 'DPA' },
+  { key: 'dpSuccesses',label: 'DP'  },
+  { key: 'dpPct',      label: 'DP%', fmt: v => v !== null ? (v * 100).toFixed(0) + '%' : '—' },
+  { key: 'tagAttempts',label: 'TAGA' },
+  { key: 'tagSuccesses',label:'TAG'  },
+  { key: 'tagPct',     label: 'TAG%', fmt: v => v !== null ? (v * 100).toFixed(0) + '%' : '—' },
 ];
 const TEAM_RECORD_COLS = [
   { key: 'GP', label: 'GP' },
@@ -3006,7 +3022,9 @@ function playerPitchingData(s) {
     kPerBF: s.pKPerBF, kPerInn: s.pKPerInn, bbPerInn: s.pBBPerInn };
 }
 function playerFieldingData(s) {
-  return { GP: s.fGP, PO: s.PO, E: s.E };
+  return { GP: s.fGP, PO: s.PO, E: s.E,
+    dpAttempts: s.dpAttempts, dpSuccesses: s.dpSuccesses, dpPct: s.dpPct,
+    tagAttempts: s.tagAttempts, tagSuccesses: s.tagSuccesses, tagPct: s.tagPct };
 }
 function teamBattingData(bs, gp = 0) {
   return { GP: gp, PA: bs.PA, AB: bs.AB, AVG: bs.AVG, OBP: bs.OBP, SLG: bs.SLG, H: bs.H,
@@ -3066,9 +3084,17 @@ function renderPlayerPitchingRow(s) {
 }
 
 function renderPlayerFieldingRow(s) {
+  const dpPctStr  = s.dpPct  !== null && s.dpPct  !== undefined ? (s.dpPct  * 100).toFixed(0) + '%' : '—';
+  const tagPctStr = s.tagPct !== null && s.tagPct !== undefined ? (s.tagPct * 100).toFixed(0) + '%' : '—';
   return `<div class="stat-row-lg">
     ${statTile('PO', s.PO)}
     ${statTile('E', s.E)}
+    ${statTile('DPA', s.dpAttempts || 0)}
+    ${statTile('DP', s.dpSuccesses || 0)}
+    ${statTile('DP%', dpPctStr)}
+    ${statTile('TAGA', s.tagAttempts || 0)}
+    ${statTile('TAG', s.tagSuccesses || 0)}
+    ${statTile('TAG%', tagPctStr)}
   </div>`;
 }
 
@@ -5621,6 +5647,12 @@ function switchLiveTab(tab) {
   _liveTab = tab;
   $$('.lg-pane').forEach(p => { p.hidden = p.dataset.tab !== tab; });
   $$('.lg-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  if (tab === 'plays') {
+    requestAnimationFrame(() => {
+      const log = document.querySelector('.play-log');
+      if (log) log.scrollTop = log.scrollHeight;
+    });
+  }
 }
 
 function toggleLiveMenu() {
