@@ -491,7 +491,8 @@
 
   /* ---------- Games split panel ---------- */
   .games-split { grid-template-columns: 210px 1fr; }
-  .games-detail-panel { padding: 0; overflow-y: auto; max-height: 82vh; }
+  .games-detail-panel { padding: 0; overflow-y: auto; max-height: 82vh; min-height: 0; }
+  .games-detail-panel:empty { display: none; }
 
   /* ============================================================
      LIVE GAME SCREEN
