@@ -886,6 +886,8 @@
     paint-order: stroke;
   }
   .field-svg .batter-marker { pointer-events: none; }
+  .field-svg .batter-marker--clickable { pointer-events: all; }
+  .field-svg .batter-marker--clickable:hover .batter-circle { stroke: #facc15; stroke-width: 2.5; }
   .field-svg .batter-marker .batter-circle {
     /* fill is set inline per-team — do not override here */
     stroke: rgba(255,255,255,0.9);
@@ -1294,7 +1296,6 @@
   .at-bat-row .player-name { font-weight: 600; color: #111827; }
   .at-bat-row .batter-skip-btn { cursor: pointer; border-bottom: 1px dashed #d1d5db; }
   .at-bat-row .batter-skip-btn:hover { color: #6b7280; }
-  .lg-matchup-side[onclick]:hover .lg-matchup-name { color: #6b7280; }
   .at-bat-row .player-num { color: #6b7280; font-size: 12px; margin-right: 4px; }
   .at-bat-row .game-stats { font-size: 11px; color: #6b7280; margin-top: 2px; }
 
@@ -5954,19 +5955,13 @@ function renderMatchupStrip(g) {
   const batterName = batter
     ? `<span class="matchup-num">#${escapeHtml(batter.jerseyNumber || '-')}</span> ${escapeHtml(batter.name)}`
     : '?';
-  const batterNameEl = canScore && batterId
-    ? `${batterName} <span style="font-size:10px;color:#9ca3af">⏭</span>`
-    : batterName;
   const pn = pitcher ? `<span class="matchup-num">#${escapeHtml(pitcher.jerseyNumber || '-')}</span> ${escapeHtml(pitcher.name)}` : '?';
-  const sprayBtnNoPropagate = batterId ? `<button class="btn btn-sm spray-toggle-btn" onclick="event.stopPropagation();toggleSprayChart()" title="Spray chart">📍</button>` : '';
-  const batterSideAttrs = canScore && batterId
-    ? `onclick="showSkipBatterModal()" style="cursor:pointer" title="Tap to skip batter"`
-    : '';
+  const sprayBtn = batterId ? `<button class="btn btn-sm spray-toggle-btn" onclick="toggleSprayChart()" title="Spray chart">📍</button>` : '';
   return `
     <div class="lg-matchup-strip">
-      <div class="lg-matchup-side" ${batterSideAttrs}>
-        <div class="lg-matchup-label">At bat ${sprayBtnNoPropagate}</div>
-        <div class="lg-matchup-name">${batterNameEl}</div>
+      <div class="lg-matchup-side">
+        <div class="lg-matchup-label">At bat ${sprayBtn}</div>
+        <div class="lg-matchup-name">${batterName}</div>
         <div class="lg-matchup-stats">${batterId ? batterMatchupStats(g, batterId) : '—'}</div>
       </div>
       <div class="lg-matchup-side lg-matchup-right">
@@ -6748,12 +6743,18 @@ function drawField(overrideBases = null) {
       ${isCompleted ? '' : fielderMarker(pitcherId, pitcher, 'P',  FIELD.MOUND.x,   FIELD.MOUND.y,   fielderFill)}
       ${isCompleted ? '' : fielderMarker(cfId,      cf,      'CF', FIELD.CF_HOME.x, FIELD.CF_HOME.y, fielderFill)}
       <!-- Batter marker (team color circle, just below home plate) -->
-      ${batter ? `<g class="batter-marker" transform="translate(${FIELD.HOME.x},${FIELD.HOME.y + 26})">
-        <circle class="batter-circle" cx="0" cy="0" r="14" style="fill:${batterFill};fill-opacity:0.85"/>
-        <text class="pos" x="0" y="0">🏏</text>
-        <text class="name bg" y="22">${escapeHtml(batter.name)}</text>
-        <text class="name"    y="22">${escapeHtml(batter.name)}</text>
-      </g>` : ''}
+      ${batter ? (() => {
+        const canScoreNow = !LiveGameWatchOnly && canUserScore() && !__bipStep;
+        const gAttrs = canScoreNow
+          ? `class="batter-marker batter-marker--clickable" onclick="showSkipBatterModal()" style="cursor:pointer"`
+          : `class="batter-marker"`;
+        return `<g ${gAttrs} transform="translate(${FIELD.HOME.x},${FIELD.HOME.y + 26})">
+          <circle class="batter-circle" cx="0" cy="0" r="14" style="fill:${batterFill};fill-opacity:0.85"/>
+          <text class="pos" x="0" y="0">🏏</text>
+          <text class="name bg" y="22">${escapeHtml(batter.name)}</text>
+          <text class="name"    y="22">${escapeHtml(batter.name)}</text>
+        </g>`;
+      })() : ''}
       <!-- Spray chart BIP dots + legend -->
       ${sprayLayer}
       <!-- Locate-mode instruction banner overlaid at top of field -->
