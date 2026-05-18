@@ -743,16 +743,13 @@
   }
   .scoreboard .middle .inning { font-size: 15px; font-weight: 600; }
   .scoreboard .middle .outs {
-    margin-top: 4px;
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    opacity: 0.85;
+    margin-top: 5px;
+    display: flex;
+    justify-content: center;
   }
   .scoreboard .middle .out-dots {
     display: inline-flex;
-    gap: 3px;
-    margin-left: 4px;
+    gap: 5px;
   }
   .scoreboard .middle .out-dot {
     width: 8px; height: 8px;
@@ -5863,7 +5860,7 @@ function liveGameHTML(g, home, away) {
         </div>
         <div class="middle">
           <div class="inning" id="sb-inning">${isCompleted ? 'FINAL' : inningStr}</div>
-          ${isCompleted ? `<div class="outs" id="sb-outs">Outs <span class="out-dots"><span class="out-dot${g.outs >= 1 ? ' on' : ''}"></span><span class="out-dot${g.outs >= 2 ? ' on' : ''}"></span><span class="out-dot${g.outs >= 3 ? ' on' : ''}"></span></span></div>` : ''}
+          <div class="outs" id="sb-outs"><span class="out-dots"><span class="out-dot${g.outs >= 1 ? ' on' : ''}"></span><span class="out-dot${g.outs >= 2 ? ' on' : ''}"></span><span class="out-dot${g.outs >= 3 ? ' on' : ''}"></span></span></div>
         </div>
         <div class="team-side ${battingSide === 'home' && !isCompleted ? 'batting' : ''}">
           <div class="name">${escapeHtml(home.name)}</div>
@@ -5874,7 +5871,6 @@ function liveGameHTML(g, home, away) {
           <div class="count-block"><span class="label">B</span><span class="val" id="count-b">${g.balls}</span></div>
           <div class="count-block"><span class="label">S</span><span class="val" id="count-s">${g.strikes}</span></div>
           <div class="count-block"><span class="label">F</span><span class="val" id="count-f">${g.fouls || 0}</span></div>
-          <div class="count-block"><span class="label">Outs</span><span class="val" id="count-o">${g.outs}</span></div>
         </div>` : ''}
       </div>
 
@@ -6240,7 +6236,7 @@ function selectPlay(ts) {
   const sbInning = $('#sb-inning');
   if (sbInning) sbInning.textContent = (event.half === 'top' ? '▲ Top ' : '▼ Bot ') + event.inning;
   const sbOuts = $('#sb-outs');
-  if (sbOuts) sbOuts.innerHTML = `Outs <span class="out-dots"><span class="out-dot${outs >= 1 ? ' on' : ''}"></span><span class="out-dot${outs >= 2 ? ' on' : ''}"></span><span class="out-dot${outs >= 3 ? ' on' : ''}"></span></span>`;
+  if (sbOuts) sbOuts.innerHTML = `<span class="out-dots"><span class="out-dot${outs >= 1 ? ' on' : ''}"></span><span class="out-dot${outs >= 2 ? ' on' : ''}"></span><span class="out-dot${outs >= 3 ? ' on' : ''}"></span></span>`;
 
   const banner = $('#replay-banner');
   if (banner) {
@@ -6262,7 +6258,7 @@ function clearPlaySelection(g) {
   const sbInning = $('#sb-inning');
   if (sbInning) sbInning.textContent = 'FINAL';
   const sbOuts = $('#sb-outs');
-  if (sbOuts) sbOuts.innerHTML = `Outs <span class="out-dots"><span class="out-dot"></span><span class="out-dot"></span><span class="out-dot"></span></span>`;
+  if (sbOuts) sbOuts.innerHTML = `<span class="out-dots"><span class="out-dot"></span><span class="out-dot"></span><span class="out-dot"></span></span>`;
   const banner = $('#replay-banner');
   if (banner) banner.style.display = 'none';
 }
