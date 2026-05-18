@@ -5517,6 +5517,7 @@ let LiveGameId = null;
 let _lastLiveGameId = null;
 let LiveGameWatchOnly = false;
 let _sprayChartVisible = false;
+let _sprayBatterId = null; // player the chart is locked to; set on toggle-on
 let _scoringHeartbeat = null;
 let _selectedPlayTs = null;
 const _undoStack = [];
@@ -5579,6 +5580,7 @@ function renderLiveGame(gameId, watchOnly = false) {
     _liveTab = 'score';
     _prevGameSnap = null;
     _sprayChartVisible = false;
+    _sprayBatterId = null;
   }
   _lastLiveGameId = gameId;
   LiveGameId = gameId;
@@ -6729,6 +6731,13 @@ let __bipDetail = null;
 
 function toggleSprayChart() {
   _sprayChartVisible = !_sprayChartVisible;
+  if (_sprayChartVisible) {
+    // Lock to the current batter so dots stay visible even after their PA ends
+    const g = State.getGame(LiveGameId);
+    _sprayBatterId = g ? currentBatterId(g) : null;
+  } else {
+    _sprayBatterId = null;
+  }
   drawField();
   const keyEl = document.getElementById('spray-chart-key');
   const btnEl = document.getElementById('spray-toggle-btn');
@@ -6820,8 +6829,9 @@ function drawField(overrideBases = null) {
   // Spray chart dots + legend
   const SPRAY_COLORS = { '1B': '#4ade80', '2B': '#60a5fa', 'HR': '#fde68a', 'OUT': '#fb923c' };
   const sprayLayer = (() => {
-    if (!_sprayChartVisible || !batterId) return '';
-    const dots = getSprayData(batterId).map(d => {
+    const sprayPid = _sprayBatterId || batterId;
+    if (!_sprayChartVisible || !sprayPid) return '';
+    const dots = getSprayData(sprayPid).map(d => {
       const color = SPRAY_COLORS[d.outcome] || '#94a3b8';
       return `<circle cx="${d.x}" cy="${d.y}" r="5" fill="${color}" fill-opacity="0.7" stroke="#fff" stroke-width="1" stroke-opacity="0.6" pointer-events="none"/>`;
     }).join('');
