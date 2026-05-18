@@ -2129,10 +2129,14 @@
   <section id="view-games" class="view">
     <div class="toolbar">
       <h2>Games</h2>
-      <div style="display:flex;align-items:center;gap:12px">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
         <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:#6b7280;cursor:pointer;user-select:none">
           <input type="checkbox" id="chk-show-finished" onchange="showFinishedGames=this.checked;Render.games()">
           Show finished
+        </label>
+        <label id="lbl-my-games" style="display:none;align-items:center;gap:5px;font-size:13px;color:#6b7280;cursor:pointer;user-select:none">
+          <input type="checkbox" id="chk-my-games" onchange="showMyGamesOnly=this.checked;Render.games()">
+          My games only
         </label>
         <button id="btn-add-game" class="btn btn-primary" style="display:none">+ New Game</button>
       </div>
@@ -3308,6 +3312,7 @@ let selectedTeamId = null;
 // Game view state
 let selectedGameId = null;
 let showFinishedGames = false;
+let showMyGamesOnly = false;
 let statsSort    = { col: 'AVG', dir: -1 };
 let pitchSort    = { col: 'ERA', dir:  1 };
 let fieldSort    = { col: 'PO',  dir: -1 };
@@ -4281,9 +4286,17 @@ const Render = {
     const listEl = $('#games-list');
     if (!listEl) return;
 
-    // Sync checkbox with state (survives re-renders)
+    // Sync checkboxes with state (survives re-renders)
     const chk = $('#chk-show-finished');
     if (chk) chk.checked = showFinishedGames;
+    const myPid = currentUserProfile?.playerId;
+    const myTeamIds = myPid
+      ? new Set(State.teams.filter(t => (t.playerIds || []).includes(myPid)).map(t => t.id))
+      : new Set();
+    const lblMy = $('#lbl-my-games');
+    const chkMy = $('#chk-my-games');
+    if (lblMy) lblMy.style.display = myTeamIds.size ? 'flex' : 'none';
+    if (chkMy) chkMy.checked = showMyGamesOnly;
 
     if (!State.games.length) {
       const hasTwoTeams = State.teams.length >= 2;
@@ -4294,9 +4307,12 @@ const Render = {
       return;
     }
     const allSorted = [...State.games].sort((a, b) => b.createdAt - a.createdAt);
-    const sorted = showFinishedGames
+    let sorted = showFinishedGames
       ? allSorted
       : allSorted.filter(g => g.status !== 'completed');
+    if (showMyGamesOnly && myTeamIds.size) {
+      sorted = sorted.filter(g => myTeamIds.has(g.homeTeamId) || myTeamIds.has(g.awayTeamId));
+    }
 
     // If the selected game is now hidden, deselect it
     if (selectedGameId && !sorted.find(g => g.id === selectedGameId)) {
@@ -4306,7 +4322,10 @@ const Render = {
     }
 
     if (!sorted.length) {
-      listEl.innerHTML = `<div style="padding:16px;color:#6b7280;font-size:13px">No active games. <label style="cursor:pointer;color:#0369a1" onclick="showFinishedGames=true;Render.games()">Show finished?</label></div>`;
+      const emptyMsg = showMyGamesOnly
+        ? `No${showFinishedGames ? '' : ' active'} games for your team. <label style="cursor:pointer;color:#0369a1" onclick="showMyGamesOnly=false;Render.games()">Show all?</label>`
+        : `No active games. <label style="cursor:pointer;color:#0369a1" onclick="showFinishedGames=true;Render.games()">Show finished?</label>`;
+      listEl.innerHTML = `<div style="padding:16px;color:#6b7280;font-size:13px">${emptyMsg}</div>`;
       return;
     }
     // Keep selectedGameId valid
