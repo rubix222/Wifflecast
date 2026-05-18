@@ -927,7 +927,27 @@
     stroke-width: 3.5;
     r: 21;
   }
-  .spray-toggle-btn { padding:2px 6px; font-size:11px; margin-left:6px; vertical-align:middle; }
+  /* ── Spray chart toggle + key (bottom-left above undo) ── */
+  .spray-chart-controls {
+    position: absolute; bottom: 60px; left: 6px; z-index: 5;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+  }
+  .spray-chart-key {
+    background: rgba(255,255,255,0.94); border: 1px solid #e5e7eb;
+    border-radius: 6px; padding: 6px 8px; font-size: 10px; line-height: 1.6;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+  }
+  .spray-key-title { font-weight: 700; color: #374151; letter-spacing: 0.5px; margin-bottom: 3px; }
+  .spray-key-row { display: flex; align-items: center; gap: 10px; }
+  .spray-key-item { display: flex; align-items: center; gap: 4px; color: #374151; }
+  .spray-key-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.8); flex-shrink: 0; }
+  .spray-toggle-btn {
+    background: rgba(0,0,0,0.75); color: #fff; border-color: rgba(255,255,255,0.3);
+    font-size: 13px; padding: 3px 8px;
+  }
+  .spray-toggle-btn.active { background: #16a34a; border-color: #15803d; }
+  .spray-toggle-btn:hover { background: rgba(0,0,0,0.9); }
+  .spray-toggle-btn.active:hover { background: #15803d; }
   .badge { display:inline-block; font-size:10px; font-weight:700; padding:2px 7px; border-radius:10px; text-transform:uppercase; letter-spacing:0.4px; margin-left:6px; }
   .badge-guest { background:#f3f4f6; color:#6b7280; }
   .badge-invited { background:#fef3c7; color:#92400e; }
@@ -5859,6 +5879,21 @@ function liveGameHTML(g, home, away) {
                 ${!isCompleted && canScore ? `
                 <button class="btn-icon field-undo-btn" onclick="undoPlay()" ${_undoStack.length ? '' : 'disabled'} title="Undo">↩</button>
                 <button class="btn-icon field-redo-btn" onclick="redoPlay()" ${_redoStack.length ? '' : 'disabled'} title="Redo">↪</button>` : ''}
+                ${batterId ? `
+                <div class="spray-chart-controls">
+                  <div id="spray-chart-key" class="spray-chart-key" style="display:${_sprayChartVisible ? 'block' : 'none'}">
+                    <div class="spray-key-title">HIT CHART</div>
+                    <div class="spray-key-row">
+                      <span class="spray-key-item"><span class="spray-key-dot" style="background:#4ade80"></span>Single</span>
+                      <span class="spray-key-item"><span class="spray-key-dot" style="background:#60a5fa"></span>Double</span>
+                    </div>
+                    <div class="spray-key-row">
+                      <span class="spray-key-item"><span class="spray-key-dot" style="background:#fde68a"></span>HR</span>
+                      <span class="spray-key-item"><span class="spray-key-dot" style="background:#fb923c"></span>Out</span>
+                    </div>
+                  </div>
+                  <button class="btn-icon spray-toggle-btn${_sprayChartVisible ? ' active' : ''}" id="spray-toggle-btn" onclick="toggleSprayChart()" title="Toggle hit chart">📍 Hit Chart</button>
+                </div>` : ''}
               </div>
             </div>
           </div>
@@ -5958,11 +5993,10 @@ function renderMatchupStrip(g) {
     ? `<span class="matchup-num">#${escapeHtml(batter.jerseyNumber || '-')}</span> ${escapeHtml(batter.name)}`
     : '?';
   const pn = pitcher ? `<span class="matchup-num">#${escapeHtml(pitcher.jerseyNumber || '-')}</span> ${escapeHtml(pitcher.name)}` : '?';
-  const sprayBtn = batterId ? `<button class="btn btn-sm spray-toggle-btn" onclick="toggleSprayChart()" title="Spray chart">📍</button>` : '';
   return `
     <div class="lg-matchup-strip">
       <div class="lg-matchup-side">
-        <div class="lg-matchup-label">At bat ${sprayBtn}</div>
+        <div class="lg-matchup-label">At bat</div>
         <div class="lg-matchup-name">${batterName}</div>
         <div class="lg-matchup-stats">${batterId ? batterMatchupStats(g, batterId) : '—'}</div>
       </div>
@@ -6013,13 +6047,11 @@ function renderBatterRow(g) {
   const nameEl = canScore
     ? `<span class="player-name batter-skip-btn" onclick="showSkipBatterModal()" title="Click to skip this batter">${escapeHtml(batter?.name || '?')} <span style="font-size:10px;color:#9ca3af">⏭</span></span>`
     : `<span class="player-name">${escapeHtml(batter?.name || '?')}</span>`;
-  const sprayBtn = batterId ? `<button class="btn btn-sm spray-toggle-btn" onclick="toggleSprayChart()" title="Spray chart">📍</button>` : '';
   return `
     <div class="at-bat-row">
       <div>
         <span class="player-num">#${escapeHtml(batter?.jerseyNumber || '-')}</span>
         ${nameEl}
-        ${sprayBtn}
         <div class="game-stats">${batterId ? batterGameStats(g, batterId) : ''}</div>
       </div>
     </div>
@@ -6621,6 +6653,10 @@ let __bipDetail = null;
 function toggleSprayChart() {
   _sprayChartVisible = !_sprayChartVisible;
   drawField();
+  const keyEl = document.getElementById('spray-chart-key');
+  const btnEl = document.getElementById('spray-toggle-btn');
+  if (keyEl) keyEl.style.display = _sprayChartVisible ? 'block' : 'none';
+  if (btnEl) btnEl.classList.toggle('active', _sprayChartVisible);
 }
 
 function getSprayData(playerId) {
@@ -6711,20 +6747,7 @@ function drawField(overrideBases = null) {
       const color = SPRAY_COLORS[d.outcome] || '#94a3b8';
       return `<circle cx="${d.x}" cy="${d.y}" r="5" fill="${color}" fill-opacity="0.7" stroke="#fff" stroke-width="1" stroke-opacity="0.6" pointer-events="none"/>`;
     }).join('');
-    const legend = `
-      <g pointer-events="none">
-        <rect x="6" y="318" width="130" height="60" rx="5" fill="rgba(255,255,255,0.92)" stroke="#e5e7eb" stroke-width="1"/>
-        <text x="14" y="334" font-size="10" font-weight="700" fill="#374151" letter-spacing="0.5">HIT CHART</text>
-        <circle cx="18" cy="349" r="5" fill="#4ade80" fill-opacity="0.8" stroke="#fff" stroke-width="1"/>
-        <text x="27"  y="353" font-size="10" fill="#374151">Single</text>
-        <circle cx="78" cy="349" r="5" fill="#60a5fa" fill-opacity="0.8" stroke="#fff" stroke-width="1"/>
-        <text x="87"  y="353" font-size="10" fill="#374151">Double</text>
-        <circle cx="18" cy="367" r="5" fill="#fde68a" fill-opacity="0.8" stroke="#fff" stroke-width="1"/>
-        <text x="27"  y="371" font-size="10" fill="#374151">HR</text>
-        <circle cx="78" cy="367" r="5" fill="#fb923c" fill-opacity="0.8" stroke="#fff" stroke-width="1"/>
-        <text x="87"  y="371" font-size="10" fill="#374151">Out</text>
-      </g>`;
-    return dots + legend;
+    return dots;
   })();
 
   // Instruction overlay rendered inside the SVG — never affects DOM layout
