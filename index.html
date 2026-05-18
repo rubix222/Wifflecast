@@ -5934,10 +5934,10 @@ function renderPlayLog(g) {
     let fielderStr = '';
     if (e.outcome === 'OUT' && e.fielderId) {
       const f = State.getPlayer(e.fielderId);
-      if (f) fielderStr = ` <span class="play-fielder">→ ${escapeHtml(f.name)}</span>`;
+      if (f) fielderStr = ` <span class="play-fielder">by ${escapeHtml(f.name)}</span>`;
     } else if (e.outcome === 'ERR_REACH' && e.errorById) {
       const f = State.getPlayer(e.errorById);
-      if (f) fielderStr = ` <span class="play-fielder">(err: ${escapeHtml(f.name)})</span>`;
+      if (f) fielderStr = ` <span class="play-fielder">by ${escapeHtml(f.name)}</span>`;
     }
 
     // Extra detail line: DP, tag play
