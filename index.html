@@ -6272,6 +6272,7 @@ let _prevGameSnap  = null;   // snapshot before last Firestore push
 const _animQueue   = [];
 let   _animRunning = false;
 let   _animGen     = 0;   // incremented on every cancel; stale callbacks check this
+let   _animFielderPid = null; // player id currently being animated — suppressed in drawField()
 
 function _snapGame(g) {
   if (!g) return null;
@@ -6313,10 +6314,8 @@ function _cancelAnim() {
   if (ballEl)    { ballEl.style.transition = 'none'; ballEl.style.display = 'none'; }
   if (fielderEl) { fielderEl.style.transition = 'none'; fielderEl.style.display = 'none'; }
   if (bannerEl)  { bannerEl.style.transition = 'none'; bannerEl.style.opacity = '0'; }
-  // Restore any hidden static fielder circles
-  document.querySelectorAll('#field-svg .fielder[style*="visibility"]').forEach(el => {
-    el.style.visibility = '';
-  });
+  // Restore the suppressed fielder if animation was cut short
+  if (_animFielderPid) { _animFielderPid = null; drawField(); }
 }
 
 // Convert SVG 0-400 user coords → screen pixels via the CTM.
@@ -6457,9 +6456,8 @@ function _runAnim(item) {
       const runDur  = item.phase2Dur || 450; // match ball phase-2 duration
       const startDelay = item.viaSvg ? (item.phase1Dur || 350) : 0;
 
-      // Hide the static SVG fielder circle so only the animated one is visible
-      const staticFielder = document.querySelector(`#field-svg .fielder[data-pid="${fi.pid}"]`);
-      if (staticFielder) staticFielder.style.visibility = 'hidden';
+      // Suppress this fielder's static circle in drawField() for the duration of the animation
+      _animFielderPid = fi.pid;
 
       // Place fielder SVG at start position (viewBox is -30 -30 60 60, so circle centre = top-left corner)
       fielderEl.style.cssText = `
@@ -6501,11 +6499,9 @@ function _runAnim(item) {
         fielderEl.style.transition = `opacity ${fadeMs}ms`;
         fielderEl.style.opacity    = '0';
       }
-      // Restore the static SVG fielder circle as the animated one fades
-      if (item.fielderInfo?.pid) {
-        const sf = document.querySelector(`#field-svg .fielder[data-pid="${item.fielderInfo.pid}"]`);
-        if (sf) sf.style.visibility = '';
-      }
+      // Un-suppress the static fielder circle as the animated one fades
+      _animFielderPid = null;
+      drawField();
     }, totalVisible);
 
     // ── Done — advance queue ──────────────────────────────────
@@ -6713,8 +6709,9 @@ function drawField(overrideBases = null) {
   const fielderFill = _teamColor(State.getTeam(fieldingTeamId(g)));
   const batterFill  = _teamColor(State.getTeam(battingTeamId(g)));
 
-  const fielderMarker = (pid, player, pos, cx, cy, fillColor) => {
+  const fielderMarker = (pid, player, pos, cx, cy, fillColor, hidden = false) => {
     if (!pid || !player) return '';
+    if (hidden) return '';
     const gloveMode = __fieldClickMode && __fieldClickMode.needFielder;
     if (gloveMode) {
       // Out/error drag mode: glove image only, no circle.
@@ -6790,8 +6787,8 @@ function drawField(overrideBases = null) {
       ${sq(FIELD.SECOND.x, FIELD.SECOND.y, bases && bases[2])}
       ${sq(FIELD.THIRD.x,  FIELD.THIRD.y,  bases && bases[3])}
       <!-- Fielder markers -->
-      ${isCompleted ? '' : fielderMarker(pitcherId, pitcher, 'P',  FIELD.MOUND.x,   FIELD.MOUND.y,   fielderFill)}
-      ${isCompleted ? '' : fielderMarker(cfId,      cf,      'CF', FIELD.CF_HOME.x, FIELD.CF_HOME.y, fielderFill)}
+      ${isCompleted ? '' : fielderMarker(pitcherId, pitcher, 'P',  FIELD.MOUND.x,   FIELD.MOUND.y,   fielderFill, pitcherId === _animFielderPid)}
+      ${isCompleted ? '' : fielderMarker(cfId,      cf,      'CF', FIELD.CF_HOME.x, FIELD.CF_HOME.y, fielderFill, cfId      === _animFielderPid)}
       <!-- Batter marker (team color circle, just below home plate) -->
       ${batter ? (() => {
         const canScoreNow = !LiveGameWatchOnly && canUserScore() && !__bipStep;
