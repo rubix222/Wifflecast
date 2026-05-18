@@ -1277,12 +1277,16 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    margin: 6px 8px 0;
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    z-index: 10;
     padding: 8px 12px;
     background: rgba(240,253,244,0.97);
     border: 1px solid #bbf7d0;
     border-radius: 8px;
-    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.10);
   }
   .bip-instruction[hidden] { display: none; }
   .bip-instruction-text {
@@ -5926,19 +5930,19 @@ function liveGameHTML(g, home, away) {
           ${renderLastScorerPill(g)}
           ${canScore && isScoringLockStale(g) ? `<div style="background:#fef9c3;border-bottom:1px solid #fde68a;padding:8px 14px;font-size:12px;color:#92400e">⚠️ Your scoring session was inactive. Resume scoring to stay active — another scorer can take over until you do.</div>` : ''}
           ${!isCompleted ? renderMatchupStrip(g) : ''}
-          <div id="bip-instruction" class="bip-instruction"${__bipStep !== 'locate' ? ' hidden' : ''}>
-            <span class="bip-instruction-text">${
-              __bipKind === 'out'   ? 'Drag fielder to where the play happened' :
-              __bipKind === 'error' ? 'Drag fielder to where the error happened' :
-              __bipKind === 'hr'    ? 'Tap where the ball left the field' :
-                                      'Tap where the ball landed'
-            }</span>
-            <button class="bip-instruction-cancel" onclick="bipCancel()">✕</button>
-          </div>
           <div class="field-wrap">
             <div class="field-and-bases">
               <div class="field-panel">
                 <div id="field-container"></div>
+                <div id="bip-instruction" class="bip-instruction"${__bipStep !== 'locate' ? ' hidden' : ''}>
+                  <span class="bip-instruction-text">${
+                    __bipKind === 'out'   ? 'Drag fielder to where the play happened' :
+                    __bipKind === 'error' ? 'Drag fielder to where the error happened' :
+                    __bipKind === 'hr'    ? 'Tap where the ball left the field' :
+                                            'Tap where the ball landed'
+                  }</span>
+                  <button class="bip-instruction-cancel" onclick="bipCancel()">✕</button>
+                </div>
                 ${!isCompleted && canScore ? `
                 <button class="btn-icon field-undo-btn" onclick="undoPlay()" ${_undoStack.length ? '' : 'disabled'} title="Undo">↩</button>
                 <button class="btn-icon field-redo-btn" onclick="redoPlay()" ${_redoStack.length ? '' : 'disabled'} title="Redo">↪</button>` : ''}
