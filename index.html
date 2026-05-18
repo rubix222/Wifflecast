@@ -4153,7 +4153,7 @@ const Render = {
     const teamNameCell = (t) => {
       const canEdit = isAdmin() || (myPid && (t.playerIds || []).includes(myPid));
       const editBtn = canEdit ? ` <button class="btn-icon" title="Edit team" onclick="event.stopPropagation();showTeamModal('${t.id}')" style="font-size:12px;padding:1px 4px">✎</button>` : '';
-      return `<td>${escapeHtml(t.name)}${editBtn}</td>`;
+      return `<td><span style="cursor:pointer;border-bottom:1px dashed #9ca3af" onclick="event.stopPropagation();showTeamStatsModal('${t.id}')">${escapeHtml(t.name)}</span>${editBtn}</td>`;
     };
 
     // ── BATTING GRID ──
