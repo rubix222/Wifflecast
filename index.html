@@ -1409,6 +1409,16 @@
   .play-entry.selected { background: #dcfce7 !important; border-left: 3px solid #166534 !important; padding-left: 8px; }
   .play-count { font-size: 11px; color: #9ca3af; margin-left: 4px; }
   .play-fielder { font-size: 12px; color: #6b7280; }
+  .play-outcome { font-weight: 600; }
+  .play-outcome--out    { color: #dc2626; }
+  .play-outcome--error  { color: #b45309; }
+  .play-outcome--hit    { color: #16a34a; }
+  .play-outcome--walk   { color: #0d9488; }
+  .play-runs-pill {
+    display: inline-block; background: #fef08a; color: #854d0e;
+    font-size: 10px; font-weight: 700; padding: 1px 6px;
+    border-radius: 8px; margin-left: 5px; vertical-align: middle;
+  }
   .play-extras { font-size: 11px; color: #6b7280; display: block; margin-top: 1px; padding-left: 2px; }
   .play-inning-end {
     color: #9ca3af;
@@ -6090,20 +6100,27 @@ function renderPlayLog(g) {
       countStr = `<span class="play-count">${c}</span>`;
     }
 
-    // Fielder name for outs and errors
+    // Outcome color class
+    const outcomeClass = { K: 'play-outcome--out', OUT: 'play-outcome--out',
+      ERR_REACH: 'play-outcome--error',
+      '1B': 'play-outcome--hit', '2B': 'play-outcome--hit',
+      '3B': 'play-outcome--hit', HR: 'play-outcome--hit',
+      BB: 'play-outcome--walk' }[e.outcome] || '';
+
+    // Fielder name (plain, no team color)
     const _fielderSpan = (pid) => {
       const f = State.getPlayer(pid);
-      if (!f) return '';
-      const ft = State.teams.find(t => (t.playerIds || []).includes(pid));
-      const fc = ft ? _teamColor(ft) : '#6b7280';
-      return ` <span class="play-fielder" style="color:${fc};font-weight:600">by ${escapeHtml(f.name)}</span>`;
+      return f ? ` <span class="play-fielder">by ${escapeHtml(f.name)}</span>` : '';
     };
     let fielderStr = '';
-    if (e.outcome === 'OUT' && e.fielderId) {
-      fielderStr = _fielderSpan(e.fielderId);
-    } else if (e.outcome === 'ERR_REACH' && e.errorById) {
-      fielderStr = _fielderSpan(e.errorById);
-    }
+    if (e.outcome === 'OUT' && e.fielderId)          fielderStr = _fielderSpan(e.fielderId);
+    else if (e.outcome === 'ERR_REACH' && e.errorById) fielderStr = _fielderSpan(e.errorById);
+
+    // Runs scored pill
+    const runsScored = (e.runsScoredBy || []).length;
+    const runsPill = runsScored > 0
+      ? `<span class="play-runs-pill">+${runsScored} run${runsScored !== 1 ? 's' : ''}</span>`
+      : '';
 
     // Extra detail line: DP, tag play
     const extraParts = [];
@@ -6115,12 +6132,12 @@ function renderPlayLog(g) {
       ? `<span class="play-extras">${extraParts.join(' · ')}</span>`
       : '';
 
-    const scorerTag  = isAdmin() && e.scoredByName
+    const scorerTag = isAdmin() && e.scoredByName
       ? ` <span class="play-scorer" title="Scored by ${escapeHtml(e.scoredByName)}">✎${escapeHtml(e.scoredByName)}</span>`
       : '';
     const tsAttr = isCompleted ? `data-ts="${e.ts}"` : '';
 
-    parts.push(`<li class="play-entry${isCompleted ? ' clickable' : ''}" ${tsAttr}>${escapeHtml(batter?.name || '?')} — ${desc}${fielderStr} ${countStr}${scorerTag}${extrasStr}</li>`);
+    parts.push(`<li class="play-entry${isCompleted ? ' clickable' : ''}" ${tsAttr}>${escapeHtml(batter?.name || '?')} — <span class="play-outcome ${outcomeClass}">${desc}</span>${fielderStr}${runsPill} ${countStr}${scorerTag}${extrasStr}</li>`);
   });
 
   // Close out the last half-inning
