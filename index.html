@@ -6069,13 +6069,18 @@ function renderPlayLog(g) {
     }
 
     // Fielder name for outs and errors
+    const _fielderSpan = (pid) => {
+      const f = State.getPlayer(pid);
+      if (!f) return '';
+      const ft = State.teams.find(t => (t.playerIds || []).includes(pid));
+      const fc = ft ? _teamColor(ft) : '#6b7280';
+      return ` <span class="play-fielder" style="color:${fc};font-weight:600">by ${escapeHtml(f.name)}</span>`;
+    };
     let fielderStr = '';
     if (e.outcome === 'OUT' && e.fielderId) {
-      const f = State.getPlayer(e.fielderId);
-      if (f) fielderStr = ` <span class="play-fielder">by ${escapeHtml(f.name)}</span>`;
+      fielderStr = _fielderSpan(e.fielderId);
     } else if (e.outcome === 'ERR_REACH' && e.errorById) {
-      const f = State.getPlayer(e.errorById);
-      if (f) fielderStr = ` <span class="play-fielder">by ${escapeHtml(f.name)}</span>`;
+      fielderStr = _fielderSpan(e.errorById);
     }
 
     // Extra detail line: DP, tag play
