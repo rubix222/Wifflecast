@@ -845,7 +845,7 @@
   .field-svg .fielder.dragging { opacity: 0.5; }
   /* --- fielder marker: circle mode (default) --- */
   .field-svg .fielder .fielder-circle {
-    fill: rgba(15,15,15,0.72);
+    /* fill is set inline per-team — do not override here */
     stroke: rgba(255,255,255,0.85);
     stroke-width: 1.5;
   }
@@ -887,7 +887,7 @@
   }
   .field-svg .batter-marker { pointer-events: none; }
   .field-svg .batter-marker .batter-circle {
-    fill: rgba(194, 65, 12, 0.82);   /* orange — batting team colour */
+    /* fill is set inline per-team — do not override here */
     stroke: rgba(255,255,255,0.9);
     stroke-width: 1.5;
   }
@@ -1294,12 +1294,7 @@
   .at-bat-row .player-name { font-weight: 600; color: #111827; }
   .at-bat-row .batter-skip-btn { cursor: pointer; border-bottom: 1px dashed #d1d5db; }
   .at-bat-row .batter-skip-btn:hover { color: #6b7280; }
-  button.batter-skip-btn {
-    background: none; border: none; border-bottom: 1px dashed #9ca3af;
-    padding: 0; margin: 0; font: inherit; color: inherit; font-weight: 700;
-    cursor: pointer; line-height: inherit; display: inline;
-  }
-  button.batter-skip-btn:hover { color: #6b7280; }
+  .lg-matchup-side[onclick]:hover .lg-matchup-name { color: #6b7280; }
   .at-bat-row .player-num { color: #6b7280; font-size: 12px; margin-right: 4px; }
   .at-bat-row .game-stats { font-size: 11px; color: #6b7280; margin-top: 2px; }
 
@@ -5959,16 +5954,19 @@ function renderMatchupStrip(g) {
   const batterName = batter
     ? `<span class="matchup-num">#${escapeHtml(batter.jerseyNumber || '-')}</span> ${escapeHtml(batter.name)}`
     : '?';
-  const bn = canScore && batterId
-    ? `<button class="batter-skip-btn" onclick="showSkipBatterModal()" title="Click to skip this batter">${batterName} <span style="font-size:10px;color:#9ca3af;opacity:0.8">⏭</span></button>`
-    : `<span>${batterName}</span>`;
+  const batterNameEl = canScore && batterId
+    ? `${batterName} <span style="font-size:10px;color:#9ca3af">⏭</span>`
+    : batterName;
   const pn = pitcher ? `<span class="matchup-num">#${escapeHtml(pitcher.jerseyNumber || '-')}</span> ${escapeHtml(pitcher.name)}` : '?';
-  const sprayBtn = batterId ? `<button class="btn btn-sm spray-toggle-btn" onclick="toggleSprayChart()" title="Spray chart">📍</button>` : '';
+  const sprayBtnNoPropagate = batterId ? `<button class="btn btn-sm spray-toggle-btn" onclick="event.stopPropagation();toggleSprayChart()" title="Spray chart">📍</button>` : '';
+  const batterSideAttrs = canScore && batterId
+    ? `onclick="showSkipBatterModal()" style="cursor:pointer" title="Tap to skip batter"`
+    : '';
   return `
     <div class="lg-matchup-strip">
-      <div class="lg-matchup-side">
-        <div class="lg-matchup-label">At bat ${sprayBtn}</div>
-        <div class="lg-matchup-name">${bn}</div>
+      <div class="lg-matchup-side" ${batterSideAttrs}>
+        <div class="lg-matchup-label">At bat ${sprayBtnNoPropagate}</div>
+        <div class="lg-matchup-name">${batterNameEl}</div>
         <div class="lg-matchup-stats">${batterId ? batterMatchupStats(g, batterId) : '—'}</div>
       </div>
       <div class="lg-matchup-side lg-matchup-right">
@@ -6674,7 +6672,7 @@ function drawField(overrideBases = null) {
     } else {
       // Normal mode: simple circle + position label + name
       return `<g class="fielder" data-pid="${pid}" data-pos="${pos}" transform="translate(${cx},${cy})">
-        <circle class="fielder-circle" cx="0" cy="0" r="16" fill="${fillColor}" fill-opacity="0.85"/>
+        <circle class="fielder-circle" cx="0" cy="0" r="16" style="fill:${fillColor};fill-opacity:0.85"/>
         <text class="pos" x="0" y="0">${pos}</text>
         <text class="name bg" y="26">${escapeHtml(player.name)}</text>
         <text class="name" y="26">${escapeHtml(player.name)}</text>
@@ -6751,7 +6749,7 @@ function drawField(overrideBases = null) {
       ${isCompleted ? '' : fielderMarker(cfId,      cf,      'CF', FIELD.CF_HOME.x, FIELD.CF_HOME.y, fielderFill)}
       <!-- Batter marker (team color circle, just below home plate) -->
       ${batter ? `<g class="batter-marker" transform="translate(${FIELD.HOME.x},${FIELD.HOME.y + 26})">
-        <circle class="batter-circle" cx="0" cy="0" r="14" fill="${batterFill}" fill-opacity="0.85"/>
+        <circle class="batter-circle" cx="0" cy="0" r="14" style="fill:${batterFill};fill-opacity:0.85"/>
         <text class="pos" x="0" y="0">🏏</text>
         <text class="name bg" y="22">${escapeHtml(batter.name)}</text>
         <text class="name"    y="22">${escapeHtml(batter.name)}</text>
