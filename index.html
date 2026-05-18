@@ -4416,6 +4416,14 @@ async function deletePlayer(id) {
 /* ============================================================
    TEAM MODAL
    ============================================================ */
+function _randomTeamColor() {
+  const palette = [
+    '#dc2626','#ea580c','#d97706','#65a30d','#16a34a','#0d9488',
+    '#0284c7','#2563eb','#7c3aed','#9333ea','#c026d3','#db2777',
+  ];
+  return palette[Math.floor(Math.random() * palette.length)];
+}
+
 function showTeamModal(id = null) {
   const editing = id ? State.getTeam(id) : null;
   if (State.players.length < 2) { toast('Add at least 2 players first', 'error'); return; }
@@ -4445,7 +4453,7 @@ function showTeamModal(id = null) {
         </div>
         <div class="form-group">
           <label for="team-color">Team color</label>
-          <input type="color" id="team-color" value="${editing?.color || '#166534'}" style="width:48px;height:36px;padding:2px;cursor:pointer;border-radius:6px;border:1px solid #d1d5db" />
+          <input type="color" id="team-color" value="${editing?.color || _randomTeamColor()}" style="width:48px;height:36px;padding:2px;cursor:pointer;border-radius:6px;border:1px solid #d1d5db" />
         </div>
         <div class="form-group">
           <label>Roster <span class="muted small">(select 2 or more players${!isAdmin() ? ' — only admins can change roster' : ''})</span></label>
