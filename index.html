@@ -1294,6 +1294,12 @@
   .at-bat-row .player-name { font-weight: 600; color: #111827; }
   .at-bat-row .batter-skip-btn { cursor: pointer; border-bottom: 1px dashed #d1d5db; }
   .at-bat-row .batter-skip-btn:hover { color: #6b7280; }
+  button.batter-skip-btn {
+    background: none; border: none; border-bottom: 1px dashed #9ca3af;
+    padding: 0; margin: 0; font: inherit; color: inherit; font-weight: 700;
+    cursor: pointer; line-height: inherit; display: inline;
+  }
+  button.batter-skip-btn:hover { color: #6b7280; }
   .at-bat-row .player-num { color: #6b7280; font-size: 12px; margin-right: 4px; }
   .at-bat-row .game-stats { font-size: 11px; color: #6b7280; margin-top: 2px; }
 
@@ -5922,8 +5928,8 @@ function renderMatchupStrip(g) {
     ? `<span class="matchup-num">#${escapeHtml(batter.jerseyNumber || '-')}</span> ${escapeHtml(batter.name)}`
     : '?';
   const bn = canScore && batterId
-    ? `<span class="batter-skip-btn" onclick="showSkipBatterModal()" title="Click to skip this batter" style="cursor:pointer;border-bottom:1px dashed #d1d5db">${batterName} <span style="font-size:10px;color:#9ca3af">⏭</span></span>`
-    : batterName;
+    ? `<button class="batter-skip-btn" onclick="showSkipBatterModal()" title="Click to skip this batter">${batterName} <span style="font-size:10px;color:#9ca3af;opacity:0.8">⏭</span></button>`
+    : `<span>${batterName}</span>`;
   const pn = pitcher ? `<span class="matchup-num">#${escapeHtml(pitcher.jerseyNumber || '-')}</span> ${escapeHtml(pitcher.name)}` : '?';
   const sprayBtn = batterId ? `<button class="btn btn-sm spray-toggle-btn" onclick="toggleSprayChart()" title="Spray chart">📍</button>` : '';
   return `
