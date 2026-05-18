@@ -3202,6 +3202,10 @@ function showPlayerStatsModal(playerId) {
   const p = State.getPlayer(playerId); if (!p) return;
   const s = State.computePlayerStats(playerId);
   const name = p.jerseyNumber ? `#${p.jerseyNumber} ${p.name}` : p.name;
+  const canEdit = isAdmin() || currentUserProfile?.playerId === playerId;
+  const editBtn = canEdit
+    ? `<button class="btn btn-sm" onclick="Modal.hide();showPlayerModal('${playerId}')" style="margin-right:8px">✎ Edit</button>`
+    : '';
   Modal.show(`
     <div class="modal-header">
       <h3>${escapeHtml(name)}</h3>
@@ -3209,6 +3213,10 @@ function showPlayerStatsModal(playerId) {
     </div>
     <div class="modal-body">
       ${renderPlayerStatTable(s)}
+    </div>
+    <div class="modal-footer">
+      ${editBtn}
+      <button class="btn" onclick="Modal.hide()">Close</button>
     </div>`);
 }
 
@@ -4109,10 +4117,8 @@ const Render = {
         const disp = col.fmt ? col.fmt(d[col.key]) : (d[col.key] ?? '—');
         return `<td>${disp}</td>`;
       }).join('');
-      const canEditPlayer = isAdmin() || currentUserProfile?.playerId === p.id;
-      const editBtn = canEditPlayer ? ` <button class="btn-icon" title="Edit" onclick="event.stopPropagation();showPlayerModal('${p.id}')" style="font-size:12px;padding:1px 4px">✎</button>` : '';
       return `<tr onclick="showPlayerStatsModal('${p.id}')" style="cursor:pointer" title="View ${escapeHtml(p.name)}'s stats">
-        <td>${escapeHtml(p.name)}${editBtn}</td>
+        <td>${escapeHtml(p.name)}</td>
         ${cells}
       </tr>`;
     }).join('');
