@@ -4085,7 +4085,12 @@ const Render = {
     if (!c) return;
     const toolbar = $('#teams-toolbar');
     if (toolbar) {
-      toolbar.innerHTML = isAdmin() ? '<button class="btn btn-primary btn-sm" onclick="showTeamModal()">+ Add Team</button>' : '';
+      const myPid = currentUserProfile?.playerId;
+      const selectedTeam = selectedTeamId ? State.getTeam(selectedTeamId) : null;
+      const canEditSelected = selectedTeam && (isAdmin() || (myPid && (selectedTeam.playerIds || []).includes(myPid)));
+      const editBtn = canEditSelected ? `<button class="btn btn-sm" onclick="showTeamModal('${selectedTeamId}')">✎ Edit Team</button>` : '';
+      const addBtn  = isAdmin() ? '<button class="btn btn-primary btn-sm" onclick="showTeamModal()">+ Add Team</button>' : '';
+      toolbar.innerHTML = [editBtn, addBtn].filter(Boolean).join(' ');
     }
 
     if (!State.teams.length) {
