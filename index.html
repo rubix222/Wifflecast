@@ -6573,7 +6573,7 @@ function drawField(overrideBases = null) {
     }).join('');
     const legend = `
       <g pointer-events="none">
-        <rect x="6" y="318" width="130" height="74" rx="5" fill="rgba(255,255,255,0.92)" stroke="#e5e7eb" stroke-width="1"/>
+        <rect x="6" y="318" width="130" height="60" rx="5" fill="rgba(255,255,255,0.92)" stroke="#e5e7eb" stroke-width="1"/>
         <text x="14" y="334" font-size="10" font-weight="700" fill="#374151" letter-spacing="0.5">HIT CHART</text>
         <circle cx="18" cy="349" r="5" fill="#4ade80" fill-opacity="0.8" stroke="#fff" stroke-width="1"/>
         <text x="27"  y="353" font-size="10" fill="#374151">Single</text>
@@ -6583,7 +6583,6 @@ function drawField(overrideBases = null) {
         <text x="27"  y="371" font-size="10" fill="#374151">Home Run</text>
         <circle cx="78" cy="367" r="5" fill="#fb923c" fill-opacity="0.8" stroke="#fff" stroke-width="1"/>
         <text x="87"  y="371" font-size="10" fill="#374151">Out</text>
-        <text x="14"  y="385" font-size="9" fill="#9ca3af">Errors shown as resulting base</text>
       </g>`;
     return dots + legend;
   })();
