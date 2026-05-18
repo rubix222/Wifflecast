@@ -6485,9 +6485,15 @@ function getSprayData(playerId) {
   const results = [];
   for (const g of State.games) {
     for (const e of (g.events || [])) {
-      if (e.type === 'pa_end' && e.batterId === playerId && e.location) {
-        results.push({ x: e.location.x, y: e.location.y, outcome: e.outcome });
+      if (e.type !== 'pa_end' || e.batterId !== playerId || !e.location) continue;
+      // Errors are grouped with the base they resulted in (errBase)
+      let displayOutcome = e.outcome;
+      if (e.outcome === 'ERR_REACH') {
+        displayOutcome = e.errBase || '1B'; // treat as the base reached
       }
+      // Skip triples — not shown on spray chart
+      if (displayOutcome === '3B') continue;
+      results.push({ x: e.location.x, y: e.location.y, outcome: displayOutcome });
     }
   }
   return results.slice(-50);
@@ -6557,14 +6563,29 @@ function drawField(overrideBases = null) {
       </g>`
   };
 
-  // Spray chart dots
-  const sprayDots = (() => {
+  // Spray chart dots + legend
+  const SPRAY_COLORS = { '1B': '#4ade80', '2B': '#60a5fa', 'HR': '#fde68a', 'OUT': '#fb923c' };
+  const sprayLayer = (() => {
     if (!_sprayChartVisible || !batterId) return '';
-    const SPRAY_COLORS = { '1B': '#4ade80', '2B': '#60a5fa', '3B': '#67e8f9', 'HR': '#fde68a', 'OUT': '#fb923c', 'ERR_REACH': '#c084fc' };
-    return getSprayData(batterId).map(d => {
+    const dots = getSprayData(batterId).map(d => {
       const color = SPRAY_COLORS[d.outcome] || '#94a3b8';
-      return `<circle cx="${d.x}" cy="${d.y}" r="5" fill="${color}" fill-opacity="0.65" stroke="#fff" stroke-width="1" stroke-opacity="0.5" pointer-events="none"/>`;
+      return `<circle cx="${d.x}" cy="${d.y}" r="5" fill="${color}" fill-opacity="0.7" stroke="#fff" stroke-width="1" stroke-opacity="0.6" pointer-events="none"/>`;
     }).join('');
+    const legend = `
+      <g pointer-events="none">
+        <rect x="6" y="318" width="130" height="74" rx="5" fill="rgba(255,255,255,0.92)" stroke="#e5e7eb" stroke-width="1"/>
+        <text x="14" y="334" font-size="10" font-weight="700" fill="#374151" letter-spacing="0.5">HIT CHART</text>
+        <circle cx="18" cy="349" r="5" fill="#4ade80" fill-opacity="0.8" stroke="#fff" stroke-width="1"/>
+        <text x="27"  y="353" font-size="10" fill="#374151">Single</text>
+        <circle cx="78" cy="349" r="5" fill="#60a5fa" fill-opacity="0.8" stroke="#fff" stroke-width="1"/>
+        <text x="87"  y="353" font-size="10" fill="#374151">Double</text>
+        <circle cx="18" cy="367" r="5" fill="#fde68a" fill-opacity="0.8" stroke="#fff" stroke-width="1"/>
+        <text x="27"  y="371" font-size="10" fill="#374151">Home Run</text>
+        <circle cx="78" cy="367" r="5" fill="#fb923c" fill-opacity="0.8" stroke="#fff" stroke-width="1"/>
+        <text x="87"  y="371" font-size="10" fill="#374151">Out</text>
+        <text x="14"  y="385" font-size="9" fill="#9ca3af">Errors shown as resulting base</text>
+      </g>`;
+    return dots + legend;
   })();
 
   // Instruction overlay rendered inside the SVG — never affects DOM layout
@@ -6603,8 +6624,8 @@ function drawField(overrideBases = null) {
         <text class="name bg" y="22">${escapeHtml(batter.name)}</text>
         <text class="name"    y="22">${escapeHtml(batter.name)}</text>
       </g>` : ''}
-      <!-- Spray chart BIP dots -->
-      ${sprayDots}
+      <!-- Spray chart BIP dots + legend -->
+      ${sprayLayer}
       <!-- Locate-mode instruction banner overlaid at top of field -->
       ${instrOverlay}
     </svg>
