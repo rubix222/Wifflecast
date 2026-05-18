@@ -4527,6 +4527,19 @@ function _randomTeamColor() {
   ];
   return palette[Math.floor(Math.random() * palette.length)];
 }
+// Returns the team's saved color, or a stable color derived from the team ID
+// so teams without an explicit color still get a consistent non-black display.
+function _teamColor(team) {
+  if (!team) return '#6b7280';
+  if (team.color) return team.color;
+  const palette = [
+    '#dc2626','#ea580c','#d97706','#65a30d','#16a34a','#0d9488',
+    '#0284c7','#2563eb','#7c3aed','#9333ea','#c026d3','#db2777',
+  ];
+  let h = 0;
+  for (let i = 0; i < (team.id || '').length; i++) h = (h * 31 + team.id.charCodeAt(i)) & 0xffff;
+  return palette[h % palette.length];
+}
 
 function showTeamModal(id = null) {
   const editing = id ? State.getTeam(id) : null;
@@ -6645,10 +6658,8 @@ function drawField(overrideBases = null) {
   const batter = batterId ? State.getPlayer(batterId) : null;
 
   // Team colors for fielder/batter circles
-  const fieldingTeam = State.getTeam(fieldingTeamId(g));
-  const battingTeam  = State.getTeam(battingTeamId(g));
-  const fielderFill  = fieldingTeam?.color || '#0f0f0f';
-  const batterFill   = battingTeam?.color  || '#c2410c';
+  const fielderFill = _teamColor(State.getTeam(fieldingTeamId(g)));
+  const batterFill  = _teamColor(State.getTeam(battingTeamId(g)));
 
   const fielderMarker = (pid, player, pos, cx, cy, fillColor) => {
     if (!pid || !player) return '';
