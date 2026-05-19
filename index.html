@@ -6737,13 +6737,7 @@ let __bipDetail = null;
 
 function toggleSprayChart() {
   _sprayChartVisible = !_sprayChartVisible;
-  if (_sprayChartVisible) {
-    // Lock to the current batter so dots stay visible even after their PA ends
-    const g = State.getGame(LiveGameId);
-    _sprayBatterId = g ? currentBatterId(g) : null;
-  } else {
-    _sprayBatterId = null;
-  }
+  _sprayBatterId = null;
   drawField();
   const keyEl = document.getElementById('spray-chart-key');
   const btnEl = document.getElementById('spray-toggle-btn');
@@ -7564,7 +7558,11 @@ async function applyPaEnd(g, ev) {
   const fresh = State.getGame(g.id);
   await postPlayCheck(fresh);
   Modal.hide();
+  // Flash the just-batted player's spray chart so the new dot is visible for
+  // this one render, then clear so subsequent renders use the new current batter.
+  if (_sprayChartVisible) _sprayBatterId = batterId;
   renderLiveGame(g.id);
+  _sprayBatterId = null;
 }
 
 function ensureLineScore(g) {
