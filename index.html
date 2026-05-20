@@ -6643,7 +6643,8 @@ function _detectAndQueueAnims(newG, prev) {
     const newPid = Object.keys(newPositions).find(pid => newPositions[pid] === 'P') || null;
     if (newPid && newPid !== prev.pitcherId) {
       const pitcher = State.getPlayer(newPid);
-      _queueAnim({ text: `New Pitcher: ${pitcher?.name || '?'}`, color: '#a78bfa', holdMs: 1800 });
+      _queueAnim({ text: `⚾ Pitching Change`, color: '#a78bfa', big: true, holdMs: 1200 });
+      _queueAnim({ text: `Now Pitching: ${pitcher?.name || '?'}`, color: '#a78bfa', big: true, holdMs: 2000 });
     }
   }
 
@@ -7075,7 +7076,13 @@ async function swapFielder(currentPid, newPid) {
   await State.updateGame(g.id, patch);
   Modal.hide();
   renderLiveGame(g.id);
-  toast(`${oldPos}: ${State.getPlayer(newPid)?.name || '?'}`, 'success');
+  if (oldPos === 'P') {
+    const pitcher = State.getPlayer(newPid);
+    _queueAnim({ text: `⚾ Pitching Change`, color: '#a78bfa', big: true, holdMs: 1200 });
+    _queueAnim({ text: `Now Pitching: ${pitcher?.name || '?'}`, color: '#a78bfa', big: true, holdMs: 2000 });
+  } else {
+    toast(`${oldPos}: ${State.getPlayer(newPid)?.name || '?'}`, 'success');
+  }
 }
 
 /* ============================================================
