@@ -5523,8 +5523,8 @@ let LiveGameId = null;
 let _lastLiveGameId = null;
 let LiveGameWatchOnly = false;
 let _sprayChartVisible = false;
-let _sprayBatterId = null;  // player to show during animation; null = current batter
-let _sprayMaxDots  = null;  // cap dot count to exclude the just-recorded hit during anim
+let _sprayBatterId    = null;  // player to show during animation; null = current batter
+let _sprayCachedDots  = null;  // snapshot of dots taken before save; prevents new dot from appearing
 let _scoringHeartbeat = null;
 let _selectedPlayTs = null;
 const _undoStack = [];
@@ -5588,7 +5588,7 @@ function renderLiveGame(gameId, watchOnly = false) {
     _prevGameSnap = null;
     _sprayChartVisible = false;
     _sprayBatterId     = null;
-    _sprayMaxDots      = null;
+    _sprayCachedDots   = null;
   }
   _lastLiveGameId = gameId;
   LiveGameId = gameId;
@@ -6431,9 +6431,9 @@ function _cancelAnim() {
   if (bannerEl)  { bannerEl.style.transition = 'none'; bannerEl.style.opacity = '0'; }
   // Restore the suppressed fielder and release spray lock if animation was cut short
   if (_animFielderPid || _sprayBatterId) {
-    _animFielderPid = null;
-    _sprayBatterId  = null;
-    _sprayMaxDots   = null;
+    _animFielderPid  = null;
+    _sprayBatterId   = null;
+    _sprayCachedDots = null;
     drawField();
   }
 }
@@ -6621,9 +6621,9 @@ function _runAnim(item) {
       }
       // Un-suppress the static fielder circle as the animated one fades
       // Also release the spray chart lock so it switches to the new batter
-      _animFielderPid = null;
-      _sprayBatterId  = null;
-      _sprayMaxDots   = null;
+      _animFielderPid  = null;
+      _sprayBatterId   = null;
+      _sprayCachedDots = null;
       drawField();
     }, totalVisible);
 
@@ -6877,13 +6877,11 @@ function drawField(overrideBases = null) {
   const SPRAY_COLORS = { '1B': '#4ade80', '2B': '#60a5fa', 'HR': '#fde68a', 'OUT': '#fb923c' };
   const sprayLayer = (() => {
     if (!_sprayChartVisible) return '';
-    // During animation, lock to the just-batted player; otherwise show current batter
+    // During animation: use cached snapshot (excludes the just-recorded hit) for the
+    // locked batter. After animation: live data for the current batter.
     const sprayPid = _sprayBatterId || batterId;
     if (!sprayPid) return '';
-    const allDots = getSprayData(sprayPid);
-    // Cap dots to exclude the just-recorded hit while the animation plays
-    const visibleDots = _sprayMaxDots !== null ? allDots.slice(0, _sprayMaxDots) : allDots;
-    const dots = visibleDots.map(d => {
+    const dots = (_sprayCachedDots !== null ? _sprayCachedDots : getSprayData(sprayPid)).map(d => {
       const color = SPRAY_COLORS[d.outcome] || '#94a3b8';
       return `<circle cx="${d.x}" cy="${d.y}" r="5" fill="${color}" fill-opacity="0.7" stroke="#fff" stroke-width="1" stroke-opacity="0.6" pointer-events="none"/>`;
     }).join('');
@@ -7519,10 +7517,13 @@ async function applyPaEnd(g, ev) {
     const anim = _buildOutcomeAnim(event, g);
     if (anim) {
       _queueAnim(anim);
-      // Lock spray chart to current batter's PRIOR history while animation plays
+      // Lock spray chart to current batter's PRIOR history while animation plays.
+      // Snapshot the dot array NOW (before State.updateGame) so the new hit is excluded.
+      // A count-based cap fails because getSprayData uses slice(-50), which shifts the
+      // window after the new event is appended, letting the new dot slip through.
       if (_sprayChartVisible && batterId) {
-        _sprayBatterId = batterId;
-        _sprayMaxDots  = getSprayData(batterId).length; // count before this play is saved
+        _sprayBatterId   = batterId;
+        _sprayCachedDots = getSprayData(batterId); // snapshot — new hit not in State yet
       }
     }
   }
