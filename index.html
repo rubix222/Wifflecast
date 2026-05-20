@@ -2746,7 +2746,7 @@ const State = {
           // Innings pitched: count outs recorded by this pitcher (K, OUT)
           if (e.outcome === 'K' || e.outcome === 'OUT') pIP_outs++;
           pER += e.earnedRuns || 0;
-          pR += (e.runsScoredBy || []).length;
+          pR  += e.earnedRuns || 0; // earnedRuns includes batter's run on HR; runsScoredBy misses it
           pBF++;
           pPitches      += e.pitches       || 0;
           pStrikePitches += e.strikePitches || 0;
@@ -5773,71 +5773,102 @@ function renderLiveStatsTable(g, away, home) {
 function renderHittingStats(g, away, home) {
   const renderTeam = (team, orderKey) => {
     const order = g[orderKey] || [];
-    if (!order.length) return `<tr><td colspan="7" class="muted" style="padding:8px;text-align:center">No lineup set</td></tr>`;
+    if (!order.length) return `<tr><td colspan="12" class="muted" style="padding:8px;text-align:center">No lineup set</td></tr>`;
     return order.map(pid => {
       const p = State.getPlayer(pid);
-      let ab=0, h=0, dbl=0, hr=0, bb=0, k=0, rbi=0;
+      let ab=0, h=0, singles=0, dbl=0, triples=0, hr=0, bb=0, k=0, rbi=0, r=0;
       (g.events || []).forEach(e => {
         if (e.type !== 'pa_end' || e.batterId !== pid) return;
         if (e.outcome === 'BB') { bb++; return; }
         ab++;
-        if (['1B','2B','3B','HR'].includes(e.outcome)) h++;
-        if (e.outcome === '2B') dbl++;
-        if (e.outcome === 'HR') hr++;
-        if (e.outcome === 'K') k++;
+        if (e.outcome === '1B') { h++; singles++; }
+        else if (e.outcome === '2B') { h++; dbl++; }
+        else if (e.outcome === '3B') { h++; triples++; }
+        else if (e.outcome === 'HR') { h++; hr++; }
+        else if (e.outcome === 'K') k++;
         rbi += e.rbi || 0;
+        if ((e.runsScoredBy || []).includes(pid)) r++;
       });
-      return `<tr><td>${escapeHtml(p?.name||'?')}</td><td>${h}-${ab}</td><td>${dbl}</td><td>${hr}</td><td>${bb}</td><td>${k}</td><td>${rbi}</td></tr>`;
+      const avg = ab ? (h / ab).toFixed(3).replace(/^0/, '') : '.000';
+      return `<tr>
+        <td>${escapeHtml(p?.name||'?')}</td>
+        <td>${ab}</td><td>${h}</td><td>${avg}</td>
+        <td>${singles}</td><td>${dbl}</td><td>${triples}</td><td>${hr}</td>
+        <td>${r}</td><td>${rbi}</td><td>${bb}</td><td>${k}</td>
+      </tr>`;
     }).join('');
   };
-  const hdr = name => `<tr class="stats-team-hdr"><th colspan="7">${escapeHtml(name)}</th></tr>
-    <tr class="stats-col-hdr"><th>Player</th><th>H-AB</th><th>2B</th><th>HR</th><th>BB</th><th>K</th><th>RBI</th></tr>`;
+  const hdr = name => `<tr class="stats-team-hdr"><th colspan="12">${escapeHtml(name)}</th></tr>
+    <tr class="stats-col-hdr"><th>Player</th><th>AB</th><th>H</th><th>AVG</th><th>1B</th><th>2B</th><th>3B</th><th>HR</th><th>R</th><th>RBI</th><th>BB</th><th>K</th></tr>`;
   return `<table>
     <thead>${hdr(away.name)}</thead><tbody>${renderTeam(away,'awayBattingOrder')}</tbody>
     <thead>${hdr(home.name)}</thead><tbody>${renderTeam(home,'homeBattingOrder')}</tbody>
   </table>
   <div class="stats-key">
-    <span><strong>H-AB</strong> Hits-At Bats</span>
-    <span><strong>2B</strong> Doubles</span>
-    <span><strong>HR</strong> Home Runs</span>
+    <span><strong>AB</strong> At Bats</span>
+    <span><strong>H</strong> Hits</span>
+    <span><strong>AVG</strong> Batting Average</span>
+    <span><strong>1B/2B/3B/HR</strong> Hit Types</span>
+    <span><strong>R</strong> Runs Scored</span>
+    <span><strong>RBI</strong> Runs Batted In</span>
     <span><strong>BB</strong> Walks</span>
     <span><strong>K</strong> Strikeouts</span>
-    <span><strong>RBI</strong> Runs Batted In</span>
   </div>`;
 }
 
 function renderPitchingStats(g, away, home) {
   const renderTeam = (team, positions, pitchingHalf) => {
-    const pitcherIds = (team.playerIds || []).filter(pid => (positions||{})[pid] === 'P');
-    if (!pitcherIds.length) return `<tr><td colspan="7" class="muted" style="padding:8px;text-align:center">No pitcher assigned</td></tr>`;
-    return pitcherIds.map(pid => {
+    // Find all pitchers who actually threw this half (from event log), plus current assigned P
+    const teamPidSet = new Set(team.playerIds || []);
+    const eventPids = [...new Set(
+      (g.events || [])
+        .filter(e => e.type === 'pa_end' && e.half === pitchingHalf && e.pitcherId && teamPidSet.has(e.pitcherId))
+        .map(e => e.pitcherId)
+    )];
+    // Fall back to current position assignment if no events yet
+    if (!eventPids.length) {
+      const curPid = Object.keys(positions || {}).find(pid => (positions||{})[pid] === 'P' && teamPidSet.has(pid));
+      if (curPid) eventPids.push(curPid);
+    }
+    if (!eventPids.length) return `<tr><td colspan="9" class="muted" style="padding:8px;text-align:center">No pitcher assigned</td></tr>`;
+    return eventPids.map(pid => {
       const p = State.getPlayer(pid);
-      let outs=0, h=0, bb=0, k=0, r=0, pitches=0;
+      let outs=0, h=0, hr=0, bb=0, k=0, er=0, pitches=0;
       (g.events || []).forEach(e => {
-        if (e.type !== 'pa_end' || e.half !== pitchingHalf) return;
+        if (e.type !== 'pa_end' || e.half !== pitchingHalf || e.pitcherId !== pid) return;
         if (e.outcome === 'OUT' || e.outcome === 'K') outs++;
         if (['1B','2B','3B','HR'].includes(e.outcome)) h++;
+        if (e.outcome === 'HR') hr++;
         if (e.outcome === 'BB') bb++;
         if (e.outcome === 'K') k++;
-        r += e.rbi || 0;
+        er += e.earnedRuns || 0;
         pitches += e.pitches || 0;
       });
-      const ip = `${Math.floor(outs/3)}${outs%3 ? '.'+outs%3 : ''}`;
-      return `<tr><td>${escapeHtml(p?.name||'?')}</td><td>${ip}</td><td>${h}</td><td>${bb}</td><td>${k}</td><td>${r}</td><td>${pitches}</td></tr>`;
+      const ipOuts = outs;
+      const ipStr = `${Math.floor(ipOuts/3)}${ipOuts%3 ? '.'+ipOuts%3 : ''}`;
+      const era = ipOuts > 0 ? ((er * 27) / ipOuts).toFixed(2) : '—';
+      return `<tr>
+        <td>${escapeHtml(p?.name||'?')}</td>
+        <td>${ipStr}</td><td>${era}</td>
+        <td>${h}</td><td>${hr}</td><td>${bb}</td><td>${k}</td>
+        <td>${er}</td><td>${pitches}</td>
+      </tr>`;
     }).join('');
   };
-  const hdr = name => `<tr class="stats-team-hdr"><th colspan="7">${escapeHtml(name)}</th></tr>
-    <tr class="stats-col-hdr"><th>Player</th><th>IP</th><th>H</th><th>BB</th><th>K</th><th>R</th><th>Pitches</th></tr>`;
+  const hdr = name => `<tr class="stats-team-hdr"><th colspan="9">${escapeHtml(name)}</th></tr>
+    <tr class="stats-col-hdr"><th>Player</th><th>IP</th><th>ERA</th><th>H</th><th>HR</th><th>BB</th><th>K</th><th>ER</th><th>Pitches</th></tr>`;
   return `<table>
     <thead>${hdr(away.name)}</thead><tbody>${renderTeam(away, g.awayPositions, 'bottom')}</tbody>
     <thead>${hdr(home.name)}</thead><tbody>${renderTeam(home, g.homePositions, 'top')}</tbody>
   </table>
   <div class="stats-key">
     <span><strong>IP</strong> Innings Pitched</span>
+    <span><strong>ERA</strong> Earned Run Average (9-inning)</span>
     <span><strong>H</strong> Hits Allowed</span>
+    <span><strong>HR</strong> Home Runs Allowed</span>
     <span><strong>BB</strong> Walks</span>
     <span><strong>K</strong> Strikeouts</span>
-    <span><strong>R</strong> Runs Allowed</span>
+    <span><strong>ER</strong> Earned Runs</span>
     <span><strong>Pitches</strong> Pitch Count</span>
   </div>`;
 }
@@ -5845,20 +5876,26 @@ function renderPitchingStats(g, away, home) {
 function renderFieldingStats(g, away, home) {
   const renderTeam = (team, positions, fieldingHalf) => {
     const ids = team.playerIds || [];
-    if (!ids.length) return `<tr><td colspan="3" class="muted" style="padding:8px;text-align:center">No players</td></tr>`;
-    return ids.map(pid => {
+    if (!ids.length) return `<tr><td colspan="5" class="muted" style="padding:8px;text-align:center">No players</td></tr>`;
+    const rows = ids.map(pid => {
       const p = State.getPlayer(pid);
-      let po=0, err=0;
+      let po=0, err=0, dpAtt=0, dpSuc=0, tagAtt=0, tagSuc=0;
       (g.events || []).forEach(e => {
         if (e.type !== 'pa_end' || e.half !== fieldingHalf) return;
         if (e.fielderId === pid && e.outcome === 'OUT') po++;
         if (e.errorById === pid) err++;
+        if (e.fielderId === pid && (e.doublePlay || e.dpAttempted)) { dpAtt++; if (e.doublePlay) dpSuc++; }
+        if (e.fielderId === pid && e.sacFly) { tagAtt++; if (e.sacFlyOut) tagSuc++; }
       });
-      return `<tr><td>${escapeHtml(p?.name||'?')}</td><td>${po}</td><td>${err}</td></tr>`;
-    }).join('');
+      if (po + err + dpAtt + tagAtt === 0) return null;
+      const dpStr  = dpAtt  > 0 ? `${dpSuc}/${dpAtt}`  : '—';
+      const tagStr = tagAtt > 0 ? `${tagSuc}/${tagAtt}` : '—';
+      return `<tr><td>${escapeHtml(p?.name||'?')}</td><td>${po}</td><td>${err}</td><td>${dpStr}</td><td>${tagStr}</td></tr>`;
+    }).filter(Boolean).join('');
+    return rows || `<tr><td colspan="5" class="muted" style="padding:8px;text-align:center">No fielding events</td></tr>`;
   };
-  const hdr = name => `<tr class="stats-team-hdr"><th colspan="3">${escapeHtml(name)}</th></tr>
-    <tr class="stats-col-hdr"><th>Player</th><th>PO</th><th>E</th></tr>`;
+  const hdr = name => `<tr class="stats-team-hdr"><th colspan="5">${escapeHtml(name)}</th></tr>
+    <tr class="stats-col-hdr"><th>Player</th><th>PO</th><th>E</th><th>DP</th><th>TAG</th></tr>`;
   return `<table>
     <thead>${hdr(away.name)}</thead><tbody>${renderTeam(away, g.awayPositions, 'bottom')}</tbody>
     <thead>${hdr(home.name)}</thead><tbody>${renderTeam(home, g.homePositions, 'top')}</tbody>
@@ -5866,6 +5903,8 @@ function renderFieldingStats(g, away, home) {
   <div class="stats-key">
     <span><strong>PO</strong> Putouts</span>
     <span><strong>E</strong> Errors</span>
+    <span><strong>DP</strong> Double Plays (made/attempted)</span>
+    <span><strong>TAG</strong> Tag plays (made/attempted)</span>
   </div>`;
 }
 
