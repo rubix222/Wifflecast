@@ -1291,7 +1291,7 @@ const Render = {
     const tog = $('#admin-features-toggle');
     if (tog) tog.innerHTML = `
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
-        <span style="color:${adminFeaturesEnabled ? '#111827' : '#6b7280'}">${adminFeaturesEnabled ? 'Admin features on' : 'Viewing as non-admin'}</span>
+        <span style="color:${adminFeaturesEnabled ? '#111827' : '#6b7280'};font-size:12px">${adminFeaturesEnabled ? 'Show admin controls site-wide' : 'Admin controls hidden site-wide'}</span>
         <input type="checkbox" ${adminFeaturesEnabled ? 'checked' : ''} onchange="toggleAdminFeatures()" style="width:16px;height:16px;cursor:pointer" />
       </label>`;
     if (!State.users.length) {
@@ -1379,7 +1379,7 @@ const Render = {
         <td><span class="muted small">${playerCount} player${playerCount !== 1 ? 's' : ''}</span></td>
         <td style="white-space:nowrap">
           <button class="btn-icon" title="Edit" onclick="showTeamModal('${t.id}')">✎</button>
-          ${isAdmin() ? `<button class="btn-icon" title="Delete" onclick="deleteTeam('${t.id}')">🗑</button>` : ''}
+          ${isAdminUser() ? `<button class="btn-icon" title="Delete" onclick="deleteTeam('${t.id}')">🗑</button>` : ''}
         </td>
       </tr>`;
     }).join('');
@@ -1846,7 +1846,7 @@ function showPlayerModal(id = null) {
 }
 async function submitPlayer(e, id) {
   e.preventDefault();
-  if (!isAdmin() && currentUserProfile?.playerId !== id) { toast('Not authorized', 'error'); return; }
+  if (!isAdminUser() && currentUserProfile?.playerId !== id) { toast('Not authorized', 'error'); return; }
   const data = { name: $('#player-name').value, jerseyNumber: $('#player-jersey').value };
   if (!data.name.trim()) return;
   if (id) await State.updatePlayer(id, data);
@@ -1856,7 +1856,7 @@ async function submitPlayer(e, id) {
   toast(id ? 'Player updated' : 'Player added', 'success');
 }
 async function deleteUser(uid) {
-  if (!isAdmin()) return;
+  if (!isAdminUser()) return;
   if (uid === currentUser?.uid) { toast('Cannot delete your own account', 'error'); return; }
   if (!confirm('Delete this user? Their linked player (if any) will become a guest.')) return;
   try {
@@ -1912,13 +1912,13 @@ function showTeamModal(id = null) {
   // Non-admin team members can open the modal for their own team
   const myPid = currentUserProfile?.playerId;
   const isMember = myPid && (editing?.playerIds || []).includes(myPid);
-  if (id && !isAdmin() && !isMember) { toast('Not authorized', 'error'); return; }
+  if (id && !isAdminUser() && !isMember) { toast('Not authorized', 'error'); return; }
   const selected = new Set(editing?.playerIds || []);
   const playerOptions = [...State.players]
     .sort((a, b) => a.name.localeCompare(b.name))
     .map(p => `
       <label class="player-picker-item">
-        <input type="checkbox" value="${p.id}" ${selected.has(p.id) ? 'checked' : ''} ${!isAdmin() ? 'disabled' : ''}/>
+        <input type="checkbox" value="${p.id}" ${selected.has(p.id) ? 'checked' : ''} ${!isAdminUser() ? 'disabled' : ''}/>
         <span class="jersey-badge" style="width:24px; height:24px; font-size:11px;">${escapeHtml(p.jerseyNumber || '#')}</span>
         <span>${escapeHtml(p.name)}</span>
       </label>`).join('');
@@ -1938,7 +1938,7 @@ function showTeamModal(id = null) {
           <input type="color" id="team-color" value="${editing ? (editing.color || '#6b7280') : _randomTeamColor()}" style="width:48px;height:36px;padding:2px;cursor:pointer;border-radius:6px;border:1px solid #d1d5db" />
         </div>
         <div class="form-group">
-          <label>Roster <span class="muted small">(select 2 or more players${!isAdmin() ? ' — only admins can change roster' : ''})</span></label>
+          <label>Roster <span class="muted small">(select 2 or more players${!isAdminUser() ? ' — only admins can change roster' : ''})</span></label>
           <div class="player-picker" id="team-player-picker">${playerOptions}</div>
         </div>
       </div>
@@ -1953,10 +1953,10 @@ async function submitTeam(e, id) {
   const existingTeam = id ? State.getTeam(id) : null;
   const myPid = currentUserProfile?.playerId;
   const isMember = myPid && (existingTeam?.playerIds || []).includes(myPid);
-  if (!isAdmin() && !isMember) { toast('Not authorized', 'error'); return; }
+  if (!isAdminUser() && !isMember) { toast('Not authorized', 'error'); return; }
   const color = $('#team-color').value;
   // Non-admins keep existing roster; admins can change it
-  const checked = isAdmin()
+  const checked = isAdminUser()
     ? $$('#team-player-picker input[type=checkbox]:checked').map(cb => cb.value)
     : (existingTeam?.playerIds || []);
   if (checked.length < 2) { toast('Pick at least 2 players', 'error'); return; }
