@@ -411,6 +411,20 @@ let teamFieldSort  = { col: 'PO', dir: -1 };
 let teamRecordSort = { col: 'W',  dir: -1 };
 let teamsView      = 'record'; // 'record' | 'batting' | 'pitching' | 'fielding'
 
+// ---- Stats event filter ----
+// null = all events/games; Set = explicit selection of tournament IDs + '__none__'
+let statsEventFilter = null;
+
+// ---- Tournament-detail stats view state ----
+let _tournStatsView = 'batting'; // 'batting' | 'pitching' | 'fielding'
+let _tournTeamView  = 'batting'; // 'batting' | 'pitching'
+// Sort state — separate from main stats so the two views are independent
+let _tpSort  = { col: 'AVG', dir: -1 }; // tournament player batting
+let _tppSort = { col: 'ERA', dir:  1 }; // tournament player pitching
+let _tpfSort = { col: 'PO',  dir: -1 }; // tournament player fielding
+let _ttbSort = { col: 'AVG', dir: -1 }; // tournament team batting
+let _ttpSort = { col: 'ERA', dir:  1 }; // tournament team pitching
+
 function setPlayersView(view) {
   playersView = view;
   $$('#players-subnav button').forEach(b => b.classList.toggle('active', b.dataset.pview === view));
@@ -679,6 +693,244 @@ async function adminResetPassword(uid) {
   } catch (err) {
     toast('Failed to send reset email: ' + (err.message || err.code), 'error');
   }
+}
+
+/* ============================================================
+   STATS EVENT FILTER
+   ============================================================ */
+
+// Returns the Set of tournament IDs (+ '__none__') that have at least one game.
+function getFilterKeys() {
+  const keys = new Set();
+  if (State.games.some(g => !g.tournamentId)) keys.add('__none__');
+  State.tournaments.forEach(t => {
+    if (State.games.some(g => g.tournamentId === t.id)) keys.add(t.id);
+  });
+  return keys;
+}
+
+// Returns a Set<gameId> matching the active filter, or null if all games should be used.
+function getFilteredGameIds() {
+  if (statsEventFilter === null) return null;
+  const ids = new Set();
+  State.games.forEach(g => {
+    const key = g.tournamentId || '__none__';
+    if (statsEventFilter.has(key)) ids.add(g.id);
+  });
+  return ids;
+}
+
+function renderStatsFilterBar() {
+  const c = $('#stats-filter-bar');
+  if (!c) return;
+  const filterKeys = getFilterKeys();
+  if (filterKeys.size <= 1) { c.innerHTML = ''; return; } // only one source — no filter needed
+
+  const isFiltered = statsEventFilter !== null;
+  const chips = [];
+  if (filterKeys.has('__none__')) {
+    const checked = !isFiltered || statsEventFilter.has('__none__');
+    chips.push(`<label class="stats-filter-chip${checked ? '' : ' unchecked'}">
+      <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleStatsFilter('__none__')">
+      <span>No Event</span>
+    </label>`);
+  }
+  State.tournaments.forEach(t => {
+    if (!filterKeys.has(t.id)) return;
+    const checked = !isFiltered || statsEventFilter.has(t.id);
+    chips.push(`<label class="stats-filter-chip${checked ? '' : ' unchecked'}">
+      <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleStatsFilter('${t.id}')">
+      <span>${escapeHtml(t.name)}</span>
+    </label>`);
+  });
+
+  c.innerHTML = `<div class="stats-filter-bar">
+    <span class="stats-filter-label">Filter by event:</span>
+    <div class="stats-filter-chips">${chips.join('')}</div>
+    ${isFiltered ? `<button class="btn btn-sm" onclick="clearStatsFilter()" style="flex-shrink:0">Show All</button>` : ''}
+  </div>`;
+}
+
+function toggleStatsFilter(key) {
+  const allKeys = getFilterKeys();
+  if (statsEventFilter === null) {
+    // Currently showing all — uncheck the one clicked
+    statsEventFilter = new Set([...allKeys].filter(k => k !== key));
+  } else {
+    const next = new Set(statsEventFilter);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    statsEventFilter = next.size === allKeys.size ? null : next;
+  }
+  Render.players();
+  Render.teams();
+}
+
+function clearStatsFilter() {
+  statsEventFilter = null;
+  Render.players();
+  Render.teams();
+}
+
+/* ============================================================
+   TOURNAMENT-DETAIL STATS
+   ============================================================ */
+
+function getTournamentGameIds(tournId) {
+  return new Set(State.games.filter(g => g.tournamentId === tournId).map(g => g.id));
+}
+
+// Players who appear in any event in the tournament's games (batters + pitchers)
+// Also includes players in batting orders (for games that haven't started yet or have no PAs).
+function getTournamentPlayers(tournId) {
+  const games = State.games.filter(g => g.tournamentId === tournId);
+  const pids = new Set();
+  games.forEach(g => {
+    (g.homeBattingOrder || []).forEach(pid => pids.add(pid));
+    (g.awayBattingOrder || []).forEach(pid => pids.add(pid));
+    (g.events || []).forEach(e => {
+      if (e.type !== 'pa_end') return;
+      if (e.batterId)  pids.add(e.batterId);
+      if (e.pitcherId) pids.add(e.pitcherId);
+    });
+  });
+  return [...pids].map(pid => State.getPlayer(pid)).filter(Boolean);
+}
+
+function renderTournPlayerStats(tournId) {
+  const c = $('#tourn-player-stats');
+  if (!c) return;
+  const gameIds = getTournamentGameIds(tournId);
+  const players = getTournamentPlayers(tournId);
+  if (!players.length) { c.innerHTML = '<div class="help-text" style="padding:8px">No player data yet.</div>'; return; }
+
+  const view = _tournStatsView;
+  const cols  = view === 'pitching' ? PITCH_COLS : view === 'fielding' ? FIELD_COLS : BATTING_COLS;
+  const sort  = view === 'pitching' ? _tppSort : view === 'fielding' ? _tpfSort : _tpSort;
+
+  let rows = players.map(p => {
+    const s = State.computePlayerStats(p.id, gameIds);
+    const d = view === 'pitching' ? playerPitchingData(s)
+            : view === 'fielding' ? playerFieldingData(s)
+            : playerBattingData(s);
+    return { p, d };
+  });
+  if (view === 'pitching') rows = rows.filter(r => (r.d.IP || 0) > 0);
+  if (!rows.length) { c.innerHTML = '<div class="help-text" style="padding:8px">No stats yet for this view.</div>'; return; }
+
+  rows.sort((a, b) => {
+    if (sort.col === 'name') return b.p.name.localeCompare(a.p.name) * sort.dir;
+    let av = a.d[sort.col] ?? null, bv = b.d[sort.col] ?? null;
+    if (av === null) av = sort.dir > 0 ? Infinity : -Infinity;
+    if (bv === null) bv = sort.dir > 0 ? Infinity : -Infinity;
+    return (bv - av) * sort.dir;
+  });
+
+  const thArr = col => {
+    const isSorted = sort.col === col.key;
+    const arr = isSorted ? (sort.dir === -1 ? '▼' : '▲') : '<span style="opacity:0.25">▼</span>';
+    return `<th class="num-col ${isSorted ? 'sorted' : ''}" onclick="sortTournPlayerStats('${tournId}','${col.key}','${view}')">${col.label}<span class="sort-arr">${arr}</span></th>`;
+  };
+  const nameSortArr = sort.col === 'name'
+    ? (sort.dir === -1 ? '<span class="sort-arr">▼</span>' : '<span class="sort-arr">▲</span>')
+    : '<span class="sort-arr" style="opacity:0.25">▼</span>';
+
+  const myPid = currentUserProfile?.playerId;
+  const tbody = rows.map(({ p, d }) => {
+    const cells = cols.map(col => `<td>${col.fmt ? col.fmt(d[col.key]) : (d[col.key] ?? '—')}</td>`).join('');
+    return `<tr class="${myPid === p.id ? 'mine' : ''}" style="cursor:pointer" onclick="showPlayerStatsModal('${p.id}')">
+      <td>${escapeHtml(p.name)}</td>${cells}
+    </tr>`;
+  }).join('');
+
+  c.innerHTML = `<div class="stats-table-wrap"><table class="stats-table">
+    <thead><tr>
+      <th onclick="sortTournPlayerStats('${tournId}','name','${view}')">Player${nameSortArr}</th>
+      ${cols.map(thArr).join('')}
+    </tr></thead>
+    <tbody>${tbody}</tbody>
+  </table></div>`;
+}
+
+function renderTournTeamStats(tournId) {
+  const c = $('#tourn-team-stats');
+  if (!c) return;
+  const t = State.getTournament(tournId);
+  if (!t) return;
+  const gameIds = getTournamentGameIds(tournId);
+  if (!gameIds.size) { c.innerHTML = '<div class="help-text" style="padding:8px">No games played yet.</div>'; return; }
+
+  const teams = (t.teamIds || []).map(tid => State.getTeam(tid)).filter(Boolean);
+  if (!teams.length) { c.innerHTML = '<div class="help-text" style="padding:8px">No teams.</div>'; return; }
+
+  const view = _tournTeamView;
+  const COLS = view === 'pitching' ? PITCH_COLS : BATTING_COLS;
+  const sort = view === 'pitching' ? _ttpSort : _ttbSort;
+
+  let rows = teams.map(team => {
+    const bat = State.computeTeamBattingStats(team.id, gameIds);
+    const pit = State.computeTeamPitchingStats(team.id, gameIds);
+    const ts  = State.computeTeamStats(team.id, gameIds);
+    const d   = view === 'pitching' ? teamPitchingData(pit, ts.gamesPlayed) : teamBattingData(bat, ts.gamesPlayed);
+    return { team, d };
+  });
+
+  rows.sort((a, b) => {
+    if (sort.col === 'name') return b.team.name.localeCompare(a.team.name) * sort.dir;
+    let av = a.d[sort.col] ?? null, bv = b.d[sort.col] ?? null;
+    if (av === null) av = sort.dir > 0 ? Infinity : -Infinity;
+    if (bv === null) bv = sort.dir > 0 ? Infinity : -Infinity;
+    return (bv - av) * sort.dir;
+  });
+
+  const thArr = col => {
+    const isSorted = sort.col === col.key;
+    const arr = isSorted ? (sort.dir === -1 ? '▼' : '▲') : '<span style="opacity:0.25">▼</span>';
+    return `<th class="num-col ${isSorted ? 'sorted' : ''}" onclick="sortTournTeamStats('${tournId}','${col.key}','${view}')">${col.label}<span class="sort-arr">${arr}</span></th>`;
+  };
+  const nameSortArr = sort.col === 'name'
+    ? (sort.dir === -1 ? '<span class="sort-arr">▼</span>' : '<span class="sort-arr">▲</span>')
+    : '<span class="sort-arr" style="opacity:0.25">▼</span>';
+
+  const tbody = rows.map(({ team, d }) =>
+    `<tr style="cursor:pointer" onclick="showTeamStatsModal('${team.id}')">
+      <td>${escapeHtml(team.name)}</td>
+      ${COLS.map(col => `<td>${col.fmt ? col.fmt(d[col.key]) : (d[col.key] ?? '—')}</td>`).join('')}
+    </tr>`
+  ).join('');
+
+  c.innerHTML = `<div class="stats-table-wrap"><table class="stats-table">
+    <thead><tr>
+      <th onclick="sortTournTeamStats('${tournId}','name','${view}')">Team${nameSortArr}</th>
+      ${COLS.map(thArr).join('')}
+    </tr></thead>
+    <tbody>${tbody}</tbody>
+  </table></div>`;
+}
+
+function setTournStatsView(tournId, view) {
+  _tournStatsView = view;
+  $$('#tourn-player-subnav button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  renderTournPlayerStats(tournId);
+}
+
+function setTournTeamView(tournId, view) {
+  _tournTeamView = view;
+  $$('#tourn-team-subnav button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  renderTournTeamStats(tournId);
+}
+
+function sortTournPlayerStats(tournId, col, view) {
+  const sort = view === 'pitching' ? _tppSort : view === 'fielding' ? _tpfSort : _tpSort;
+  if (sort.col === col) sort.dir *= -1;
+  else { sort.col = col; sort.dir = (col === 'ERA' || col === 'WHIP' || col === 'BB') ? 1 : -1; }
+  renderTournPlayerStats(tournId);
+}
+
+function sortTournTeamStats(tournId, col, view) {
+  const sort = view === 'pitching' ? _ttpSort : _ttbSort;
+  if (sort.col === col) sort.dir *= -1;
+  else { sort.col = col; sort.dir = (col === 'ERA' || col === 'WHIP') ? 1 : -1; }
+  renderTournTeamStats(tournId);
 }
 
 async function invitePlayer(playerId) {
@@ -1102,6 +1354,7 @@ const Render = {
   },
 
   players() {
+    renderStatsFilterBar();
     const c = $('#players-container');
 
     // Toolbar buttons (next to Players section heading)
@@ -1132,8 +1385,9 @@ const Render = {
     const cols  = which === 'pitching' ? PITCH_COLS : which === 'fielding' ? FIELD_COLS : BATTING_COLS;
 
     // Build rows with normalized data objects (unified keys shared with team cols)
+    const _gameIds = getFilteredGameIds();
     let rows = sorted.map(p => {
-      const s = State.computePlayerStats(p.id);
+      const s = State.computePlayerStats(p.id, _gameIds);
       const d = which === 'pitching' ? playerPitchingData(s)
               : which === 'fielding' ? playerFieldingData(s)
               : playerBattingData(s);
@@ -1215,12 +1469,13 @@ const Render = {
       return `<td><span style="cursor:pointer;border-bottom:1px dashed #9ca3af" onclick="event.stopPropagation();showTeamStatsModal('${t.id}')">${escapeHtml(t.name)}</span></td>`;
     };
     const teamRowClass = (t) => isMyTeam(t) ? 'mine' : '';
+    const _gameIds = getFilteredGameIds();
 
     // ── BATTING GRID ──
     if (teamsView === 'batting') {
       const COLS = BATTING_COLS;
       const sort = teamBatSort;
-      let rows = sorted.map(t => ({ t, d: teamBattingData(State.computeTeamBattingStats(t.id), State.computeTeamStats(t.id).gamesPlayed) }));
+      let rows = sorted.map(t => ({ t, d: teamBattingData(State.computeTeamBattingStats(t.id, _gameIds), State.computeTeamStats(t.id, _gameIds).gamesPlayed) }));
       rows.sort((a, b) => {
         if (sort.col === 'name') return b.t.name.localeCompare(a.t.name) * sort.dir;
         let av = a.d[sort.col] ?? 0, bv = b.d[sort.col] ?? 0;
@@ -1246,7 +1501,7 @@ const Render = {
     if (teamsView === 'pitching') {
       const COLS = PITCH_COLS;
       const sort = teamPitSort;
-      let rows = sorted.map(t => ({ t, d: teamPitchingData(State.computeTeamPitchingStats(t.id), State.computeTeamStats(t.id).gamesPlayed) }));
+      let rows = sorted.map(t => ({ t, d: teamPitchingData(State.computeTeamPitchingStats(t.id, _gameIds), State.computeTeamStats(t.id, _gameIds).gamesPlayed) }));
       rows.sort((a, b) => {
         if (sort.col === 'name') return b.t.name.localeCompare(a.t.name) * sort.dir;
         let av = a.d[sort.col] ?? null, bv = b.d[sort.col] ?? null;
@@ -1274,7 +1529,7 @@ const Render = {
     if (teamsView === 'fielding') {
       const COLS = FIELD_COLS;
       const sort = teamFieldSort;
-      let rows = sorted.map(t => ({ t, d: State.computeTeamFieldingStats(t.id) }));
+      let rows = sorted.map(t => ({ t, d: State.computeTeamFieldingStats(t.id, _gameIds) }));
       rows.sort((a, b) => {
         if (sort.col === 'name') return b.t.name.localeCompare(a.t.name) * sort.dir;
         return ((b.d[sort.col] ?? 0) - (a.d[sort.col] ?? 0)) * sort.dir;
@@ -1300,7 +1555,7 @@ const Render = {
       const COLS = TEAM_RECORD_COLS;
       const sort = teamRecordSort;
       let rows = sorted.map(t => {
-        const ts = State.computeTeamStats(t.id);
+        const ts = State.computeTeamStats(t.id, _gameIds);
         return { t, d: { GP: ts.gamesPlayed, W: ts.wins, L: ts.losses, RF: ts.runsFor, RA: ts.runsAgainst } };
       });
       rows.sort((a, b) => {
@@ -1957,7 +2212,25 @@ function renderTournamentDetail(id) {
 
       <div class="tourn-section-title">Games</div>
       ${gamesHtml}
+
+      <div class="tourn-section-title" style="margin-top:20px">Player Stats</div>
+      <div class="players-subnav" id="tourn-player-subnav">
+        <button class="${_tournStatsView === 'batting' ? 'active' : ''}" data-view="batting" onclick="setTournStatsView('${id}','batting')">Batting</button>
+        <button class="${_tournStatsView === 'pitching' ? 'active' : ''}" data-view="pitching" onclick="setTournStatsView('${id}','pitching')">Pitching</button>
+        <button class="${_tournStatsView === 'fielding' ? 'active' : ''}" data-view="fielding" onclick="setTournStatsView('${id}','fielding')">Fielding</button>
+      </div>
+      <div id="tourn-player-stats"></div>
+
+      <div class="tourn-section-title" style="margin-top:16px">Team Stats</div>
+      <div class="players-subnav" id="tourn-team-subnav">
+        <button class="${_tournTeamView === 'batting' ? 'active' : ''}" data-view="batting" onclick="setTournTeamView('${id}','batting')">Batting</button>
+        <button class="${_tournTeamView === 'pitching' ? 'active' : ''}" data-view="pitching" onclick="setTournTeamView('${id}','pitching')">Pitching</button>
+      </div>
+      <div id="tourn-team-stats"></div>
     </div>`;
+
+  renderTournPlayerStats(id);
+  renderTournTeamStats(id);
 }
 
 function showNewTournamentModal() {
@@ -2818,6 +3091,8 @@ Object.assign(window, {
   // Admin mode + player view
   setPlayersView, selectPlayer, showPlayerStatsModal, showTeamStatsModal,
   setStatsMain, setTeamsView, sortTeamStats,
+  toggleStatsFilter, clearStatsFilter,
+  setTournStatsView, setTournTeamView, sortTournPlayerStats, sortTournTeamStats,
   setHomePlayerView, setHomeTeamsView, sortHomeTeams,
   selectTeam,
   switchTab,

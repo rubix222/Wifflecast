@@ -417,7 +417,8 @@ const State = {
   },
 
   // ---- Stat aggregation from event log ----
-  computePlayerStats(playerId) {
+  // gameIds: optional Set<string> — if provided, only games in the set are counted
+  computePlayerStats(playerId, gameIds = null) {
     let AB=0, H=0, R=0, RBI=0, BB=0, TB=0, K_bat=0;
     let K_looking=0, K_swinging=0, K_foul=0;
     let pK=0, pBB=0, pIP_outs=0, pER=0, pR=0, pKL=0, pKS=0, pKF=0, pH=0;
@@ -428,7 +429,8 @@ const State = {
     const battedGames  = new Set();
     const fieldedGames = new Set();
 
-    this.games.forEach(g => {
+    const games = gameIds ? this.games.filter(g => gameIds.has(g.id)) : this.games;
+    games.forEach(g => {
       (g.events || []).forEach(e => {
         if (e.type !== 'pa_end') return; // only summarize at end of plate appearance
         const isBat = e.batterId === playerId;
@@ -508,8 +510,9 @@ const State = {
     };
   },
 
-  computeTeamStats(teamId) {
-    const games = this.games.filter(g => g.homeTeamId === teamId || g.awayTeamId === teamId);
+  computeTeamStats(teamId, gameIds = null) {
+    const pool  = gameIds ? this.games.filter(g => gameIds.has(g.id)) : this.games;
+    const games = pool.filter(g => g.homeTeamId === teamId || g.awayTeamId === teamId);
     const completed = games.filter(g => g.status === 'completed');
     let wins = 0, losses = 0, ties = 0, runsFor = 0, runsAgainst = 0;
     completed.forEach(g => {
@@ -528,9 +531,10 @@ const State = {
     };
   },
 
-  computeTeamBattingStats(teamId) {
+  computeTeamBattingStats(teamId, gameIds = null) {
     let AB=0, H=0, R=0, RBI=0, BB=0, TB=0, K=0, singles=0, doubles=0, triples=0, hrs=0;
-    this.games.forEach(g => {
+    const pool = gameIds ? this.games.filter(g => gameIds.has(g.id)) : this.games;
+    pool.forEach(g => {
       if (g.homeTeamId !== teamId && g.awayTeamId !== teamId) return;
       const battingHalf = g.homeTeamId === teamId ? 'bottom' : 'top';
       (g.events || []).forEach(e => {
@@ -555,9 +559,10 @@ const State = {
     };
   },
 
-  computeTeamPitchingStats(teamId) {
+  computeTeamPitchingStats(teamId, gameIds = null) {
     let outs=0, ER=0, R=0, K=0, BB=0, H=0, BF=0, pitches=0, strikePitches=0;
-    this.games.forEach(g => {
+    const pool = gameIds ? this.games.filter(g => gameIds.has(g.id)) : this.games;
+    pool.forEach(g => {
       if (g.homeTeamId !== teamId && g.awayTeamId !== teamId) return;
       const pitchingHalf = g.homeTeamId === teamId ? 'top' : 'bottom';
       (g.events || []).forEach(e => {
@@ -585,9 +590,10 @@ const State = {
     return { IP, ER, R, K, BB, H, ERA, WHIP, pPerIP, pPerBF, sPct, kPerBF, kPerInn, bbPerInn };
   },
 
-  computeTeamFieldingStats(teamId) {
+  computeTeamFieldingStats(teamId, gameIds = null) {
     let E = 0, PO = 0, dpAttempts = 0, dpSuccesses = 0, tagAttempts = 0, tagSuccesses = 0;
-    const games = this.games.filter(g => g.homeTeamId === teamId || g.awayTeamId === teamId);
+    const pool  = gameIds ? this.games.filter(g => gameIds.has(g.id)) : this.games;
+    const games = pool.filter(g => g.homeTeamId === teamId || g.awayTeamId === teamId);
     const GP = games.filter(g => g.status === 'completed').length;
     games.forEach(g => {
       // The team fields during the opposite half from when they bat
