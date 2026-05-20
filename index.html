@@ -5523,7 +5523,6 @@ let LiveGameId = null;
 let _lastLiveGameId = null;
 let LiveGameWatchOnly = false;
 let _sprayChartVisible = false;
-let _sprayBatterId = null; // player the chart is locked to; set on toggle-on
 let _scoringHeartbeat = null;
 let _selectedPlayTs = null;
 const _undoStack = [];
@@ -5586,7 +5585,6 @@ function renderLiveGame(gameId, watchOnly = false) {
     _liveTab = 'score';
     _prevGameSnap = null;
     _sprayChartVisible = false;
-    _sprayBatterId = null;
   }
   _lastLiveGameId = gameId;
   LiveGameId = gameId;
@@ -6737,7 +6735,6 @@ let __bipDetail = null;
 
 function toggleSprayChart() {
   _sprayChartVisible = !_sprayChartVisible;
-  _sprayBatterId = null;
   drawField();
   const keyEl = document.getElementById('spray-chart-key');
   const btnEl = document.getElementById('spray-toggle-btn');
@@ -6829,9 +6826,8 @@ function drawField(overrideBases = null) {
   // Spray chart dots + legend
   const SPRAY_COLORS = { '1B': '#4ade80', '2B': '#60a5fa', 'HR': '#fde68a', 'OUT': '#fb923c' };
   const sprayLayer = (() => {
-    const sprayPid = _sprayBatterId || batterId;
-    if (!_sprayChartVisible || !sprayPid) return '';
-    const dots = getSprayData(sprayPid).map(d => {
+    if (!_sprayChartVisible || !batterId) return '';
+    const dots = getSprayData(batterId).map(d => {
       const color = SPRAY_COLORS[d.outcome] || '#94a3b8';
       return `<circle cx="${d.x}" cy="${d.y}" r="5" fill="${color}" fill-opacity="0.7" stroke="#fff" stroke-width="1" stroke-opacity="0.6" pointer-events="none"/>`;
     }).join('');
@@ -7558,11 +7554,7 @@ async function applyPaEnd(g, ev) {
   const fresh = State.getGame(g.id);
   await postPlayCheck(fresh);
   Modal.hide();
-  // Flash the just-batted player's spray chart so the new dot is visible for
-  // this one render, then clear so subsequent renders use the new current batter.
-  if (_sprayChartVisible) _sprayBatterId = batterId;
   renderLiveGame(g.id);
-  _sprayBatterId = null;
 }
 
 function ensureLineScore(g) {
