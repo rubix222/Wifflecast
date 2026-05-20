@@ -5523,6 +5523,8 @@ let LiveGameId = null;
 let _lastLiveGameId = null;
 let LiveGameWatchOnly = false;
 let _sprayChartVisible = false;
+let _sprayBatterId = null;  // player to show during animation; null = current batter
+let _sprayMaxDots  = null;  // cap dot count to exclude the just-recorded hit during anim
 let _scoringHeartbeat = null;
 let _selectedPlayTs = null;
 const _undoStack = [];
@@ -5585,6 +5587,8 @@ function renderLiveGame(gameId, watchOnly = false) {
     _liveTab = 'score';
     _prevGameSnap = null;
     _sprayChartVisible = false;
+    _sprayBatterId     = null;
+    _sprayMaxDots      = null;
   }
   _lastLiveGameId = gameId;
   LiveGameId = gameId;
@@ -6386,8 +6390,13 @@ function _cancelAnim() {
   if (ballEl)    { ballEl.style.transition = 'none'; ballEl.style.display = 'none'; }
   if (fielderEl) { fielderEl.style.transition = 'none'; fielderEl.style.display = 'none'; }
   if (bannerEl)  { bannerEl.style.transition = 'none'; bannerEl.style.opacity = '0'; }
-  // Restore the suppressed fielder if animation was cut short
-  if (_animFielderPid) { _animFielderPid = null; drawField(); }
+  // Restore the suppressed fielder and release spray lock if animation was cut short
+  if (_animFielderPid || _sprayBatterId) {
+    _animFielderPid = null;
+    _sprayBatterId  = null;
+    _sprayMaxDots   = null;
+    drawField();
+  }
 }
 
 // Convert SVG 0-400 user coords → screen pixels via the CTM.
@@ -6572,7 +6581,10 @@ function _runAnim(item) {
         fielderEl.style.opacity    = '0';
       }
       // Un-suppress the static fielder circle as the animated one fades
+      // Also release the spray chart lock so it switches to the new batter
       _animFielderPid = null;
+      _sprayBatterId  = null;
+      _sprayMaxDots   = null;
       drawField();
     }, totalVisible);
 
@@ -6825,8 +6837,14 @@ function drawField(overrideBases = null) {
   // Spray chart dots + legend
   const SPRAY_COLORS = { '1B': '#4ade80', '2B': '#60a5fa', 'HR': '#fde68a', 'OUT': '#fb923c' };
   const sprayLayer = (() => {
-    if (!_sprayChartVisible || !batterId) return '';
-    const dots = getSprayData(batterId).map(d => {
+    if (!_sprayChartVisible) return '';
+    // During animation, lock to the just-batted player; otherwise show current batter
+    const sprayPid = _sprayBatterId || batterId;
+    if (!sprayPid) return '';
+    const allDots = getSprayData(sprayPid);
+    // Cap dots to exclude the just-recorded hit while the animation plays
+    const visibleDots = _sprayMaxDots !== null ? allDots.slice(0, _sprayMaxDots) : allDots;
+    const dots = visibleDots.map(d => {
       const color = SPRAY_COLORS[d.outcome] || '#94a3b8';
       return `<circle cx="${d.x}" cy="${d.y}" r="5" fill="${color}" fill-opacity="0.7" stroke="#fff" stroke-width="1" stroke-opacity="0.6" pointer-events="none"/>`;
     }).join('');
@@ -7460,7 +7478,14 @@ async function applyPaEnd(g, ev) {
   // Show outcome animation immediately for the scorer (watcher gets theirs via rerenderLive)
   if (!LiveGameWatchOnly) {
     const anim = _buildOutcomeAnim(event, g);
-    if (anim) _queueAnim(anim);
+    if (anim) {
+      _queueAnim(anim);
+      // Lock spray chart to current batter's PRIOR history while animation plays
+      if (_sprayChartVisible && batterId) {
+        _sprayBatterId = batterId;
+        _sprayMaxDots  = getSprayData(batterId).length; // count before this play is saved
+      }
+    }
   }
 
   const newBases = { 1: g.bases[1], 2: g.bases[2], 3: g.bases[3] };
