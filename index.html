@@ -5523,7 +5523,6 @@ let LiveGameId = null;
 let _lastLiveGameId = null;
 let LiveGameWatchOnly = false;
 let _sprayChartVisible = false;
-let _sprayBatterId = null; // holds just-batted player during animation; null = follow current batter
 let _scoringHeartbeat = null;
 let _selectedPlayTs = null;
 const _undoStack = [];
@@ -5586,7 +5585,6 @@ function renderLiveGame(gameId, watchOnly = false) {
     _liveTab = 'score';
     _prevGameSnap = null;
     _sprayChartVisible = false;
-    _sprayBatterId = null;
   }
   _lastLiveGameId = gameId;
   LiveGameId = gameId;
@@ -6388,12 +6386,8 @@ function _cancelAnim() {
   if (ballEl)    { ballEl.style.transition = 'none'; ballEl.style.display = 'none'; }
   if (fielderEl) { fielderEl.style.transition = 'none'; fielderEl.style.display = 'none'; }
   if (bannerEl)  { bannerEl.style.transition = 'none'; bannerEl.style.opacity = '0'; }
-  // Restore suppressed fielder and spray chart lock if animation was cut short
-  if (_animFielderPid || _sprayBatterId) {
-    _animFielderPid = null;
-    _sprayBatterId = null;
-    drawField();
-  }
+  // Restore the suppressed fielder if animation was cut short
+  if (_animFielderPid) { _animFielderPid = null; drawField(); }
 }
 
 // Convert SVG 0-400 user coords → screen pixels via the CTM.
@@ -6577,9 +6571,8 @@ function _runAnim(item) {
         fielderEl.style.transition = `opacity ${fadeMs}ms`;
         fielderEl.style.opacity    = '0';
       }
-      // Un-suppress the static fielder circle and release spray chart lock as animation fades
+      // Un-suppress the static fielder circle as the animated one fades
       _animFielderPid = null;
-      _sprayBatterId = null;
       drawField();
     }, totalVisible);
 
@@ -6832,9 +6825,8 @@ function drawField(overrideBases = null) {
   // Spray chart dots + legend
   const SPRAY_COLORS = { '1B': '#4ade80', '2B': '#60a5fa', 'HR': '#fde68a', 'OUT': '#fb923c' };
   const sprayLayer = (() => {
-    const sprayPid = _sprayBatterId || batterId;
-    if (!_sprayChartVisible || !sprayPid) return '';
-    const dots = getSprayData(sprayPid).map(d => {
+    if (!_sprayChartVisible || !batterId) return '';
+    const dots = getSprayData(batterId).map(d => {
       const color = SPRAY_COLORS[d.outcome] || '#94a3b8';
       return `<circle cx="${d.x}" cy="${d.y}" r="5" fill="${color}" fill-opacity="0.7" stroke="#fff" stroke-width="1" stroke-opacity="0.6" pointer-events="none"/>`;
     }).join('');
@@ -7563,19 +7555,11 @@ async function applyPaEnd(g, ev) {
     [facedKey]: (g[facedKey] || 0) + 1,
   };
 
-  // If an animation is about to play, hold the spray chart on the just-batted
-  // player so the new dot stays visible until the animation finishes.
-  const animWillPlay = !LiveGameWatchOnly && !!_buildOutcomeAnim(event, g);
-  if (_sprayChartVisible && animWillPlay) _sprayBatterId = batterId;
-
   await State.updateGame(g.id, patch);
   const fresh = State.getGame(g.id);
   await postPlayCheck(fresh);
   Modal.hide();
   renderLiveGame(g.id);
-
-  // No animation — switch spray chart to new batter immediately
-  if (!animWillPlay) _sprayBatterId = null;
 }
 
 function ensureLineScore(g) {
