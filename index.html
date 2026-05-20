@@ -52,6 +52,7 @@
     <span id="storage-status" class="storage-status connected">☁️ Firestore</span>
     <span id="auth-user-name" style="display:none;font-size:13px;color:#fef9c3;font-weight:600"></span>
     <button id="btn-sign-in" class="btn btn-sm">Sign In</button>
+    <button id="btn-change-password" class="btn btn-sm" style="display:none" onclick="showChangePasswordModal()">🔑 Password</button>
     <button id="btn-sign-out" class="btn btn-sm" style="display:none">Sign Out</button>
   </div>
 </header>
@@ -247,6 +248,8 @@
   import { getAuth, onAuthStateChanged, signInWithEmailAndPassword,
            createUserWithEmailAndPassword, signOut,
            sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink,
+           sendPasswordResetEmail, EmailAuthProvider,
+           reauthenticateWithCredential, updatePassword,
            browserLocalPersistence, setPersistence }
     from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
 
@@ -270,7 +273,9 @@
   window._fs = { db, collection, doc, getDocs, setDoc, deleteDoc, onSnapshot,
                  auth, onAuthStateChanged, signInWithEmailAndPassword,
                  createUserWithEmailAndPassword, signOut,
-                 sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink };
+                 sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink,
+                 sendPasswordResetEmail, EmailAuthProvider,
+                 reauthenticateWithCredential, updatePassword };
   document.dispatchEvent(new Event('firebase-ready'));
 </script>
 

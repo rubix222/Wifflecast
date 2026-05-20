@@ -504,20 +504,23 @@ async function submitMyPlayer(e) {
 }
 
 function updateAuthUI() {
-  const btnIn  = $('#btn-sign-in');
-  const btnOut = $('#btn-sign-out');
-  const nameEl = $('#auth-user-name');
+  const btnIn   = $('#btn-sign-in');
+  const btnOut  = $('#btn-sign-out');
+  const btnChPw = $('#btn-change-password');
+  const nameEl  = $('#auth-user-name');
   if (!btnIn) return;
 
   if (currentUser) {
-    btnIn.style.display  = 'none';
-    btnOut.style.display = '';
-    nameEl.style.display = '';
+    btnIn.style.display   = 'none';
+    btnOut.style.display  = '';
+    if (btnChPw) btnChPw.style.display = '';
+    nameEl.style.display  = '';
     nameEl.textContent = currentUserProfile?.name || currentUser.email.split('@')[0];
   } else {
-    btnIn.style.display  = '';
-    btnOut.style.display = 'none';
-    nameEl.style.display = 'none';
+    btnIn.style.display   = '';
+    btnOut.style.display  = 'none';
+    if (btnChPw) btnChPw.style.display = 'none';
+    nameEl.style.display  = 'none';
   }
 
   // Add-team / add-game buttons — admin only
@@ -623,6 +626,59 @@ async function signOutUser() {
   updateAuthUI();
   Render.all();
   toast('Signed out');
+}
+
+function showChangePasswordModal(errorMsg = '') {
+  Modal.show(`
+    <div class="modal-header">
+      <h3>Change Password</h3>
+      <button class="btn-icon" onclick="Modal.hide()">✕</button>
+    </div>
+    <form onsubmit="submitChangePassword(event)">
+      <div class="modal-body">
+        ${errorMsg ? `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:8px 12px;color:#b91c1c;font-size:13px;margin-bottom:12px">${escapeHtml(errorMsg)}</div>` : ''}
+        <div class="form-group"><label>Current Password</label><input name="current" type="password" required autofocus /></div>
+        <div class="form-group"><label>New Password</label><input name="newpw" type="password" required minlength="6" /></div>
+        <div class="form-group"><label>Confirm New Password</label><input name="confirm" type="password" required minlength="6" /></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" onclick="Modal.hide()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Change Password</button>
+      </div>
+    </form>`);
+}
+
+async function submitChangePassword(event) {
+  event.preventDefault();
+  const form = event.target;
+  const current = form.current.value;
+  const newpw   = form.newpw.value;
+  const confirm = form.confirm.value;
+  if (newpw !== confirm) { showChangePasswordModal('New passwords do not match.'); return; }
+  if (newpw.length < 6)  { showChangePasswordModal('Password must be at least 6 characters.'); return; }
+  const fs = window._fs;
+  try {
+    const credential = fs.EmailAuthProvider.credential(currentUser.email, current);
+    await fs.reauthenticateWithCredential(currentUser, credential);
+    await fs.updatePassword(currentUser, newpw);
+    Modal.hide();
+    toast('Password changed!', 'success');
+  } catch (err) {
+    showChangePasswordModal(authErrorMessage(err.code));
+  }
+}
+
+async function adminResetPassword(uid) {
+  const u = State.users.find(u => u.uid === uid);
+  if (!u?.email) { toast('No email on file for this user', 'error'); return; }
+  if (!confirm(`Send a password reset email to ${u.email}?`)) return;
+  try {
+    const fs = window._fs;
+    await fs.sendPasswordResetEmail(fs.auth, u.email);
+    toast(`Reset email sent to ${u.email}`, 'success');
+  } catch (err) {
+    toast('Failed to send reset email: ' + (err.message || err.code), 'error');
+  }
 }
 
 async function invitePlayer(playerId) {
@@ -912,7 +968,12 @@ const Render = {
                 <input type="checkbox" ${u.canScore ? 'checked' : ''} onchange="toggleCanScore('${u.uid}')" />
               </label>`}
         </td>
-        <td><button class="btn-icon" title="Delete user" onclick="deleteUser('${u.uid}')">🗑</button></td>
+        <td style="white-space:nowrap">
+          ${u.email && u.email !== ADMIN_EMAIL
+            ? `<button class="btn-icon" title="Send password reset email" onclick="adminResetPassword('${u.uid}')">🔑</button>`
+            : ''}
+          <button class="btn-icon" title="Delete user" onclick="deleteUser('${u.uid}')">🗑</button>
+        </td>
       </tr>`;
     }).join('');
     c.innerHTML = `<div class="stats-table-wrap"><table class="stats-table">
@@ -2734,6 +2795,7 @@ document.addEventListener('firebase-ready', boot, { once: true });
 Object.assign(window, {
   Modal, Render, State,
   showAuthModal, submitAuth, signOutUser, invitePlayer,
+  showChangePasswordModal, submitChangePassword, adminResetPassword,
   showPlayerModal, deletePlayer, deleteUser, showTeamModal, deleteTeam, cancelInvite, toggleAdminFeatures,
   bipChooseKind, bipChooseDetail, bipCancel,
   showDoublePlayResult, applyDoublePlay,
