@@ -413,7 +413,8 @@ let teamsView      = 'record'; // 'record' | 'batting' | 'pitching' | 'fielding'
 
 // ---- Stats event filter ----
 // null = all events/games; Set = explicit selection of tournament IDs + '__none__'
-let statsEventFilter = null;
+let statsEventFilter  = null; // null = all events; Set<key> = subset
+let _statsFilterDraft = null; // pending state while filter modal is open
 
 // ---- Tournament-detail stats view state ----
 let _tournStatsView = 'batting'; // 'batting' | 'pitching' | 'fielding'
@@ -724,43 +725,137 @@ function renderStatsFilterBar() {
   const c = $('#stats-filter-bar');
   if (!c) return;
   const filterKeys = getFilterKeys();
-  if (filterKeys.size <= 1) { c.innerHTML = ''; return; } // only one source — no filter needed
+  if (filterKeys.size <= 1) { c.innerHTML = ''; return; }
 
   const isFiltered = statsEventFilter !== null;
-  const chips = [];
-  if (filterKeys.has('__none__')) {
-    const checked = !isFiltered || statsEventFilter.has('__none__');
-    chips.push(`<label class="stats-filter-chip${checked ? '' : ' unchecked'}">
-      <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleStatsFilter('__none__')">
-      <span>No Event</span>
-    </label>`);
-  }
-  State.tournaments.forEach(t => {
-    if (!filterKeys.has(t.id)) return;
-    const checked = !isFiltered || statsEventFilter.has(t.id);
-    chips.push(`<label class="stats-filter-chip${checked ? '' : ' unchecked'}">
-      <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleStatsFilter('${t.id}')">
-      <span>${escapeHtml(t.name)}</span>
-    </label>`);
-  });
+  const activeCount = isFiltered ? statsEventFilter.size : filterKeys.size;
+  const totalCount  = filterKeys.size;
+  const label = isFiltered ? `Events: ${activeCount} / ${totalCount}` : 'Filter by Event';
+  const badge = isFiltered ? ` <span class="stats-filter-active-badge">${activeCount}</span>` : '';
 
   c.innerHTML = `<div class="stats-filter-bar">
-    <span class="stats-filter-label">Filter by event:</span>
-    <div class="stats-filter-chips">${chips.join('')}</div>
-    ${isFiltered ? `<button class="btn btn-sm" onclick="clearStatsFilter()" style="flex-shrink:0">Show All</button>` : ''}
+    <button class="btn btn-sm stats-filter-btn${isFiltered ? ' filtered' : ''}" onclick="showStatsFilterModal()">▾ ${label}</button>
+    ${isFiltered ? `<button class="btn-icon stats-filter-clear-btn" onclick="clearStatsFilter()" title="Clear filter">✕</button>` : ''}
   </div>`;
 }
 
-function toggleStatsFilter(key) {
+function showStatsFilterModal() {
   const allKeys = getFilterKeys();
-  if (statsEventFilter === null) {
-    // Currently showing all — uncheck the one clicked
-    statsEventFilter = new Set([...allKeys].filter(k => k !== key));
-  } else {
-    const next = new Set(statsEventFilter);
-    if (next.has(key)) next.delete(key); else next.add(key);
-    statsEventFilter = next.size === allKeys.size ? null : next;
+  if (!allKeys.size) return;
+  _statsFilterDraft = statsEventFilter === null ? null : new Set(statsEventFilter);
+  Modal.show(_buildStatsFilterHtml(''));
+  const inp = $('#stats-filter-search');
+  if (inp) setTimeout(() => inp.focus(), 50);
+}
+
+function _buildStatsFilterHtml(searchTerm) {
+  const allKeys  = getFilterKeys();
+  const term     = searchTerm.toLowerCase();
+  const rows     = [];
+
+  const makeRow = (key, labelText) => {
+    if (term && !labelText.toLowerCase().includes(term)) return;
+    const checked = _statsFilterDraft === null || _statsFilterDraft.has(key);
+    rows.push(`<label class="stats-filter-item${checked ? '' : ' unchecked'}">
+      <input type="checkbox" ${checked ? 'checked' : ''} onchange="statsFilterDraftToggle('${key}')">
+      <span>${escapeHtml(labelText)}</span>
+    </label>`);
+  };
+
+  if (allKeys.has('__none__')) makeRow('__none__', 'No Event');
+  State.tournaments.forEach(t => { if (allKeys.has(t.id)) makeRow(t.id, t.name); });
+
+  const allChecked = _statsFilterDraft === null;
+  const noneChecked = _statsFilterDraft !== null && _statsFilterDraft.size === 0;
+
+  return `
+    <div class="modal-header">
+      <h2>Filter by Event</h2>
+      <button class="btn-icon" onclick="Modal.hide()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="text" id="stats-filter-search" class="stats-filter-search-input"
+        placeholder="Search events…" oninput="statsFilterSearch(this.value)"
+        value="${escapeHtml(searchTerm)}" autocomplete="off">
+      <div class="stats-filter-modal-actions">
+        <button class="btn-link${allChecked ? ' active' : ''}" onclick="statsFilterSelectAll()">Select All</button>
+        <button class="btn-link${noneChecked ? ' active' : ''}" onclick="statsFilterClearAll()">Clear All</button>
+      </div>
+      <div id="stats-filter-list" class="stats-filter-list">
+        ${rows.length ? rows.join('') : '<div class="help-text" style="padding:8px 0">No events match.</div>'}
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="Modal.hide()">Cancel</button>
+      <button class="btn btn-primary" onclick="applyStatsFilter()">Apply</button>
+    </div>`;
+}
+
+function statsFilterSearch(q) {
+  const term = q.toLowerCase();
+  $$('#stats-filter-list .stats-filter-item').forEach(item => {
+    const name = (item.querySelector('span')?.textContent || '').toLowerCase();
+    item.style.display = name.includes(term) ? '' : 'none';
+  });
+  const empty = !$$('#stats-filter-list .stats-filter-item').some(i => i.style.display !== 'none');
+  let noMatch = $('#stats-filter-no-match');
+  if (empty && !noMatch) {
+    const d = document.createElement('div');
+    d.id = 'stats-filter-no-match';
+    d.className = 'help-text';
+    d.style.padding = '8px 0';
+    d.textContent = 'No events match.';
+    $('#stats-filter-list').appendChild(d);
+  } else if (!empty && noMatch) {
+    noMatch.remove();
   }
+}
+
+function statsFilterDraftToggle(key) {
+  const allKeys = getFilterKeys();
+  if (_statsFilterDraft === null) {
+    _statsFilterDraft = new Set([...allKeys].filter(k => k !== key));
+  } else {
+    if (_statsFilterDraft.has(key)) {
+      _statsFilterDraft.delete(key);
+    } else {
+      _statsFilterDraft.add(key);
+      if (_statsFilterDraft.size === allKeys.size) _statsFilterDraft = null;
+    }
+  }
+  // Update visual state of the row without re-rendering the whole modal
+  const lbl = document.querySelector(`#stats-filter-list .stats-filter-item input[onchange="statsFilterDraftToggle('${key}')"]`)?.closest('label');
+  if (lbl) {
+    const isChecked = _statsFilterDraft === null || _statsFilterDraft.has(key);
+    lbl.classList.toggle('unchecked', !isChecked);
+  }
+}
+
+function statsFilterSelectAll() {
+  _statsFilterDraft = null;
+  $$('#stats-filter-list .stats-filter-item').forEach(item => {
+    item.classList.remove('unchecked');
+    const cb = item.querySelector('input[type="checkbox"]');
+    if (cb) cb.checked = true;
+  });
+  // Update button states
+  $$('.stats-filter-modal-actions .btn-link').forEach((b, i) => b.classList.toggle('active', i === 0));
+}
+
+function statsFilterClearAll() {
+  _statsFilterDraft = new Set();
+  $$('#stats-filter-list .stats-filter-item').forEach(item => {
+    item.classList.add('unchecked');
+    const cb = item.querySelector('input[type="checkbox"]');
+    if (cb) cb.checked = false;
+  });
+  $$('.stats-filter-modal-actions .btn-link').forEach((b, i) => b.classList.toggle('active', i === 1));
+}
+
+function applyStatsFilter() {
+  statsEventFilter = _statsFilterDraft;
+  _statsFilterDraft = null;
+  Modal.hide();
   Render.players();
   Render.teams();
 }
@@ -3091,7 +3186,7 @@ Object.assign(window, {
   // Admin mode + player view
   setPlayersView, selectPlayer, showPlayerStatsModal, showTeamStatsModal,
   setStatsMain, setTeamsView, sortTeamStats,
-  toggleStatsFilter, clearStatsFilter,
+  showStatsFilterModal, statsFilterSearch, statsFilterDraftToggle, statsFilterSelectAll, statsFilterClearAll, applyStatsFilter, clearStatsFilter,
   setTournStatsView, setTournTeamView, sortTournPlayerStats, sortTournTeamStats,
   setHomePlayerView, setHomeTeamsView, sortHomeTeams,
   selectTeam,
