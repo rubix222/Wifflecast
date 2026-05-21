@@ -1758,9 +1758,8 @@ const Render = {
     if (!State.games.length) {
       const hasTwoTeams = State.teams.length >= 2;
       const adminMsg = hasTwoTeams ? 'No games yet.' : 'Create at least 2 teams first.';
-      const adminBtn = hasTwoTeams ? '<br><br><button class="btn btn-primary btn-sm" onclick="showNewGameModal()">+ New Game</button>' : '';
       listEl.innerHTML = `<div style="padding:16px;color:#6b7280;font-size:13px">
-        ${isAdmin() ? adminMsg + adminBtn : 'No games found.'}
+        ${isAdmin() ? adminMsg : 'No games found.'}
       </div>`;
       return;
     }
@@ -2098,8 +2097,9 @@ async function submitNewGame(e) {
     return;
   }
   Modal.hide();
+  selectGame(game.id);
   Render.all();
-  openGame(game.id);
+  toast('Game created', 'success');
 }
 async function deleteGame(id) {
   if (!confirm('Delete this game?')) return;
