@@ -596,8 +596,7 @@ function showAuthModal(mode = 'signin', errorMsg = '') {
     </div>
     <div class="modal-body">
       ${errorMsg ? `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:8px 12px;color:#b91c1c;font-size:13px;margin-bottom:12px">${escapeHtml(errorMsg)}</div>` : ''}
-      <div id="google-btn-container" style="margin-bottom:4px;min-height:44px"></div>
-      <button type="button" style="display:none">
+      <button type="button" class="btn-google" onclick="signInWithGoogle()">
         <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#4285F4" d="M44.5 20H24v8.5h11.7C34.2 33.6 29.6 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 6 1.1 8.2 3l6-6C34.5 5.1 29.5 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21c10.8 0 20-7.8 20-21 0-1.4-.1-2.7-.5-4z"/><path fill="#34A853" d="M6.3 14.7l7 5.1C15 16.1 19.1 13 24 13c3.1 0 6 1.1 8.2 3l6-6C34.5 5.1 29.5 3 24 3c-7.6 0-14.2 4.6-17.7 11.7z"/><path fill="#FBBC05" d="M24 45c5.4 0 10.3-1.8 14.1-4.9l-6.5-5.4C29.6 36.4 26.9 37 24 37c-5.6 0-10.2-3.4-11.7-8.3l-7 5.4C8.9 41 15.9 45 24 45z"/><path fill="#EA4335" d="M44.5 20H24v8.5h11.7c-.8 2.3-2.3 4.2-4.2 5.6l6.5 5.4C42 36.2 45 30.6 45 24c0-1.4-.1-2.7-.5-4z"/></svg>
         Continue with Google
       </button>
@@ -618,7 +617,6 @@ function showAuthModal(mode = 'signin', errorMsg = '') {
         </div>
       </form>
     </div>`);
-  renderGoogleSignInButton();
 }
 
 async function submitAuth(event, mode) {
@@ -707,7 +705,6 @@ async function handleGoogleCredential(response) {
 
 // GIS is initialized once; re-initializing causes "called multiple times" warnings.
 let _gisInitialized = false;
-let _gisButtonRendered = false; // track whether renderButton() has been called
 async function ensureGISInitialized() {
   if (_gisInitialized) return true;
   const gis = typeof google !== 'undefined' && google.accounts?.id;
@@ -718,48 +715,31 @@ async function ensureGISInitialized() {
     client_id: clientId,
     callback: handleGoogleCredential,
     auto_select: false,
-    // Don't set use_fedcm_for_prompt — we're using renderButton(), not prompt(),
-    // so this flag is irrelevant and causes repeated AbortErrors when the modal closes.
+    cancel_on_tap_outside: true,
   });
   _gisInitialized = true;
   return true;
 }
 
-// Renders the GIS button into #google-btn-container inside the auth modal.
-// Uses requestAnimationFrame so the modal is in the layout tree before we
-// measure its width — fixes the button overflowing on narrow/mobile modals.
-async function renderGoogleSignInButton() {
-  const container = document.getElementById('google-btn-container');
-  if (!container) return;
+// No-op — renderButton() causes a personalized "Sign in as [name]" button that
+// overflows the modal. We use our own btn-google button + prompt() instead.
+function renderGoogleSignInButton() {}
+
+// signInWithGoogle — uses our own styled button and triggers GIS One Tap overlay.
+// prompt() shows Google's account chooser without any in-modal rendering or sizing issues.
+async function signInWithGoogle() {
   const ready = await ensureGISInitialized();
   if (!ready) {
-    // GIS not loaded yet — show our own styled fallback button
-    container.innerHTML = `<button class="btn-google" onclick="signInWithGoogle()">
-      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/></svg>
-      Continue with Google
-    </button>`;
-    _gisButtonRendered = false; // allow retry once GIS loads
+    toast('Google Sign-In is still loading — please try again in a moment.', 'error');
     return;
   }
-  // Only call renderButton() if the container is empty — Modal.hide() wipes
-  // the DOM, so we re-render when the modal reopens, but skip if already present.
-  if (_gisButtonRendered && container.hasChildNodes()) return;
-  _gisButtonRendered = true;
-  // Wait one animation frame so the modal is laid out and offsetWidth is real
-  await new Promise(r => requestAnimationFrame(r));
-  const width = Math.min(container.offsetWidth || 300, 400);
-  google.accounts.id.renderButton(container, {
-    theme: 'outline',
-    size: 'large',
-    width,
-    text: 'signin_with',
-    shape: 'rectangular',
-    logo_alignment: 'left',
+  google.accounts.id.prompt(notification => {
+    if (!notification) return;
+    const type = notification.getMomentType?.() ?? '';
+    if (type === 'skipped' || type === 'not_displayed') {
+      toast('Google sign-in was suppressed by the browser. Please try again or use email sign-in.', 'error');
+    }
   });
-}
-
-async function signInWithGoogle() {
-  renderGoogleSignInButton();
 }
 
 async function checkGoogleRedirect() {
