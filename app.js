@@ -677,11 +677,22 @@ async function checkGoogleRedirect() {
     await createOrLinkUserProfile(user, invitedPlayer?.id || null, user.displayName);
     toast('Signed in with Google!', 'success');
   } catch (err) {
-    if (err.code === 'auth/unauthorized-domain') {
-      toast('Google sign-in blocked: domain not authorized in Firebase.', 'error');
-    } else if (err.code) {
-      toast('Google sign-in failed: ' + err.code, 'error');
-    }
+    // Log full error so it persists in DevTools console even if UI closes
+    console.error('[Google Sign-In] checkGoogleRedirect error:', err);
+    const code = err.code || 'unknown';
+    const msg = err.message || '';
+    // Show a modal so the error doesn't disappear — helps diagnose config issues
+    Modal.show(`
+      <h2>Google Sign-In Failed</h2>
+      <p style="margin:12px 0 6px"><strong>Error code:</strong></p>
+      <pre style="background:#f3f4f6;padding:10px;border-radius:6px;font-size:13px;overflow-x:auto;white-space:pre-wrap;word-break:break-all">${code}</pre>
+      <p style="margin:12px 0 6px"><strong>Details:</strong></p>
+      <pre style="background:#f3f4f6;padding:10px;border-radius:6px;font-size:13px;overflow-x:auto;white-space:pre-wrap;word-break:break-all">${msg}</pre>
+      <p style="margin-top:14px;font-size:13px;color:#6b7280">Copy the error code above and share it to get help fixing this.</p>
+      <div style="margin-top:16px;text-align:right">
+        <button class="btn btn-primary" onclick="Modal.hide()">OK</button>
+      </div>
+    `);
   }
 }
 
