@@ -741,9 +741,9 @@ async function renderGoogleSignInButton() {
     _gisButtonRendered = false; // allow retry once GIS loads
     return;
   }
-  // Only call renderButton() once — each call creates a new FedCM request,
-  // and closing the modal without signing in aborts it (noisy AbortError spam).
-  if (_gisButtonRendered) return;
+  // Only call renderButton() if the container is empty — Modal.hide() wipes
+  // the DOM, so we re-render when the modal reopens, but skip if already present.
+  if (_gisButtonRendered && container.hasChildNodes()) return;
   _gisButtonRendered = true;
   // Wait one animation frame so the modal is laid out and offsetWidth is real
   await new Promise(r => requestAnimationFrame(r));
