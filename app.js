@@ -721,7 +721,7 @@ async function signInWithGoogle() {
       const result = await navigator.credentials.get({
         identity: {
           context: 'signin',
-          providers: [{ configURL: 'https://accounts.google.com/.well-known/web-identity', clientId, nonce }],
+          providers: [{ configURL: 'https://accounts.google.com/gsi/fedcm.json', clientId, nonce }],
         },
       });
       if (result?.token) {
