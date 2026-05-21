@@ -401,7 +401,7 @@ let selectedTeamId = null;
 // Game view state
 let selectedGameId = null;
 let showFinishedGames = false;
-let showMyGamesOnly = false;
+let showMyGamesOnly = true;
 let statsSort    = { col: 'AVG', dir: -1 };
 let pitchSort    = { col: 'ERA', dir:  1 };
 let fieldSort    = { col: 'PO',  dir: -1 };
