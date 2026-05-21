@@ -320,6 +320,13 @@ const State = {
     this.teams.forEach(t => { t.playerIds = t.playerIds.filter(pid => pid !== id); });
     await Storage.removePlayer(id);
     await Promise.all(teamsToUpdate.map(t => Storage.saveTeam(t)));
+    // Remove games where a participating team now has fewer than 2 players
+    const thinTeams = new Set(this.teams.filter(t => t.playerIds.length < 2).map(t => t.id));
+    if (thinTeams.size) {
+      const broken = this.games.filter(g => thinTeams.has(g.homeTeamId) || thinTeams.has(g.awayTeamId));
+      this.games = this.games.filter(g => !thinTeams.has(g.homeTeamId) && !thinTeams.has(g.awayTeamId));
+      await Promise.all(broken.map(g => Storage.removeGame(g.id)));
+    }
   },
 
   // ---- Team CRUD ----
@@ -337,8 +344,11 @@ const State = {
     await Storage.saveTeam(t);
   },
   async deleteTeam(id) {
+    const broken = this.games.filter(g => g.homeTeamId === id || g.awayTeamId === id);
+    this.games = this.games.filter(g => g.homeTeamId !== id && g.awayTeamId !== id);
     this.teams = this.teams.filter(t => t.id !== id);
     await Storage.removeTeam(id);
+    await Promise.all(broken.map(g => Storage.removeGame(g.id)));
   },
 
   // ---- Game CRUD ----
