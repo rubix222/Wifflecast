@@ -606,7 +606,7 @@ function showAuthModal(mode = 'signin', errorMsg = '') {
       <form onsubmit="submitAuth(event,'${mode}')">
         ${mode === 'signup' ? `<div class="form-group"><label>Name</label><input name="uname" type="text" required autofocus placeholder="Your name" /></div>` : ''}
         <div class="form-group"><label>Email</label><input name="email" type="email" required ${mode === 'signin' ? 'autofocus' : ''} /></div>
-        <div class="form-group"><label>Password</label><input name="password" type="password" required minlength="6" /></div>
+        <div class="form-group"><label>Password</label><input name="password" type="password" required minlength="6" autocomplete="${mode === 'signin' ? 'current-password' : 'new-password'}" /></div>
         <div class="modal-footer">
           <p style="margin:0 auto 0 0;font-size:13px">
             ${mode === 'signin'
@@ -723,9 +723,12 @@ async function signInWithGoogle() {
     cancel_on_tap_outside: true,
     use_fedcm_for_prompt: true,
   });
-  // Try One Tap first; if suppressed, render the standard GIS button in the modal
+  // Try One Tap first; if suppressed, render the standard GIS button in the modal.
+  // Use getMomentType() — FedCM-compatible replacement for deprecated
+  // isNotDisplayed() / isSkippedMoment() per the GIS FedCM migration guide.
   gis.prompt(notification => {
-    if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+    const type = notification.getMomentType?.() ?? '';
+    if (type === 'skipped' || type === 'dismissed') {
       const fallback = document.getElementById('google-btn-fallback');
       if (fallback) {
         fallback.style.display = '';
@@ -801,9 +804,9 @@ function showChangePasswordModal(errorMsg = '') {
     <form onsubmit="submitChangePassword(event)">
       <div class="modal-body">
         ${errorMsg ? `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:8px 12px;color:#b91c1c;font-size:13px;margin-bottom:12px">${escapeHtml(errorMsg)}</div>` : ''}
-        <div class="form-group"><label>Current Password</label><input name="current" type="password" required autofocus /></div>
-        <div class="form-group"><label>New Password</label><input name="newpw" type="password" required minlength="6" /></div>
-        <div class="form-group"><label>Confirm New Password</label><input name="confirm" type="password" required minlength="6" /></div>
+        <div class="form-group"><label>Current Password</label><input name="current" type="password" required autofocus autocomplete="current-password" /></div>
+        <div class="form-group"><label>New Password</label><input name="newpw" type="password" required minlength="6" autocomplete="new-password" /></div>
+        <div class="form-group"><label>Confirm New Password</label><input name="confirm" type="password" required minlength="6" autocomplete="new-password" /></div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn" onclick="Modal.hide()">Cancel</button>
