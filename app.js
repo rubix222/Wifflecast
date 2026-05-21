@@ -1411,8 +1411,7 @@ const Render = {
         : 'Not Started';
       const eventName = g.tournamentId ? (State.getTournament(g.tournamentId)?.name || g.tournamentName || null) : null;
       return `<tr>
-        <td>${escapeHtml(away?.name||'?')} @ ${escapeHtml(home?.name||'?')}${eventName ? `<div class="muted small" style="margin-top:2px">📋 ${escapeHtml(eventName)}</div>` : ''}</td>
-        <td class="muted small" style="white-space:nowrap">${date}</td>
+        <td>${escapeHtml(away?.name||'?')} @ ${escapeHtml(home?.name||'?')}<div class="muted small" style="margin-top:2px">${date}${eventName ? ` · 📋 ${escapeHtml(eventName)}` : ''}</div></td>
         <td style="white-space:nowrap"><span class="game-card-status status-${g.status}" style="font-size:11px">${statusLabel}</span></td>
         <td style="white-space:nowrap">
           <button class="btn-icon" title="Open" onclick="selectGame('${g.id}');switchTab('games')">↗</button>
@@ -1421,7 +1420,7 @@ const Render = {
       </tr>`;
     }).join('');
     c.innerHTML = `<div class="stats-table-wrap"><table class="stats-table">
-      <thead><tr><th>Matchup</th><th>Date</th><th>Status</th><th></th></tr></thead>
+      <thead><tr><th>Matchup</th><th>Status</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`;
   },
