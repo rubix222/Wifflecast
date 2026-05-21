@@ -367,6 +367,9 @@
   .modal.full { max-width: none; height: 95vh; }
 
   /* ---------- Google sign-in button + divider ---------- */
+  /* Make the GIS-rendered button fill the container width */
+  #google-btn-container { width: 100%; }
+  #google-btn-container > div { width: 100% !important; }
   .btn-google {
     display: flex;
     align-items: center;
