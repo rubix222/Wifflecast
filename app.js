@@ -596,11 +596,10 @@ function showAuthModal(mode = 'signin', errorMsg = '') {
     </div>
     <div class="modal-body">
       ${errorMsg ? `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:8px 12px;color:#b91c1c;font-size:13px;margin-bottom:12px">${escapeHtml(errorMsg)}</div>` : ''}
-      <div class="btn-google" id="google-btn-wrapper" style="position:relative;cursor:pointer">
-        <div id="google-btn-container" style="position:absolute;inset:0;overflow:hidden;border-radius:8px"></div>
+      <button type="button" class="btn-google" onclick="signInWithGoogle()">
         <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#4285F4" d="M44.5 20H24v8.5h11.7C34.2 33.6 29.6 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 6 1.1 8.2 3l6-6C34.5 5.1 29.5 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21c10.8 0 20-7.8 20-21 0-1.4-.1-2.7-.5-4z"/><path fill="#34A853" d="M6.3 14.7l7 5.1C15 16.1 19.1 13 24 13c3.1 0 6 1.1 8.2 3l6-6C34.5 5.1 29.5 3 24 3c-7.6 0-14.2 4.6-17.7 11.7z"/><path fill="#FBBC05" d="M24 45c5.4 0 10.3-1.8 14.1-4.9l-6.5-5.4C29.6 36.4 26.9 37 24 37c-5.6 0-10.2-3.4-11.7-8.3l-7 5.4C8.9 41 15.9 45 24 45z"/><path fill="#EA4335" d="M44.5 20H24v8.5h11.7c-.8 2.3-2.3 4.2-4.2 5.6l6.5 5.4C42 36.2 45 30.6 45 24c0-1.4-.1-2.7-.5-4z"/></svg>
         Continue with Google
-      </div>
+      </button>
       <div class="auth-divider"><span>or</span></div>
       <form onsubmit="submitAuth(event,'${mode}')">
         ${mode === 'signup' ? `<div class="form-group"><label>Name</label><input name="uname" type="text" required autofocus placeholder="Your name" /></div>` : ''}
@@ -618,7 +617,6 @@ function showAuthModal(mode = 'signin', errorMsg = '') {
         </div>
       </form>
     </div>`);
-  renderGoogleSignInButton(); // replace fallback btn with GIS button once ready
 }
 
 async function submitAuth(event, mode) {
@@ -705,7 +703,42 @@ async function handleGoogleCredential(response) {
   }
 }
 
-// GIS is initialized once; re-initializing causes "called multiple times" warnings.
+// Google sign-in via raw FedCM API (Chrome 108+).
+// Bypasses GIS visual components entirely — no personalized button injected
+// into the modal. Chrome shows its own native account picker overlay.
+// Falls back to GIS renderButton() on browsers without FedCM.
+async function signInWithGoogle() {
+  const clientId = await getGoogleClientId();
+  if (!clientId) {
+    showAuthModal('signin', 'Could not initialize Google sign-in. Please use email sign-in.');
+    return;
+  }
+
+  // ── Path A: raw FedCM (Chrome 108+, COOP-safe, no GIS UI components) ──
+  if (window.IdentityCredential) {
+    try {
+      const nonce = (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
+      const result = await navigator.credentials.get({
+        identity: {
+          context: 'signin',
+          providers: [{ configURL: 'https://accounts.google.com/.well-known/web-identity', clientId, nonce }],
+        },
+      });
+      if (result?.token) {
+        await handleGoogleCredential({ credential: result.token });
+      }
+      return;
+    } catch (err) {
+      if (err.name === 'NotAllowedError' || err.name === 'AbortError') return; // user dismissed
+      console.warn('[Google Sign-In] FedCM failed, falling back to GIS renderButton:', err.name);
+    }
+  }
+
+  // ── Path B: GIS renderButton() fallback (non-Chrome / FedCM unavailable) ──
+  renderGoogleSignInButton();
+}
+
+// GIS renderButton fallback — only shown when FedCM isn't available.
 let _gisInitialized = false;
 async function ensureGISInitialized() {
   if (_gisInitialized) return true;
@@ -713,51 +746,21 @@ async function ensureGISInitialized() {
   if (!gis) return false;
   const clientId = await getGoogleClientId();
   if (!clientId) return false;
-  gis.initialize({
-    client_id: clientId,
-    callback: handleGoogleCredential,
-    auto_select: false,
-  });
+  gis.initialize({ client_id: clientId, callback: handleGoogleCredential, auto_select: false });
   _gisInitialized = true;
   return true;
 }
 
-// Renders the GIS sign-in button into #google-btn-container.
-// renderButton() uses FedCM which is COOP-safe — the only approach that works
-// on GitHub Pages. prompt() gets suppressed on mobile so we don't use it.
 async function renderGoogleSignInButton() {
   const container = document.getElementById('google-btn-container');
-  const wrapper   = document.getElementById('google-btn-wrapper');
   if (!container || container.hasChildNodes()) return;
   const ready = await ensureGISInitialized();
   if (!ready) return;
   await new Promise(r => requestAnimationFrame(r));
-  // Render a transparent GIS icon button sized to cover the entire wrapper.
-  // This lets our own styled button stay visible while GIS handles FedCM clicks.
-  const w = wrapper ? Math.min(wrapper.offsetWidth || 280, 400) : 280;
-  const h = wrapper ? (wrapper.offsetHeight || 44) : 44;
+  const width = Math.min(container.offsetWidth || 280, 400);
   google.accounts.id.renderButton(container, {
-    type: 'icon',        // smallest GIS unit — we hide it anyway
-    theme: 'outline',
-    size: 'large',
-    shape: 'rectangular',
-    width: w,
+    theme: 'outline', size: 'large', width, text: 'signin_with', shape: 'rectangular',
   });
-  // Make the GIS iframe fill the container (inset:0) and go nearly invisible
-  // so our button text/icon show through, but clicks reach the GIS iframe.
-  const iframe = container.querySelector('iframe');
-  if (iframe) {
-    iframe.style.cssText = `position:absolute;inset:0;width:${w}px;height:${h}px;opacity:0.01;`;
-  }
-}
-
-async function signInWithGoogle() {
-  // Called if user clicks wrapper before GIS loads; retry render so the
-  // transparent iframe gets injected and subsequent clicks go to FedCM.
-  await renderGoogleSignInButton();
-  if (!document.getElementById('google-btn-container')?.hasChildNodes()) {
-    toast('Google Sign-In is still loading — please try again in a moment.', 'error');
-  }
 }
 
 async function checkGoogleRedirect() {
