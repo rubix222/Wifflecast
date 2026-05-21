@@ -596,12 +596,11 @@ function showAuthModal(mode = 'signin', errorMsg = '') {
     </div>
     <div class="modal-body">
       ${errorMsg ? `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:8px 12px;color:#b91c1c;font-size:13px;margin-bottom:12px">${escapeHtml(errorMsg)}</div>` : ''}
-      <div id="google-btn-container">
-        <button type="button" class="btn-google" onclick="signInWithGoogle()">
+      <div id="google-btn-container" style="display:none"></div>
+      <button type="button" class="btn-google" id="google-btn-fallback" onclick="signInWithGoogle()">
         <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#4285F4" d="M44.5 20H24v8.5h11.7C34.2 33.6 29.6 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 6 1.1 8.2 3l6-6C34.5 5.1 29.5 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21c10.8 0 20-7.8 20-21 0-1.4-.1-2.7-.5-4z"/><path fill="#34A853" d="M6.3 14.7l7 5.1C15 16.1 19.1 13 24 13c3.1 0 6 1.1 8.2 3l6-6C34.5 5.1 29.5 3 24 3c-7.6 0-14.2 4.6-17.7 11.7z"/><path fill="#FBBC05" d="M24 45c5.4 0 10.3-1.8 14.1-4.9l-6.5-5.4C29.6 36.4 26.9 37 24 37c-5.6 0-10.2-3.4-11.7-8.3l-7 5.4C8.9 41 15.9 45 24 45z"/><path fill="#EA4335" d="M44.5 20H24v8.5h11.7c-.8 2.3-2.3 4.2-4.2 5.6l6.5 5.4C42 36.2 45 30.6 45 24c0-1.4-.1-2.7-.5-4z"/></svg>
         Continue with Google
-        </button>
-      </div>
+      </button>
       <div class="auth-divider"><span>or</span></div>
       <form onsubmit="submitAuth(event,'${mode}')">
         ${mode === 'signup' ? `<div class="form-group"><label>Name</label><input name="uname" type="text" required autofocus placeholder="Your name" /></div>` : ''}
@@ -727,17 +726,18 @@ async function ensureGISInitialized() {
 // renderButton() uses FedCM which is COOP-safe — the only approach that works
 // on GitHub Pages. prompt() gets suppressed on mobile so we don't use it.
 async function renderGoogleSignInButton() {
-  const container = document.getElementById('google-btn-container');
+  const container  = document.getElementById('google-btn-container');
+  const fallback   = document.getElementById('google-btn-fallback');
   if (!container) return;
-  // If already populated, skip (avoid duplicate FedCM sessions)
-  if (container.hasChildNodes()) return;
+  // If the GIS button is already visible, nothing to do
+  if (container.style.display !== 'none') return;
   const ready = await ensureGISInitialized();
-  if (!ready) return; // GIS not yet loaded; container shows fallback btn-google button
-  // requestAnimationFrame ensures the modal is in the layout tree so offsetWidth is real
+  if (!ready) return; // GIS not loaded yet — fallback btn stays visible
+  // requestAnimationFrame lets the modal finish layout so offsetWidth is accurate
   await new Promise(r => requestAnimationFrame(r));
-  // Clamp to container width so the button never overflows on narrow mobile screens
-  const w = container.offsetWidth;
-  const width = w > 50 ? Math.min(w, 400) : 280; // fallback 280 if layout not ready
+  // Use fallback width if container is still hidden (offsetWidth = 0)
+  const refWidth = fallback ? fallback.offsetWidth : 0;
+  const width = refWidth > 50 ? Math.min(refWidth, 400) : 280;
   google.accounts.id.renderButton(container, {
     theme: 'outline',
     size: 'large',
@@ -746,6 +746,9 @@ async function renderGoogleSignInButton() {
     shape: 'rectangular',
     logo_alignment: 'left',
   });
+  // Swap: hide our fallback, show the GIS button
+  if (fallback) fallback.style.display = 'none';
+  container.style.display = '';
 }
 
 async function signInWithGoogle() {
