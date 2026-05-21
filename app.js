@@ -596,10 +596,12 @@ function showAuthModal(mode = 'signin', errorMsg = '') {
     </div>
     <div class="modal-body">
       ${errorMsg ? `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:8px 12px;color:#b91c1c;font-size:13px;margin-bottom:12px">${escapeHtml(errorMsg)}</div>` : ''}
-      <button type="button" class="btn-google" onclick="signInWithGoogle()">
+      <button type="button" class="btn-google" id="google-signin-btn" onclick="signInWithGoogle()">
         <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#4285F4" d="M44.5 20H24v8.5h11.7C34.2 33.6 29.6 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 6 1.1 8.2 3l6-6C34.5 5.1 29.5 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21c10.8 0 20-7.8 20-21 0-1.4-.1-2.7-.5-4z"/><path fill="#34A853" d="M6.3 14.7l7 5.1C15 16.1 19.1 13 24 13c3.1 0 6 1.1 8.2 3l6-6C34.5 5.1 29.5 3 24 3c-7.6 0-14.2 4.6-17.7 11.7z"/><path fill="#FBBC05" d="M24 45c5.4 0 10.3-1.8 14.1-4.9l-6.5-5.4C29.6 36.4 26.9 37 24 37c-5.6 0-10.2-3.4-11.7-8.3l-7 5.4C8.9 41 15.9 45 24 45z"/><path fill="#EA4335" d="M44.5 20H24v8.5h11.7c-.8 2.3-2.3 4.2-4.2 5.6l6.5 5.4C42 36.2 45 30.6 45 24c0-1.4-.1-2.7-.5-4z"/></svg>
         Continue with Google
       </button>
+      <!-- GIS renders its button here when One Tap is suppressed -->
+      <div id="google-btn-fallback" style="display:none;margin-top:8px"></div>
       <div class="auth-divider"><span>or</span></div>
       <form onsubmit="submitAuth(event,'${mode}')">
         ${mode === 'signup' ? `<div class="form-group"><label>Name</label><input name="uname" type="text" required autofocus placeholder="Your name" /></div>` : ''}
@@ -655,60 +657,103 @@ async function signOutUser() {
   toast('Signed out');
 }
 
-async function signInWithGoogle() {
-  const fs = window._fs;
+// ── Google Identity Services (GIS) sign-in ──────────────────────────────────
+// Firebase's signInWithRedirect/getRedirectResult hangs on GitHub Pages because
+// the COOP header blocks the cross-origin iframe Firebase uses to retrieve the
+// result. GIS + signInWithCredential bypasses this entirely: GIS uses FedCM
+// (Chrome's native credential UI) so no popup or iframe is needed.
+
+let _googleClientId = null;
+async function getGoogleClientId() {
+  if (_googleClientId) return _googleClientId;
   try {
-    const provider = new fs.GoogleAuthProvider();
-    console.log('[Google Sign-In] calling signInWithRedirect, current origin:', location.origin);
-    await fs.signInWithRedirect(fs.auth, provider);
-    // Page will navigate away; result is handled in checkGoogleRedirect() on return
+    // Firebase exposes the OAuth client ID via its identitytoolkit endpoint.
+    const apiKey = 'AIzaSyDp_4n3yu7pYBHGhsphp579u5qXPXFCwNE';
+    const res = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:createAuthUri?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ providerId: 'google.com', continueUri: location.origin + '/' }),
+      }
+    );
+    const data = await res.json();
+    if (data.authUri) {
+      _googleClientId = new URL(data.authUri).searchParams.get('client_id');
+    }
+  } catch (e) {
+    console.warn('[Google Sign-In] Could not auto-fetch client ID:', e);
+  }
+  return _googleClientId;
+}
+
+async function handleGoogleCredential(response) {
+  const fs = window._fs;
+  if (!fs || !response?.credential) return;
+  try {
+    const cred = fs.GoogleAuthProvider.credential(response.credential);
+    const result = await fs.signInWithCredential(fs.auth, cred);
+    const user = result.user;
+    const invitedPlayer = State.players.find(p => p.inviteEmail === user.email);
+    await createOrLinkUserProfile(user, invitedPlayer?.id || null, user.displayName);
+    Modal.hide();
+    toast('Signed in with Google!', 'success');
+    Render.all();
   } catch (err) {
-    console.error('[Google Sign-In] signInWithRedirect threw:', err);
+    console.error('[Google Sign-In] signInWithCredential failed:', err);
     showAuthModal('signin', 'Google sign-in failed: ' + (err.code || err.message));
   }
 }
 
+async function signInWithGoogle() {
+  const gis = typeof google !== 'undefined' && google.accounts?.id;
+  if (!gis) {
+    toast('Google Sign-In is still loading — please try again in a moment.', 'error');
+    return;
+  }
+  const clientId = await getGoogleClientId();
+  if (!clientId) {
+    showAuthModal('signin', 'Could not initialize Google sign-in. Please use email/password sign-in.');
+    return;
+  }
+  gis.initialize({
+    client_id: clientId,
+    callback: handleGoogleCredential,
+    auto_select: false,
+    cancel_on_tap_outside: true,
+    use_fedcm_for_prompt: true,
+  });
+  // Try One Tap first; if suppressed, render the standard GIS button in the modal
+  gis.prompt(notification => {
+    if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+      const fallback = document.getElementById('google-btn-fallback');
+      if (fallback) {
+        fallback.style.display = '';
+        fallback.innerHTML = '';
+        gis.renderButton(fallback, { theme: 'outline', size: 'large', width: 280, text: 'signin_with' });
+      }
+    }
+  });
+}
+
 async function checkGoogleRedirect() {
+  // Legacy: handle any session still mid-redirect from the old flow.
+  // Wraps in a 4-second timeout so boot never hangs if COOP blocks the iframe.
   const fs = window._fs;
   if (!fs) return;
-  // Only run when returning from a redirect (Firebase sets this key)
-  const hasRedirectPending = Object.keys(sessionStorage).some(k => k.includes('firebase') || k.includes('pendingRedirect')) ||
-    Object.keys(localStorage).some(k => k.includes('firebase:pendingRedirect'));
-  let result = null;
   try {
-    console.log('[Google Sign-In] calling getRedirectResult...');
-    result = await fs.getRedirectResult(fs.auth);
-    console.log('[Google Sign-In] getRedirectResult returned:', result);
+    const result = await Promise.race([
+      fs.getRedirectResult(fs.auth),
+      new Promise(resolve => setTimeout(() => resolve(null), 4000)),
+    ]);
+    if (!result?.user) return;
+    const user = result.user;
+    const invitedPlayer = State.players.find(p => p.inviteEmail === user.email);
+    await createOrLinkUserProfile(user, invitedPlayer?.id || null, user.displayName);
+    toast('Signed in with Google!', 'success');
   } catch (err) {
-    // Log full error so it persists in DevTools console even if UI closes
-    console.error('[Google Sign-In] getRedirectResult threw:', err);
-    const code = err.code || 'unknown';
-    const msg = err.message || '(no message)';
-    let extra = '';
-    try { extra = JSON.stringify(err, Object.getOwnPropertyNames(err), 2); } catch (_) {}
-    Modal.show(`
-      <h2>Google Sign-In Failed</h2>
-      <p style="margin:12px 0 4px"><strong>Error code:</strong></p>
-      <pre style="background:#f3f4f6;padding:8px;border-radius:6px;font-size:13px;overflow-x:auto;white-space:pre-wrap;word-break:break-all">${escapeHtml(code)}</pre>
-      <p style="margin:10px 0 4px"><strong>Message:</strong></p>
-      <pre style="background:#f3f4f6;padding:8px;border-radius:6px;font-size:12px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;max-height:180px">${escapeHtml(msg)}</pre>
-      ${extra ? `<p style="margin:10px 0 4px"><strong>Full error:</strong></p>
-      <pre style="background:#f3f4f6;padding:8px;border-radius:6px;font-size:11px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;max-height:120px">${escapeHtml(extra)}</pre>` : ''}
-      <p style="margin-top:12px;font-size:12px;color:#6b7280">Full error also logged in browser console (F12 → Console).</p>
-      <div style="margin-top:14px;text-align:right">
-        <button class="btn btn-primary" onclick="Modal.hide()">OK</button>
-      </div>
-    `);
-    return;
+    console.warn('[Google Sign-In] checkGoogleRedirect (legacy):', err.code || err.message);
   }
-  if (!result?.user) {
-    // No redirect result — normal on fresh loads. Nothing to do.
-    return;
-  }
-  const user = result.user;
-  const invitedPlayer = State.players.find(p => p.inviteEmail === user.email);
-  await createOrLinkUserProfile(user, invitedPlayer?.id || null, user.displayName);
-  toast('Signed in with Google!', 'success');
 }
 
 function showForgotPasswordModal(msg = '', isSuccess = false) {
@@ -3275,7 +3320,7 @@ document.addEventListener('firebase-ready', boot, { once: true });
 Object.assign(window, {
   Modal, Render, State,
   showAuthModal, submitAuth, signOutUser, invitePlayer,
-  signInWithGoogle, checkGoogleRedirect,
+  signInWithGoogle, handleGoogleCredential, checkGoogleRedirect,
   showForgotPasswordModal, submitForgotPassword,
   toggleUserMenu, closeUserMenu,
   showChangePasswordModal, submitChangePassword, adminResetPassword,

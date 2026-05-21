@@ -225,7 +225,7 @@
            sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink,
            sendPasswordResetEmail, EmailAuthProvider,
            reauthenticateWithCredential, updatePassword,
-           GoogleAuthProvider, signInWithRedirect, getRedirectResult,
+           GoogleAuthProvider, signInWithCredential, signInWithRedirect, getRedirectResult,
            browserLocalPersistence, setPersistence }
     from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
 
@@ -252,10 +252,12 @@
                  sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink,
                  sendPasswordResetEmail, EmailAuthProvider,
                  reauthenticateWithCredential, updatePassword,
-                 GoogleAuthProvider, signInWithRedirect, getRedirectResult };
+                 GoogleAuthProvider, signInWithCredential, signInWithRedirect, getRedirectResult };
   document.dispatchEvent(new Event('firebase-ready'));
 </script>
 
+<!-- Google Identity Services — COOP-safe alternative to signInWithRedirect/Popup -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="state.js"></script>
 <script src="live.js"></script>
 <script src="app.js"></script>
