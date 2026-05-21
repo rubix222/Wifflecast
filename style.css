@@ -36,7 +36,7 @@
     align-items: center;
     gap: 10px;
   }
-  .site-logo { display: block; flex-shrink: 0; width: 52px; height: 52px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); }
+  .site-logo { display: block; flex-shrink: 0; width: 52px; height: 52px; object-fit: contain; background: transparent; }
   .storage-controls {
     display: flex;
     align-items: center;
