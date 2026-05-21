@@ -1445,7 +1445,7 @@ const Render = {
         <td>${escapeHtml(t.name)}</td>
         <td><span class="muted small">${playerCount} player${playerCount !== 1 ? 's' : ''}</span></td>
         <td style="white-space:nowrap">
-          <button class="btn-icon" title="Edit" onclick="showTeamModal('${t.id}')">✎</button>
+          <button class="btn-icon" title="Edit" onclick="showTeamModal('${t.id}', true)">✎</button>
           ${isAdminUser() ? `<button class="btn-icon" title="Delete" onclick="deleteTeam('${t.id}')">🗑</button>` : ''}
         </td>
       </tr>`;
@@ -1971,19 +1971,21 @@ function _teamColor(team) {
   return palette[h % palette.length];
 }
 
-function showTeamModal(id = null) {
+function showTeamModal(id = null, forceAdmin = false) {
   const editing = id ? State.getTeam(id) : null;
   if (State.players.length < 2) { toast('Add at least 2 players first', 'error'); return; }
   // Non-admin team members can open the modal for their own team
   const myPid = currentUserProfile?.playerId;
   const isMember = myPid && (editing?.playerIds || []).includes(myPid);
   if (id && !isAdminUser() && !isMember) { toast('Not authorized', 'error'); return; }
+  // Full roster editing: always on admin page, otherwise respects the toggle
+  const canEditRoster = forceAdmin || isAdmin();
   const selected = new Set(editing?.playerIds || []);
   const playerOptions = [...State.players]
     .sort((a, b) => a.name.localeCompare(b.name))
     .map(p => `
       <label class="player-picker-item">
-        <input type="checkbox" value="${p.id}" ${selected.has(p.id) ? 'checked' : ''} ${!isAdminUser() ? 'disabled' : ''}/>
+        <input type="checkbox" value="${p.id}" ${selected.has(p.id) ? 'checked' : ''} ${!canEditRoster ? 'disabled' : ''}/>
         <span class="jersey-badge" style="width:24px; height:24px; font-size:11px;">${escapeHtml(p.jerseyNumber || '#')}</span>
         <span>${escapeHtml(p.name)}</span>
       </label>`).join('');
@@ -1992,7 +1994,7 @@ function showTeamModal(id = null) {
       <h3>${editing ? 'Edit team' : 'Add team'}</h3>
       <button class="btn-icon" onclick="Modal.hide()">✕</button>
     </div>
-    <form onsubmit="submitTeam(event, ${editing ? `'${id}'` : 'null'})">
+    <form onsubmit="submitTeam(event, ${editing ? `'${id}'` : 'null'}, ${canEditRoster})">
       <div class="modal-body">
         <div class="form-group">
           <label for="team-name">Team name</label>
@@ -2003,7 +2005,7 @@ function showTeamModal(id = null) {
           <input type="color" id="team-color" value="${editing ? (editing.color || '#6b7280') : _randomTeamColor()}" style="width:48px;height:36px;padding:2px;cursor:pointer;border-radius:6px;border:1px solid #d1d5db" />
         </div>
         <div class="form-group">
-          <label>Roster <span class="muted small">(select 2 or more players${!isAdminUser() ? ' — only admins can change roster' : ''})</span></label>
+          <label>Roster <span class="muted small">(select 2 or more players${!canEditRoster ? ' — only admins can change roster' : ''})</span></label>
           <div class="player-picker" id="team-player-picker">${playerOptions}</div>
         </div>
       </div>
@@ -2013,15 +2015,15 @@ function showTeamModal(id = null) {
       </div>
     </form>`);
 }
-async function submitTeam(e, id) {
+async function submitTeam(e, id, canEditRoster = false) {
   e.preventDefault();
   const existingTeam = id ? State.getTeam(id) : null;
   const myPid = currentUserProfile?.playerId;
   const isMember = myPid && (existingTeam?.playerIds || []).includes(myPid);
   if (!isAdminUser() && !isMember) { toast('Not authorized', 'error'); return; }
   const color = $('#team-color').value;
-  // Non-admins keep existing roster; admins can change it
-  const checked = isAdminUser()
+  // Only update roster if full admin mode was active when modal opened
+  const checked = canEditRoster
     ? $$('#team-player-picker input[type=checkbox]:checked').map(cb => cb.value)
     : (existingTeam?.playerIds || []);
   if (checked.length < 2) { toast('Pick at least 2 players', 'error'); return; }
