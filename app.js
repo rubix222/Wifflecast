@@ -659,18 +659,29 @@ async function signInWithGoogle() {
   const fs = window._fs;
   try {
     const provider = new fs.GoogleAuthProvider();
-    const cred = await fs.signInWithPopup(fs.auth, provider);
-    const user = cred.user;
+    await fs.signInWithRedirect(fs.auth, provider);
+    // Page will navigate away; result is handled in checkGoogleRedirect() on return
+  } catch (err) {
+    showAuthModal('signin', 'Google sign-in failed: ' + (err.message || err.code));
+  }
+}
+
+async function checkGoogleRedirect() {
+  const fs = window._fs;
+  if (!fs) return;
+  try {
+    const result = await fs.getRedirectResult(fs.auth);
+    if (!result?.user) return;
+    const user = result.user;
     const invitedPlayer = State.players.find(p => p.inviteEmail === user.email);
     await createOrLinkUserProfile(user, invitedPlayer?.id || null, user.displayName);
-    Modal.hide();
     toast('Signed in with Google!', 'success');
   } catch (err) {
-    if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') return;
-    const msg = err.code === 'auth/popup-blocked'
-      ? 'Popup was blocked. Please allow popups for this site.'
-      : 'Google sign-in failed: ' + (err.message || err.code);
-    showAuthModal('signin', msg);
+    if (err.code === 'auth/unauthorized-domain') {
+      toast('Google sign-in blocked: domain not authorized in Firebase.', 'error');
+    } else if (err.code) {
+      toast('Google sign-in failed: ' + err.code, 'error');
+    }
   }
 }
 
@@ -3188,6 +3199,9 @@ async function boot() {
     await handleEmailLinkSignIn();
   }
 
+  // Handle Google redirect sign-in return
+  await checkGoogleRedirect();
+
   // Auth state fires immediately (null if signed out).
   // Load all data here so it works whether Firestore rules require auth or not.
   fs.onAuthStateChanged(fs.auth, async (user) => {
@@ -3235,7 +3249,7 @@ document.addEventListener('firebase-ready', boot, { once: true });
 Object.assign(window, {
   Modal, Render, State,
   showAuthModal, submitAuth, signOutUser, invitePlayer,
-  signInWithGoogle,
+  signInWithGoogle, checkGoogleRedirect,
   showForgotPasswordModal, submitForgotPassword,
   toggleUserMenu, closeUserMenu,
   showChangePasswordModal, submitChangePassword, adminResetPassword,
