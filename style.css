@@ -19,7 +19,7 @@
     flex-shrink: 0;
     background: linear-gradient(135deg, #14532d 0%, #166534 100%);
     color: #fff;
-    padding: 16px 24px;
+    padding: 6px 24px;
     box-shadow: 0 2px 6px rgba(0,0,0,0.08);
     display: flex;
     align-items: center;
@@ -36,7 +36,7 @@
     align-items: center;
     gap: 10px;
   }
-  .site-logo { display: block; flex-shrink: 0; width: 52px; height: 52px; object-fit: contain; background: transparent; }
+  .site-logo { display: block; flex-shrink: 0; width: 64px; height: 64px; object-fit: contain; background: transparent; }
   .storage-controls {
     display: flex;
     align-items: center;
