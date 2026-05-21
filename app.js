@@ -1411,7 +1411,7 @@ const Render = {
         : 'Not Started';
       const eventName = g.tournamentId ? (State.getTournament(g.tournamentId)?.name || g.tournamentName || null) : null;
       return `<tr>
-        <td style="white-space:nowrap">${escapeHtml(away?.name||'?')} @ ${escapeHtml(home?.name||'?')}${eventName ? ` <span class="muted small">📋 ${escapeHtml(eventName)}</span>` : ''}</td>
+        <td>${escapeHtml(away?.name||'?')} @ ${escapeHtml(home?.name||'?')}${eventName ? `<div class="muted small" style="margin-top:2px">📋 ${escapeHtml(eventName)}</div>` : ''}</td>
         <td class="muted small" style="white-space:nowrap">${date}</td>
         <td style="white-space:nowrap"><span class="game-card-status status-${g.status}" style="font-size:11px">${statusLabel}</span></td>
         <td style="white-space:nowrap">
