@@ -712,7 +712,7 @@ async function ensureGISInitialized() {
   if (!gis) return false;
   const clientId = await getGoogleClientId();
   if (!clientId) return false;
-  gis.initialize({ client_id: clientId, callback: handleGoogleCredential, auto_select: false });
+  gis.initialize({ client_id: clientId, callback: handleGoogleCredential, auto_select: false, use_fedcm_for_button: true });
   _gisInitialized = true;
   return true;
 }
