@@ -1235,7 +1235,7 @@ const Render = {
     const listEl = $('#tournaments-list'); if (!listEl) return;
     const sorted = [...State.tournaments].sort((a, b) => b.createdAt - a.createdAt);
     if (!sorted.length) {
-      listEl.innerHTML = '<div class="empty-state" style="padding:24px"><p>No tournaments yet.</p></div>';
+      listEl.innerHTML = '<div class="empty-state" style="padding:24px"><p>No events found.</p></div>';
       return;
     }
     listEl.innerHTML = sorted.map(t => {
@@ -1358,7 +1358,7 @@ const Render = {
     const tog = $('#admin-features-toggle');
     if (tog) tog.innerHTML = `
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
-        <span style="color:${adminFeaturesEnabled ? '#111827' : '#6b7280'};font-size:12px">${adminFeaturesEnabled ? 'Show admin controls site-wide' : 'Admin controls hidden site-wide'}</span>
+        <span style="font-size:12px;color:#111827">Show admin controls site-wide</span>
         <input type="checkbox" ${adminFeaturesEnabled ? 'checked' : ''} onchange="toggleAdminFeatures()" style="width:16px;height:16px;cursor:pointer" />
       </label>`;
     if (!State.users.length) {
