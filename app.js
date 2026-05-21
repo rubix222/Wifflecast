@@ -519,23 +519,18 @@ async function submitMyPlayer(e) {
 }
 
 function updateAuthUI() {
-  const btnIn   = $('#btn-sign-in');
-  const btnOut  = $('#btn-sign-out');
-  const btnChPw = $('#btn-change-password');
-  const nameEl  = $('#auth-user-name');
+  const btnIn      = $('#btn-sign-in');
+  const menuWrap   = $('#user-menu-wrap');
+  const nameEl     = $('#auth-user-name');
   if (!btnIn) return;
 
   if (currentUser) {
-    btnIn.style.display   = 'none';
-    btnOut.style.display  = '';
-    if (btnChPw) btnChPw.style.display = '';
-    nameEl.style.display  = '';
-    nameEl.textContent = currentUserProfile?.name || currentUser.email.split('@')[0];
+    btnIn.style.display    = 'none';
+    menuWrap.style.display = '';
+    nameEl.textContent     = currentUserProfile?.name || currentUser.email.split('@')[0];
   } else {
-    btnIn.style.display   = '';
-    btnOut.style.display  = 'none';
-    if (btnChPw) btnChPw.style.display = 'none';
-    nameEl.style.display  = 'none';
+    btnIn.style.display    = '';
+    menuWrap.style.display = 'none';
   }
 
   // Add-team / add-game buttons — admin only
@@ -546,6 +541,17 @@ function updateAuthUI() {
 
   // Admin tab — admin only
   $$('.admin-only-tab').forEach(t => { t.style.display = isAdminUser() ? '' : 'none'; });
+}
+
+function toggleUserMenu() {
+  const dd = $('#user-menu-dropdown');
+  if (!dd) return;
+  const open = dd.style.display !== 'none';
+  dd.style.display = open ? 'none' : '';
+}
+function closeUserMenu() {
+  const dd = $('#user-menu-dropdown');
+  if (dd) dd.style.display = 'none';
 }
 
 async function createOrLinkUserProfile(user, playerId, name) {
@@ -3057,7 +3063,12 @@ $('#btn-add-game').addEventListener('click', () => showNewGameModal());
 $('#btn-add-tournament').addEventListener('click', () => showNewTournamentModal());
 
 $('#btn-sign-in').addEventListener('click', () => showAuthModal('signin'));
-$('#btn-sign-out').addEventListener('click', () => signOutUser());
+$('#btn-sign-out').addEventListener('click', () => { closeUserMenu(); signOutUser(); });
+
+// Close user menu when clicking outside
+document.addEventListener('click', e => {
+  if (!e.target.closest('#user-menu-wrap')) closeUserMenu();
+}, true);
 
 // Export / import live in the Admin tab — attach via event delegation so they
 // work regardless of when the admin tab is first rendered.
@@ -3163,6 +3174,7 @@ document.addEventListener('firebase-ready', boot, { once: true });
 Object.assign(window, {
   Modal, Render, State,
   showAuthModal, submitAuth, signOutUser, invitePlayer,
+  toggleUserMenu, closeUserMenu,
   showChangePasswordModal, submitChangePassword, adminResetPassword,
   showPlayerModal, deletePlayer, deleteUser, showTeamModal, deleteTeam, cancelInvite, toggleAdminFeatures,
   bipChooseKind, bipChooseDetail, bipCancel,

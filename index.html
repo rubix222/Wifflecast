@@ -50,10 +50,18 @@
   </h1>
   <div class="storage-controls">
     <span id="storage-status" class="storage-status connected">☁️ Firestore</span>
-    <span id="auth-user-name" style="display:none;font-size:13px;color:#fef9c3;font-weight:600"></span>
     <button id="btn-sign-in" class="btn btn-sm">Sign In</button>
-    <button id="btn-change-password" class="btn btn-sm" style="display:none" onclick="showChangePasswordModal()">🔑 Password</button>
-    <button id="btn-sign-out" class="btn btn-sm" style="display:none">Sign Out</button>
+    <div id="user-menu-wrap" class="user-menu-wrap" style="display:none">
+      <button id="user-menu-btn" class="user-menu-btn" onclick="toggleUserMenu()">
+        <span id="auth-user-name"></span>
+        <span class="user-menu-caret">▾</span>
+      </button>
+      <div id="user-menu-dropdown" class="user-menu-dropdown" style="display:none">
+        <button class="user-menu-item" onclick="closeUserMenu();showChangePasswordModal()">Change Password</button>
+        <div class="user-menu-divider"></div>
+        <button class="user-menu-item user-menu-item-danger" id="btn-sign-out">Sign Out</button>
+      </div>
+    </div>
   </div>
 </header>
 
