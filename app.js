@@ -596,10 +596,12 @@ function showAuthModal(mode = 'signin', errorMsg = '') {
     </div>
     <div class="modal-body">
       ${errorMsg ? `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:8px 12px;color:#b91c1c;font-size:13px;margin-bottom:12px">${escapeHtml(errorMsg)}</div>` : ''}
-      <button type="button" class="btn-google" onclick="signInWithGoogle()">
+      <div id="google-btn-container">
+        <button type="button" class="btn-google" onclick="signInWithGoogle()">
         <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#4285F4" d="M44.5 20H24v8.5h11.7C34.2 33.6 29.6 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 6 1.1 8.2 3l6-6C34.5 5.1 29.5 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21c10.8 0 20-7.8 20-21 0-1.4-.1-2.7-.5-4z"/><path fill="#34A853" d="M6.3 14.7l7 5.1C15 16.1 19.1 13 24 13c3.1 0 6 1.1 8.2 3l6-6C34.5 5.1 29.5 3 24 3c-7.6 0-14.2 4.6-17.7 11.7z"/><path fill="#FBBC05" d="M24 45c5.4 0 10.3-1.8 14.1-4.9l-6.5-5.4C29.6 36.4 26.9 37 24 37c-5.6 0-10.2-3.4-11.7-8.3l-7 5.4C8.9 41 15.9 45 24 45z"/><path fill="#EA4335" d="M44.5 20H24v8.5h11.7c-.8 2.3-2.3 4.2-4.2 5.6l6.5 5.4C42 36.2 45 30.6 45 24c0-1.4-.1-2.7-.5-4z"/></svg>
         Continue with Google
-      </button>
+        </button>
+      </div>
       <div class="auth-divider"><span>or</span></div>
       <form onsubmit="submitAuth(event,'${mode}')">
         ${mode === 'signup' ? `<div class="form-group"><label>Name</label><input name="uname" type="text" required autofocus placeholder="Your name" /></div>` : ''}
@@ -617,6 +619,7 @@ function showAuthModal(mode = 'signin', errorMsg = '') {
         </div>
       </form>
     </div>`);
+  renderGoogleSignInButton(); // replace fallback btn with GIS button once ready
 }
 
 async function submitAuth(event, mode) {
@@ -715,31 +718,39 @@ async function ensureGISInitialized() {
     client_id: clientId,
     callback: handleGoogleCredential,
     auto_select: false,
-    cancel_on_tap_outside: true,
   });
   _gisInitialized = true;
   return true;
 }
 
-// No-op — renderButton() causes a personalized "Sign in as [name]" button that
-// overflows the modal. We use our own btn-google button + prompt() instead.
-function renderGoogleSignInButton() {}
-
-// signInWithGoogle — uses our own styled button and triggers GIS One Tap overlay.
-// prompt() shows Google's account chooser without any in-modal rendering or sizing issues.
-async function signInWithGoogle() {
+// Renders the GIS sign-in button into #google-btn-container.
+// renderButton() uses FedCM which is COOP-safe — the only approach that works
+// on GitHub Pages. prompt() gets suppressed on mobile so we don't use it.
+async function renderGoogleSignInButton() {
+  const container = document.getElementById('google-btn-container');
+  if (!container) return;
+  // If already populated, skip (avoid duplicate FedCM sessions)
+  if (container.hasChildNodes()) return;
   const ready = await ensureGISInitialized();
-  if (!ready) {
-    toast('Google Sign-In is still loading — please try again in a moment.', 'error');
-    return;
-  }
-  google.accounts.id.prompt(notification => {
-    if (!notification) return;
-    const type = notification.getMomentType?.() ?? '';
-    if (type === 'skipped' || type === 'not_displayed') {
-      toast('Google sign-in was suppressed by the browser. Please try again or use email sign-in.', 'error');
-    }
+  if (!ready) return; // GIS not yet loaded; container shows fallback btn-google button
+  // requestAnimationFrame ensures the modal is in the layout tree so offsetWidth is real
+  await new Promise(r => requestAnimationFrame(r));
+  // Clamp to container width so the button never overflows on narrow mobile screens
+  const w = container.offsetWidth;
+  const width = w > 50 ? Math.min(w, 400) : 280; // fallback 280 if layout not ready
+  google.accounts.id.renderButton(container, {
+    theme: 'outline',
+    size: 'large',
+    width,
+    text: 'signin_with',
+    shape: 'rectangular',
+    logo_alignment: 'left',
   });
+}
+
+async function signInWithGoogle() {
+  // Clicking our fallback btn-google just re-triggers the render
+  renderGoogleSignInButton();
 }
 
 async function checkGoogleRedirect() {
