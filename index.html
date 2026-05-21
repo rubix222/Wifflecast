@@ -259,6 +259,7 @@
            sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink,
            sendPasswordResetEmail, EmailAuthProvider,
            reauthenticateWithCredential, updatePassword,
+           GoogleAuthProvider, signInWithPopup,
            browserLocalPersistence, setPersistence }
     from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
 
@@ -284,7 +285,8 @@
                  createUserWithEmailAndPassword, signOut,
                  sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink,
                  sendPasswordResetEmail, EmailAuthProvider,
-                 reauthenticateWithCredential, updatePassword };
+                 reauthenticateWithCredential, updatePassword,
+                 GoogleAuthProvider, signInWithPopup };
   document.dispatchEvent(new Event('firebase-ready'));
 </script>
 

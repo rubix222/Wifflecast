@@ -594,24 +594,29 @@ function showAuthModal(mode = 'signin', errorMsg = '') {
       <h3>${mode === 'signin' ? 'Sign In' : 'Create Account'}</h3>
       <button class="btn-icon" onclick="Modal.hide()">✕</button>
     </div>
-    <form onsubmit="submitAuth(event,'${mode}')">
-      <div class="modal-body">
-        ${errorMsg ? `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:8px 12px;color:#b91c1c;font-size:13px;margin-bottom:12px">${escapeHtml(errorMsg)}</div>` : ''}
+    <div class="modal-body">
+      ${errorMsg ? `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:8px 12px;color:#b91c1c;font-size:13px;margin-bottom:12px">${escapeHtml(errorMsg)}</div>` : ''}
+      <button type="button" class="btn-google" onclick="signInWithGoogle()">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#4285F4" d="M44.5 20H24v8.5h11.7C34.2 33.6 29.6 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 6 1.1 8.2 3l6-6C34.5 5.1 29.5 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21c10.8 0 20-7.8 20-21 0-1.4-.1-2.7-.5-4z"/><path fill="#34A853" d="M6.3 14.7l7 5.1C15 16.1 19.1 13 24 13c3.1 0 6 1.1 8.2 3l6-6C34.5 5.1 29.5 3 24 3c-7.6 0-14.2 4.6-17.7 11.7z"/><path fill="#FBBC05" d="M24 45c5.4 0 10.3-1.8 14.1-4.9l-6.5-5.4C29.6 36.4 26.9 37 24 37c-5.6 0-10.2-3.4-11.7-8.3l-7 5.4C8.9 41 15.9 45 24 45z"/><path fill="#EA4335" d="M44.5 20H24v8.5h11.7c-.8 2.3-2.3 4.2-4.2 5.6l6.5 5.4C42 36.2 45 30.6 45 24c0-1.4-.1-2.7-.5-4z"/></svg>
+        Continue with Google
+      </button>
+      <div class="auth-divider"><span>or</span></div>
+      <form onsubmit="submitAuth(event,'${mode}')">
         ${mode === 'signup' ? `<div class="form-group"><label>Name</label><input name="uname" type="text" required autofocus placeholder="Your name" /></div>` : ''}
         <div class="form-group"><label>Email</label><input name="email" type="email" required ${mode === 'signin' ? 'autofocus' : ''} /></div>
         <div class="form-group"><label>Password</label><input name="password" type="password" required minlength="6" /></div>
-      </div>
-      <div class="modal-footer">
-        <p style="margin:0 auto 0 0;font-size:13px">
-          ${mode === 'signin'
-            ? `No account? <a href="#" onclick="Modal.hide();showAuthModal('signup');return false">Create one</a>
-               &nbsp;·&nbsp; <a href="#" onclick="showForgotPasswordModal();return false">Forgot password?</a>`
-            : `Have an account? <a href="#" onclick="Modal.hide();showAuthModal('signin');return false">Sign in</a>`}
-        </p>
-        <button type="button" class="btn" onclick="Modal.hide()">Cancel</button>
-        <button type="submit" class="btn btn-primary">${mode === 'signin' ? 'Sign In' : 'Create Account'}</button>
-      </div>
-    </form>`);
+        <div class="modal-footer">
+          <p style="margin:0 auto 0 0;font-size:13px">
+            ${mode === 'signin'
+              ? `No account? <a href="#" onclick="Modal.hide();showAuthModal('signup');return false">Create one</a>
+                 &nbsp;·&nbsp; <a href="#" onclick="showForgotPasswordModal();return false">Forgot password?</a>`
+              : `Have an account? <a href="#" onclick="Modal.hide();showAuthModal('signin');return false">Sign in</a>`}
+          </p>
+          <button type="button" class="btn" onclick="Modal.hide()">Cancel</button>
+          <button type="submit" class="btn btn-primary">${mode === 'signin' ? 'Sign In' : 'Create Account'}</button>
+        </div>
+      </form>
+    </div>`);
 }
 
 async function submitAuth(event, mode) {
@@ -648,6 +653,25 @@ async function signOutUser() {
   updateAuthUI();
   Render.all();
   toast('Signed out');
+}
+
+async function signInWithGoogle() {
+  const fs = window._fs;
+  try {
+    const provider = new fs.GoogleAuthProvider();
+    const cred = await fs.signInWithPopup(fs.auth, provider);
+    const user = cred.user;
+    const invitedPlayer = State.players.find(p => p.inviteEmail === user.email);
+    await createOrLinkUserProfile(user, invitedPlayer?.id || null, user.displayName);
+    Modal.hide();
+    toast('Signed in with Google!', 'success');
+  } catch (err) {
+    if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') return;
+    const msg = err.code === 'auth/popup-blocked'
+      ? 'Popup was blocked. Please allow popups for this site.'
+      : 'Google sign-in failed: ' + (err.message || err.code);
+    showAuthModal('signin', msg);
+  }
 }
 
 function showForgotPasswordModal(msg = '', isSuccess = false) {
@@ -3208,6 +3232,7 @@ document.addEventListener('firebase-ready', boot, { once: true });
 Object.assign(window, {
   Modal, Render, State,
   showAuthModal, submitAuth, signOutUser, invitePlayer,
+  signInWithGoogle,
   showForgotPasswordModal, submitForgotPassword,
   toggleUserMenu, closeUserMenu,
   showChangePasswordModal, submitChangePassword, adminResetPassword,
