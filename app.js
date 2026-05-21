@@ -659,41 +659,56 @@ async function signInWithGoogle() {
   const fs = window._fs;
   try {
     const provider = new fs.GoogleAuthProvider();
+    console.log('[Google Sign-In] calling signInWithRedirect, current origin:', location.origin);
     await fs.signInWithRedirect(fs.auth, provider);
     // Page will navigate away; result is handled in checkGoogleRedirect() on return
   } catch (err) {
-    showAuthModal('signin', 'Google sign-in failed: ' + (err.message || err.code));
+    console.error('[Google Sign-In] signInWithRedirect threw:', err);
+    showAuthModal('signin', 'Google sign-in failed: ' + (err.code || err.message));
   }
 }
 
 async function checkGoogleRedirect() {
   const fs = window._fs;
   if (!fs) return;
+  // Only run when returning from a redirect (Firebase sets this key)
+  const hasRedirectPending = Object.keys(sessionStorage).some(k => k.includes('firebase') || k.includes('pendingRedirect')) ||
+    Object.keys(localStorage).some(k => k.includes('firebase:pendingRedirect'));
+  let result = null;
   try {
-    const result = await fs.getRedirectResult(fs.auth);
-    if (!result?.user) return;
-    const user = result.user;
-    const invitedPlayer = State.players.find(p => p.inviteEmail === user.email);
-    await createOrLinkUserProfile(user, invitedPlayer?.id || null, user.displayName);
-    toast('Signed in with Google!', 'success');
+    console.log('[Google Sign-In] calling getRedirectResult...');
+    result = await fs.getRedirectResult(fs.auth);
+    console.log('[Google Sign-In] getRedirectResult returned:', result);
   } catch (err) {
     // Log full error so it persists in DevTools console even if UI closes
-    console.error('[Google Sign-In] checkGoogleRedirect error:', err);
+    console.error('[Google Sign-In] getRedirectResult threw:', err);
     const code = err.code || 'unknown';
-    const msg = err.message || '';
-    // Show a modal so the error doesn't disappear — helps diagnose config issues
+    const msg = err.message || '(no message)';
+    let extra = '';
+    try { extra = JSON.stringify(err, Object.getOwnPropertyNames(err), 2); } catch (_) {}
     Modal.show(`
       <h2>Google Sign-In Failed</h2>
-      <p style="margin:12px 0 6px"><strong>Error code:</strong></p>
-      <pre style="background:#f3f4f6;padding:10px;border-radius:6px;font-size:13px;overflow-x:auto;white-space:pre-wrap;word-break:break-all">${code}</pre>
-      <p style="margin:12px 0 6px"><strong>Details:</strong></p>
-      <pre style="background:#f3f4f6;padding:10px;border-radius:6px;font-size:13px;overflow-x:auto;white-space:pre-wrap;word-break:break-all">${msg}</pre>
-      <p style="margin-top:14px;font-size:13px;color:#6b7280">Copy the error code above and share it to get help fixing this.</p>
-      <div style="margin-top:16px;text-align:right">
+      <p style="margin:12px 0 4px"><strong>Error code:</strong></p>
+      <pre style="background:#f3f4f6;padding:8px;border-radius:6px;font-size:13px;overflow-x:auto;white-space:pre-wrap;word-break:break-all">${escapeHtml(code)}</pre>
+      <p style="margin:10px 0 4px"><strong>Message:</strong></p>
+      <pre style="background:#f3f4f6;padding:8px;border-radius:6px;font-size:12px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;max-height:180px">${escapeHtml(msg)}</pre>
+      ${extra ? `<p style="margin:10px 0 4px"><strong>Full error:</strong></p>
+      <pre style="background:#f3f4f6;padding:8px;border-radius:6px;font-size:11px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;max-height:120px">${escapeHtml(extra)}</pre>` : ''}
+      <p style="margin-top:12px;font-size:12px;color:#6b7280">Full error also logged in browser console (F12 → Console).</p>
+      <div style="margin-top:14px;text-align:right">
         <button class="btn btn-primary" onclick="Modal.hide()">OK</button>
       </div>
     `);
+    return;
   }
+  if (!result?.user) {
+    // No redirect result — normal on fresh loads. Nothing to do.
+    return;
+  }
+  const user = result.user;
+  const invitedPlayer = State.players.find(p => p.inviteEmail === user.email);
+  await createOrLinkUserProfile(user, invitedPlayer?.id || null, user.displayName);
+  toast('Signed in with Google!', 'success');
 }
 
 function showForgotPasswordModal(msg = '', isSuccess = false) {
