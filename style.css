@@ -367,10 +367,10 @@
   .modal.full { max-width: none; height: 95vh; }
 
   /* ---------- Google sign-in button + divider ---------- */
-  /* GIS renderButton() injects a div > iframe; make both fill the container */
-  #google-btn-container { width: 100%; overflow: visible; margin-bottom: 4px; }
-  #google-btn-container > div { width: 100% !important; }
-  #google-btn-container iframe { width: 100% !important; max-width: 100%; }
+  /* Transparent GIS iframe overlay — covers #google-btn-wrapper so clicks reach FedCM */
+  #google-btn-container { position: absolute; inset: 0; overflow: hidden; border-radius: 8px; }
+  #google-btn-container > div { position: absolute !important; inset: 0 !important; }
+  #google-btn-container iframe { position: absolute !important; inset: 0 !important; opacity: 0.01; cursor: pointer; }
   .btn-google {
     display: flex;
     align-items: center;
