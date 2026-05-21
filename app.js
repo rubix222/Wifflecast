@@ -1435,11 +1435,9 @@ const Render = {
     }
     const sorted = [...State.tournaments].sort((a, b) => b.createdAt - a.createdAt);
     const rows = sorted.map(t => {
-      const teamNames = (t.teamIds || []).map(id => State.getTeam(id)?.name || '?').join(', ');
       const gameCount = State.games.filter(g => g.tournamentId === t.id).length;
       return `<tr>
         <td>${escapeHtml(t.name)}</td>
-        <td class="muted small">${escapeHtml(teamNames)}</td>
         <td class="muted small" style="text-align:center">${gameCount}</td>
         <td style="white-space:nowrap">
           <button class="btn-icon" title="Edit" onclick="showTournamentModal('${t.id}')">✎</button>
@@ -1449,7 +1447,7 @@ const Render = {
       </tr>`;
     }).join('');
     c.innerHTML = `<div class="stats-table-wrap"><table class="stats-table">
-      <thead><tr><th>Name</th><th>Teams</th><th style="text-align:center">Games</th><th></th></tr></thead>
+      <thead><tr><th>Name</th><th style="text-align:center">Games</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`;
   },
