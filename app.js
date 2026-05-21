@@ -604,7 +604,8 @@ function showAuthModal(mode = 'signin', errorMsg = '') {
       <div class="modal-footer">
         <p style="margin:0 auto 0 0;font-size:13px">
           ${mode === 'signin'
-            ? `No account? <a href="#" onclick="Modal.hide();showAuthModal('signup');return false">Create one</a>`
+            ? `No account? <a href="#" onclick="Modal.hide();showAuthModal('signup');return false">Create one</a>
+               &nbsp;·&nbsp; <a href="#" onclick="showForgotPasswordModal();return false">Forgot password?</a>`
             : `Have an account? <a href="#" onclick="Modal.hide();showAuthModal('signin');return false">Sign in</a>`}
         </p>
         <button type="button" class="btn" onclick="Modal.hide()">Cancel</button>
@@ -647,6 +648,42 @@ async function signOutUser() {
   updateAuthUI();
   Render.all();
   toast('Signed out');
+}
+
+function showForgotPasswordModal(msg = '', isSuccess = false) {
+  Modal.show(`
+    <div class="modal-header">
+      <h3>Reset Password</h3>
+      <button class="btn-icon" onclick="Modal.hide()">✕</button>
+    </div>
+    <form onsubmit="submitForgotPassword(event)">
+      <div class="modal-body">
+        ${msg ? `<div style="background:${isSuccess ? '#f0fdf4' : '#fef2f2'};border:1px solid ${isSuccess ? '#bbf7d0' : '#fecaca'};border-radius:6px;padding:8px 12px;color:${isSuccess ? '#166534' : '#b91c1c'};font-size:13px;margin-bottom:12px">${escapeHtml(msg)}</div>` : ''}
+        <div class="form-group">
+          <label>Email</label>
+          <input name="email" type="email" required autofocus placeholder="your@email.com" />
+        </div>
+        <p class="help-text">We'll send a password reset link to this address.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" onclick="showAuthModal('signin')">Back</button>
+        <button type="submit" class="btn btn-primary">Send Reset Email</button>
+      </div>
+    </form>`);
+}
+
+async function submitForgotPassword(event) {
+  event.preventDefault();
+  const email = event.target.email.value.trim();
+  try {
+    await window._fs.sendPasswordResetEmail(window._fs.auth, email);
+    showForgotPasswordModal(`Reset email sent to ${email}. Check your inbox.`, true);
+  } catch (err) {
+    const msg = err.code === 'auth/user-not-found' ? 'No account found with that email.'
+              : err.code === 'auth/invalid-email'   ? 'Invalid email address.'
+              : 'Failed to send reset email. Please try again.';
+    showForgotPasswordModal(msg, false);
+  }
 }
 
 function showChangePasswordModal(errorMsg = '') {
@@ -3171,6 +3208,7 @@ document.addEventListener('firebase-ready', boot, { once: true });
 Object.assign(window, {
   Modal, Render, State,
   showAuthModal, submitAuth, signOutUser, invitePlayer,
+  showForgotPasswordModal, submitForgotPassword,
   toggleUserMenu, closeUserMenu,
   showChangePasswordModal, submitChangePassword, adminResetPassword,
   showPlayerModal, deletePlayer, deleteUser, showTeamModal, deleteTeam, cancelInvite, toggleAdminFeatures,
