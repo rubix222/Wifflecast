@@ -1424,7 +1424,7 @@ const Render = {
       </div>`;
       return `<div class="home-recent-game" onclick="selectGame('${g.id}');switchTab('games')">
         <div>
-          <div style="font-weight:600">${teamSwatch(away)}${escapeHtml(away?.name||'?')} @ ${teamSwatch(home)}${escapeHtml(home?.name||'?')}</div>
+          <div style="font-weight:600;line-height:1.4">${teamSwatch(away)}${escapeHtml(away?.name||'?')}<br><span style="color:#9ca3af;font-weight:400;font-size:11px">@</span> ${teamSwatch(home)}${escapeHtml(home?.name||'?')}</div>
           <div style="font-size:12px;color:#9ca3af">${date}</div>
         </div>
         ${actions}
@@ -1564,7 +1564,7 @@ const Render = {
         : 'Not Started';
       const eventName = g.tournamentId ? (State.getTournament(g.tournamentId)?.name || g.tournamentName || null) : null;
       return `<tr>
-        <td>${teamSwatch(away)}${escapeHtml(away?.name||'?')} @ ${teamSwatch(home)}${escapeHtml(home?.name||'?')}<div class="muted small" style="margin-top:2px">${date}${eventName ? ` · 📋 ${escapeHtml(eventName)}` : ''}</div></td>
+        <td>${teamSwatch(away)}${escapeHtml(away?.name||'?')}<div style="font-size:12px;color:#6b7280;margin-top:1px">@ ${teamSwatch(home)}${escapeHtml(home?.name||'?')}</div><div class="muted small" style="margin-top:2px">${date}${eventName ? ` · 📋 ${escapeHtml(eventName)}` : ''}</div></td>
         <td style="white-space:nowrap"><span class="game-card-status status-${g.status}" style="font-size:11px">${statusLabel}</span></td>
         <td style="white-space:nowrap">
           <button class="btn-icon" title="Open" onclick="selectGame('${g.id}');switchTab('games')">↗</button>
@@ -1933,7 +1933,7 @@ const Render = {
             <span class="game-card-status status-${g.status}" style="font-size:11px">${statusLabel}</span>
             <span style="font-size:11px;color:#9ca3af">${date}</span>
           </div>
-          <div style="font-weight:600;font-size:13px;margin-top:3px">${teamSwatch(away)}${escapeHtml(away?.name||'?')} @ ${teamSwatch(home)}${escapeHtml(home?.name||'?')}</div>
+          <div style="font-weight:600;font-size:13px;margin-top:3px;line-height:1.4">${teamSwatch(away)}${escapeHtml(away?.name||'?')}<br><span style="color:#9ca3af;font-weight:400;font-size:11px">@</span> ${teamSwatch(home)}${escapeHtml(home?.name||'?')}</div>
           ${showScore ? `<div style="font-size:12px;color:#6b7280">${g.score.away} — ${g.score.home}</div>` : ''}
           ${eventBadge}
           ${scoringLine}
@@ -2234,7 +2234,7 @@ function openGame(id) {
       const eventName = g.tournamentId ? (State.getTournament(g.tournamentId)?.name || g.tournamentName || null) : null;
       detail.innerHTML = `
         <div class="inline-game-header">
-          <h3>${teamSwatch(away)}${escapeHtml(away?.name||'?')} @ ${teamSwatch(home)}${escapeHtml(home?.name||'?')}</h3>
+          <h3 style="line-height:1.4">${teamSwatch(away)}${escapeHtml(away?.name||'?')}<br><span style="font-size:0.75em;font-weight:400;color:#9ca3af">@</span> ${teamSwatch(home)}${escapeHtml(home?.name||'?')}</h3>
           ${eventName ? `<div style="font-size:12px;color:#0369a1;margin-top:4px">📋 ${escapeHtml(eventName)}</div>` : ''}
         </div>
         <div style="padding:24px;text-align:center;color:#6b7280">
@@ -2314,7 +2314,7 @@ function buildGameListItem(g) {
        </div>`
     : '';
   return `<div class="player-list-item" style="cursor:pointer" onclick="openGame('${g.id}')">
-    <div class="pli-name">${teamSwatch(away)}${escapeHtml(away?.name||'?')} @ ${teamSwatch(home)}${escapeHtml(home?.name||'?')}</div>
+    <div class="pli-name" style="line-height:1.4">${teamSwatch(away)}${escapeHtml(away?.name||'?')}<br><span style="font-size:0.85em;color:#9ca3af;font-weight:400">@</span> ${teamSwatch(home)}${escapeHtml(home?.name||'?')}</div>
     <div class="pli-sub">${sub}</div>
     ${rowActions}
   </div>`;
@@ -2800,7 +2800,7 @@ function renderGameSetup(g) {
   if (!detail) return;
   detail.innerHTML = `
     <div class="inline-game-header">
-      <h3>${teamSwatch(away)}${escapeHtml(away.name)} @ ${teamSwatch(home)}${escapeHtml(home.name)}
+      <h3 style="line-height:1.4">${teamSwatch(away)}${escapeHtml(away.name)}<br><span style="font-size:0.75em;font-weight:400;color:#9ca3af">@</span> ${teamSwatch(home)}${escapeHtml(home.name)}
         <span class="game-card-status status-setup" style="margin-left:8px">setup</span>
       </h3>
     </div>
@@ -2835,7 +2835,7 @@ function showSetupModal(gameId) {
   Modal.show(`
     <div class="modal-header">
       <div>
-        <h2 style="margin:0">${escapeHtml(away.name)} @ ${escapeHtml(home.name)}</h2>
+        <h2 style="margin:0;line-height:1.4">${escapeHtml(away.name)}<br><span style="font-size:0.75em;font-weight:400;color:#9ca3af">@</span> ${escapeHtml(home.name)}</h2>
         ${eventName ? `<div style="font-size:12px;color:#0369a1;margin-top:2px">📋 ${escapeHtml(eventName)}</div>` : ''}
       </div>
       <button class="btn-icon" onclick="Modal.hide()">✕</button>

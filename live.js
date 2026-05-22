@@ -413,7 +413,7 @@ function liveGameHTML(g, home, away) {
       <div class="lg-topbar">
         <button class="btn-icon lg-back-btn" onclick="exitLiveGame()" title="Back">←</button>
         <div class="lg-title">
-          <div>${teamSwatch(away)}${escapeHtml(away.name)} @ ${teamSwatch(home)}${escapeHtml(home.name)}
+          <div style="line-height:1.35">${teamSwatch(away)}${escapeHtml(away.name)}<br><span style="font-size:0.85em;color:#9ca3af;font-weight:400">@</span> ${teamSwatch(home)}${escapeHtml(home.name)}
             <span class="game-card-status status-${g.status}" style="margin-left:6px;font-size:11px">${isCompleted ? 'Final' : g.status.replace('_',' ')}</span>
           </div>
           ${g.tournamentId ? `<div style="font-size:11px;color:#0369a1;font-weight:500;margin-top:1px">📋 ${escapeHtml(State.getTournament(g.tournamentId)?.name || g.tournamentName || '')}</div>` : ''}
