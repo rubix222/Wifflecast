@@ -1557,7 +1557,7 @@ const Render = {
         : 'Not Started';
       const eventName = g.tournamentId ? (State.getTournament(g.tournamentId)?.name || g.tournamentName || null) : null;
       return `<tr>
-        <td>${teamSwatch(away)}${escapeHtml(away?.name||'?')}<div style="font-size:12px;color:#6b7280;margin-top:1px">@ ${teamSwatch(home)}${escapeHtml(home?.name||'?')}</div><div class="muted small" style="margin-top:2px">${date}${eventName ? ` · 📋 ${escapeHtml(eventName)}` : ''}</div></td>
+        <td>${matchupHtml(away, home)}<div class="muted small" style="margin-top:2px">${date}${eventName ? ` · 📋 ${escapeHtml(eventName)}` : ''}</div></td>
         <td style="white-space:nowrap"><span class="game-card-status status-${g.status}" style="font-size:11px">${statusLabel}</span></td>
         <td style="white-space:nowrap">
           <button class="btn-icon" title="Open" onclick="selectGame('${g.id}');switchTab('games')">↗</button>
@@ -1927,7 +1927,7 @@ const Render = {
             <span style="font-size:11px;color:#9ca3af">${date}</span>
           </div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px">
-            <div style="font-weight:600;font-size:13px;line-height:1.4">${teamSwatch(away)}${escapeHtml(away?.name||'?')}<br><span style="color:#9ca3af;font-weight:400;font-size:11px">@</span> ${teamSwatch(home)}${escapeHtml(home?.name||'?')}</div>
+            <div style="font-weight:600;font-size:13px">${matchupHtml(away, home)}</div>
             ${showScore ? `<div style="font-size:14px;font-weight:700;color:#374151;text-align:right;line-height:1.4">${g.score.away}<br>${g.score.home}</div>` : ''}
           </div>
           ${eventBadge}
@@ -2055,6 +2055,14 @@ function _teamColor(team) {
   let h = 0;
   for (let i = 0; i < (team.id || '').length; i++) h = (h * 31 + team.id.charCodeAt(i)) & 0xffff;
   return palette[h % palette.length];
+}
+
+// Returns aligned two-row team matchup HTML with @ hanging left.
+function matchupHtml(away, home) {
+  return `<div style="display:grid;grid-template-columns:1em 1fr;align-items:center;column-gap:2px;line-height:1.5">
+    <span></span><span>${teamSwatch(away)}${escapeHtml(away?.name||'?')}</span>
+    <span style="color:#9ca3af;font-size:0.8em;text-align:right">@</span><span>${teamSwatch(home)}${escapeHtml(home?.name||'?')}</span>
+  </div>`;
 }
 
 // Returns a small colored square HTML swatch for a team.
@@ -2315,7 +2323,7 @@ function buildGameListItem(g) {
     : '';
   return `<div class="player-list-item" style="cursor:pointer" onclick="openGame('${g.id}')">
     <div style="display:flex;justify-content:space-between;align-items:center">
-      <div class="pli-name" style="line-height:1.4">${teamSwatch(away)}${escapeHtml(away?.name||'?')}<br><span style="font-size:0.85em;color:#9ca3af;font-weight:400">@</span> ${teamSwatch(home)}${escapeHtml(home?.name||'?')}</div>
+      <div class="pli-name">${matchupHtml(away, home)}</div>
       ${scoreHtml}
     </div>
     <div class="pli-sub">${subLabel}</div>
