@@ -393,8 +393,9 @@ function canUserScore() { return isAdmin() || (currentUser && currentUserProfile
 let _currentTab = 'home';  // tracks active tab for back-navigation after live game
 
 // Home tab card view state
-let homePlayerView = 'batting'; // 'batting' | 'pitching' | 'fielding'
-let homeTeamsView  = 'record';  // 'record' | 'batting' | 'pitching' | 'fielding'
+let homePlayerView    = 'batting'; // 'batting' | 'pitching' | 'fielding'
+let homeTeamsView     = 'record';  // 'record' | 'batting' | 'pitching' | 'fielding'
+let homeShowFinished  = false;
 const homeTeamSort = {
   record:   { col: 'W',   dir: -1 },
   batting:  { col: 'AVG', dir: -1 },
@@ -1405,31 +1406,20 @@ const Render = {
     // Recent games — filtered to current player's games when linked
     const recent = [...State.games]
       .filter(g => {
-        if (g.status !== 'completed' && g.status !== 'in_progress') return false;
-        if (!myPid) return true; // signed in but not linked, show all
+        if (!homeShowFinished && g.status === 'completed') return false;
+        if (g.status === 'setup') return false;
+        if (!myPid) return true;
         return (g.homeBattingOrder || []).includes(myPid) ||
                (g.awayBattingOrder || []).includes(myPid);
       })
       .sort((a, b) => b.createdAt - a.createdAt)
       .slice(0, 6);
-    const recentHtml = recent.map(g => {
-      const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
-      const isLive = g.status === 'in_progress';
-      const score = g.status === 'completed' ? `${g.score.away}-${g.score.home}` : 'LIVE';
-      const date = new Date(g.createdAt).toLocaleDateString();
-      const actions = `<div style="display:flex;gap:6px;align-items:center" onclick="event.stopPropagation()">
-        <div class="home-game-score ${isLive ? 'status-in_progress' : ''}">${score}</div>
-        <button class="btn btn-sm" onclick="renderLiveGame('${g.id}',true)">👁 Watch</button>
-        ${isLive && canUserScore() ? `<button class="btn btn-sm btn-primary" onclick="openGameForScoring('${g.id}')">▶ Score</button>` : ''}
-      </div>`;
-      return `<div class="home-recent-game" onclick="selectGame('${g.id}');switchTab('games')">
-        <div>
-          <div style="font-weight:600;line-height:1.4">${teamSwatch(away)}${escapeHtml(away?.name||'?')}<br><span style="color:#9ca3af;font-weight:400;font-size:11px">@</span> ${teamSwatch(home)}${escapeHtml(home?.name||'?')}</div>
-          <div style="font-size:12px;color:#9ca3af">${date}</div>
-        </div>
-        ${actions}
-      </div>`;
-    }).join('') || '<p style="color:#6b7280;font-size:14px;margin:0">No games yet.</p>';
+    const recentToggle = `<label style="display:flex;align-items:center;gap:5px;font-size:13px;color:#6b7280;cursor:pointer;user-select:none">
+      <input type="checkbox" ${homeShowFinished ? 'checked' : ''} onchange="homeShowFinished=this.checked;Render.home()">
+      Show finished
+    </label>`;
+    const recentHtml = recent.map(g => buildGameListItem(g)).join('')
+      || '<p style="color:#6b7280;font-size:14px;margin:0">No active games.</p>';
 
     c.innerHTML = `
       <div style="padding-top:8px">
@@ -1437,7 +1427,10 @@ const Render = {
           ${playerCard}
           ${teamsCard}
           <div class="home-card home-card-full">
-            <div class="home-section-title">${myPid ? 'My Recent Games' : 'Recent Games'}</div>
+            <div class="home-section-title" style="display:flex;justify-content:space-between;align-items:center">
+              <span>${myPid ? 'My Recent Games' : 'Recent Games'}</span>
+              ${recentToggle}
+            </div>
             ${recentHtml}
           </div>
         </div>
@@ -2308,9 +2301,10 @@ function buildGameListItem(g) {
   const scoreHtml = hasScore
     ? `<div style="font-size:14px;font-weight:700;color:#374151;text-align:right;line-height:1.4">${g.score.away}<br>${g.score.home}</div>`
     : '';
-  const subLabel = g.status === 'completed' ? 'Final'
-                 : g.status === 'in_progress' ? 'In Progress'
-                 : 'Not Started';
+  const date = new Date(g.createdAt).toLocaleDateString();
+  const subLabel = g.status === 'completed' ? `Final · ${date}`
+                 : g.status === 'in_progress' ? `In Progress · ${date}`
+                 : `Not Started · ${date}`;
   const rowActions = g.status === 'setup' && canUserScore()
     ? `<div style="margin-top:4px" onclick="event.stopPropagation()"><button class="btn btn-sm btn-primary" onclick="showSetupModal('${g.id}')">▶ Start Scoring</button></div>`
     : g.status === 'in_progress'
