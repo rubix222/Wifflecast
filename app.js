@@ -32,13 +32,13 @@ const BATTING_COLS = [
 const PITCH_COLS = [
   { key: 'GP',      label: 'GP',     desc: 'Games pitched' },
   { key: 'IP',      label: 'IP',     desc: 'Innings pitched', fmt: v => fmt.ip(v) },
+  { key: 'PC',      label: 'PC',     desc: 'Total pitches thrown' },
   { key: 'ERA',     label: 'ERA',    desc: 'Earned run average (ER × 9 / IP)', fmt: v => v !== null ? v.toFixed(2) : '—', nullLow: true },
   { key: 'K',       label: 'K',      desc: 'Strikeouts' },
   { key: 'BB',      label: 'BB',     desc: 'Walks allowed' },
   { key: 'H',       label: 'H',      desc: 'Hits allowed' },
   { key: 'R',       label: 'R',      desc: 'Runs allowed' },
   { key: 'ER',      label: 'ER',     desc: 'Earned runs' },
-  { key: 'PC',      label: 'PC',     desc: 'Total pitches thrown' },
   { key: 'WHIP',    label: 'WHIP',   desc: 'Walks + hits per inning pitched', fmt: v => v !== null ? v.toFixed(2) : '—', nullLow: true },
   { key: 'pPerIP',  label: 'P/IP',   desc: 'Pitches per inning', fmt: v => v !== null ? v.toFixed(1) : '—' },
   { key: 'pPerBF',  label: 'P/BP',   desc: 'Pitches per batter faced', fmt: v => v !== null ? v.toFixed(2) : '—' },
@@ -128,6 +128,7 @@ function renderPlayerPitchingRow(s) {
   return `<div class="stat-row-lg">
     ${statTile('ERA', s.ERA !== null ? s.ERA.toFixed(2) : '—', true)}
     ${statTile('IP', fmt.ip(s.IP), true)}
+    ${statTile('PC', s.pPitches)}
     ${statTile('GP', s.pGP)}
     ${statTile('K', s.pK)}
     ${statTile('KL', s.pKL)}
@@ -135,7 +136,6 @@ function renderPlayerPitchingRow(s) {
     ${statTile('KF', s.pKF)}
     ${statTile('BB', s.pBB)}
     ${statTile('ER', s.pER)}
-    ${statTile('PC', s.pPitches)}
   </div>`;
 }
 
