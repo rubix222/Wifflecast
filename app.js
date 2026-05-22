@@ -1428,7 +1428,7 @@ const Render = {
           ${teamsCard}
           <div class="home-card home-card-full">
             <div class="home-section-title" style="display:flex;justify-content:space-between;align-items:center">
-              <span>${myPid ? 'My Recent Games' : 'Recent Games'}</span>
+              <span>${myPid ? 'My Games' : 'Recent Games'}</span>
               ${recentToggle}
             </div>
             ${recentHtml}
