@@ -1900,18 +1900,15 @@ const Render = {
         ? `<div style="font-size:11px;color:#d97706;margin-top:3px">⚠️ Scoring session inactive</div>`
         : '';
 
-      // Setup game actions (scorers only)
-      const setupActions = isSetup && canUserScore() ? `
-        <div style="display:flex;gap:6px;margin-top:6px" onclick="event.stopPropagation()">
-          <button class="btn btn-sm btn-primary" onclick="showSetupModal('${g.id}')">▶ Start Scoring</button>
-        </div>` : '';
-
-      // Watch / Resume buttons for live games
-      const liveActions = isLive ? `
-        <div style="display:flex;gap:6px;margin-top:6px" onclick="event.stopPropagation()">
-          <button class="btn btn-sm" onclick="renderLiveGame('${g.id}',true)">👁 Watch</button>
-          ${canUserScore() ? `<button class="btn btn-sm btn-primary" onclick="openGameForScoring('${g.id}')">▶ Score</button>` : ''}
-        </div>` : '';
+      // Top-right action buttons
+      const topActions = isLive
+        ? `<div style="display:flex;gap:5px;align-items:center" onclick="event.stopPropagation()">
+             <button class="btn btn-sm" onclick="renderLiveGame('${g.id}',true)">👁 Watch</button>
+             ${canUserScore() ? `<button class="btn btn-sm btn-primary" onclick="openGameForScoring('${g.id}')">▶ Score</button>` : ''}
+           </div>`
+        : isSetup && canUserScore()
+          ? `<div onclick="event.stopPropagation()"><button class="btn btn-sm btn-primary" onclick="showSetupModal('${g.id}')">▶ Start</button></div>`
+          : '';
 
       // Status label
       const statusLabel = isSetup ? 'Not Started'
@@ -1924,7 +1921,7 @@ const Render = {
         <div style="width:100%">
           <div style="display:flex;justify-content:space-between;align-items:center">
             <span class="game-card-status status-${g.status}" style="font-size:11px">${statusLabel}</span>
-            <span style="font-size:11px;color:#9ca3af">${date}</span>
+            ${topActions}
           </div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px">
             <div style="font-weight:600;font-size:13px">${matchupHtml(away, home)}</div>
@@ -1932,9 +1929,10 @@ const Render = {
           </div>
           ${eventBadge}
           ${scoringLine}
-          ${setupActions}
-          ${liveActions}
-          ${isAdmin() ? `<button class="btn-icon" style="float:right;margin-top:-18px" title="Delete" onclick="event.stopPropagation();deleteGame('${g.id}')">🗑</button>` : ''}
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px">
+            <span></span>
+            <span style="font-size:11px;color:#9ca3af">${date}</span>
+          </div>
         </div>
       </div>`;
     }).join('');
@@ -2314,27 +2312,28 @@ function buildGameListItem(g) {
     : isLive ? 'Live'
     : isCompleted ? 'Final'
     : g.status.replace('_', ' ');
-  const setupActions = isSetup && canUserScore()
-    ? `<div style="margin-top:4px" onclick="event.stopPropagation()"><button class="btn btn-sm btn-primary" onclick="showSetupModal('${g.id}')">▶ Start Scoring</button></div>`
-    : '';
-  const liveActions = isLive
-    ? `<div style="margin-top:4px;display:flex;gap:6px" onclick="event.stopPropagation()">
+  const topActions = isLive
+    ? `<div style="display:flex;gap:5px;align-items:center" onclick="event.stopPropagation()">
          <button class="btn btn-sm" onclick="renderLiveGame('${g.id}',true)">👁 Watch</button>
          ${canUserScore() ? `<button class="btn btn-sm btn-primary" onclick="openGameForScoring('${g.id}')">▶ Score</button>` : ''}
        </div>`
-    : '';
+    : isSetup && canUserScore()
+      ? `<div onclick="event.stopPropagation()"><button class="btn btn-sm btn-primary" onclick="showSetupModal('${g.id}')">▶ Start</button></div>`
+      : '';
   const clickAttr = (isSetup && !canUserScore()) ? 'style="cursor:default;opacity:0.6"' : `onclick="openGame('${g.id}')"`;
   return `<div class="player-list-item game-list-item" ${clickAttr}>
     <div style="width:100%">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <span class="game-card-status status-${g.status}" style="font-size:11px">${statusLabel}</span>
-        <span style="font-size:11px;color:#9ca3af">${date}</span>
+        ${topActions}
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px">
         <div style="font-weight:600;font-size:13px">${matchupHtml(away, home)}</div>
         ${showScore ? `<div style="font-size:14px;font-weight:700;color:#374151;text-align:right;line-height:1.4">${g.score.away}<br>${g.score.home}</div>` : ''}
       </div>
-      ${setupActions}${liveActions}
+      <div style="text-align:right;margin-top:3px">
+        <span style="font-size:11px;color:#9ca3af">${date}</span>
+      </div>
     </div>
   </div>`;
 }
