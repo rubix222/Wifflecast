@@ -23,7 +23,6 @@ const BATTING_COLS = [
   { key: 'H',   label: 'H'   },
   { key: '1B',  label: '1B'  },
   { key: '2B',  label: '2B'  },
-  { key: '3B',  label: '3B'  },
   { key: 'HR',  label: 'HR'  },
   { key: 'R',   label: 'R'   },
   { key: 'RBI', label: 'RBI' },
@@ -69,7 +68,7 @@ const TEAM_RECORD_COLS = [
 // ── Normalize raw computePlayerStats result to unified column keys ──
 function playerBattingData(s) {
   return { GP: s.GP, PA: s.PA, AB: s.AB, AVG: s.AVG, OBP: s.OBP, SLG: s.SLG, H: s.H,
-    '1B': s.singles, '2B': s.doubles, '3B': s.triples, HR: s.hrs,
+    '1B': s.singles, '2B': s.doubles, HR: s.hrs,
     R: s.R, RBI: s.RBI, BB: s.BB, K: s.K_bat };
 }
 function playerPitchingData(s) {
@@ -84,7 +83,7 @@ function playerFieldingData(s) {
 }
 function teamBattingData(bs, gp = 0) {
   return { GP: gp, PA: bs.PA, AB: bs.AB, AVG: bs.AVG, OBP: bs.OBP, SLG: bs.SLG, H: bs.H,
-    '1B': bs.singles, '2B': bs.doubles, '3B': bs.triples, HR: bs.hrs,
+    '1B': bs.singles, '2B': bs.doubles, HR: bs.hrs,
     R: bs.R, RBI: bs.RBI, BB: bs.BB, K: bs.K };
 }
 function teamPitchingData(ps, gp = 0) {
@@ -113,7 +112,6 @@ function renderPlayerBattingRow(s) {
     ${statTile('H', s.H)}
     ${statTile('1B', s.singles)}
     ${statTile('2B', s.doubles)}
-    ${statTile('3B', s.triples)}
     ${statTile('HR', s.hrs)}
     ${statTile('R', s.R)}
     ${statTile('RBI', s.RBI)}
