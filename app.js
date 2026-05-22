@@ -14,56 +14,56 @@ const fmt = {
 // Normalized keys used by both player and team renderers.
 // Player data is mapped to these keys via normalizePlayerBatting/Pitching/Fielding.
 const BATTING_COLS = [
-  { key: 'GP',  label: 'GP'  },
-  { key: 'PA',  label: 'PA'  },
-  { key: 'AB',  label: 'AB'  },
-  { key: 'AVG', label: 'AVG', fmt: v => fmt.avg(v) },
-  { key: 'OBP', label: 'OBP', fmt: v => fmt.avg(v) },
-  { key: 'SLG', label: 'SLG', fmt: v => fmt.avg(v) },
-  { key: 'H',   label: 'H'   },
-  { key: '1B',  label: '1B'  },
-  { key: '2B',  label: '2B'  },
-  { key: 'HR',  label: 'HR'  },
-  { key: 'R',   label: 'R'   },
-  { key: 'RBI', label: 'RBI' },
-  { key: 'BB',  label: 'BB'  },
-  { key: 'K',   label: 'K'   },
+  { key: 'GP',  label: 'GP',  desc: 'Games played' },
+  { key: 'PA',  label: 'PA',  desc: 'Plate appearances' },
+  { key: 'AB',  label: 'AB',  desc: 'At bats (PA minus walks)' },
+  { key: 'AVG', label: 'AVG', desc: 'Batting average (H / AB)', fmt: v => fmt.avg(v) },
+  { key: 'OBP', label: 'OBP', desc: 'On-base percentage', fmt: v => fmt.avg(v) },
+  { key: 'SLG', label: 'SLG', desc: 'Slugging percentage', fmt: v => fmt.avg(v) },
+  { key: 'H',   label: 'H',   desc: 'Total hits' },
+  { key: '1B',  label: '1B',  desc: 'Singles' },
+  { key: '2B',  label: '2B',  desc: 'Doubles' },
+  { key: 'HR',  label: 'HR',  desc: 'Home runs' },
+  { key: 'R',   label: 'R',   desc: 'Runs scored' },
+  { key: 'RBI', label: 'RBI', desc: 'Runs batted in' },
+  { key: 'BB',  label: 'BB',  desc: 'Walks' },
+  { key: 'K',   label: 'K',   desc: 'Strikeouts' },
 ];
 const PITCH_COLS = [
-  { key: 'GP',     label: 'GP'     },
-  { key: 'IP',     label: 'IP',     fmt: v => fmt.ip(v) },
-  { key: 'ERA',    label: 'ERA',    fmt: v => v !== null ? v.toFixed(2) : '—', nullLow: true },
-  { key: 'K',      label: 'K'      },
-  { key: 'BB',     label: 'BB'     },
-  { key: 'H',      label: 'H'      },
-  { key: 'R',      label: 'R'      },
-  { key: 'ER',     label: 'ER'     },
-  { key: 'PC',     label: 'PC'     },
-  { key: 'WHIP',   label: 'WHIP',  fmt: v => v !== null ? v.toFixed(2) : '—', nullLow: true },
-  { key: 'pPerIP', label: 'P/IP',  fmt: v => v !== null ? v.toFixed(1) : '—' },
-  { key: 'pPerBF', label: 'P/BP',  fmt: v => v !== null ? v.toFixed(2) : '—' },
-  { key: 'sPct',   label: 'S%',    fmt: v => v !== null ? (v * 100).toFixed(1) + '%' : '—' },
-  { key: 'kPerBF', label: 'K/BP',  fmt: v => v !== null ? v.toFixed(3) : '—' },
-  { key: 'kPerInn',label: 'K/Inn', fmt: v => v !== null ? v.toFixed(2) : '—' },
-  { key: 'bbPerInn',label:'BB/Inn',fmt: v => v !== null ? v.toFixed(2) : '—' },
+  { key: 'GP',      label: 'GP',     desc: 'Games pitched' },
+  { key: 'IP',      label: 'IP',     desc: 'Innings pitched', fmt: v => fmt.ip(v) },
+  { key: 'ERA',     label: 'ERA',    desc: 'Earned run average (ER × 9 / IP)', fmt: v => v !== null ? v.toFixed(2) : '—', nullLow: true },
+  { key: 'K',       label: 'K',      desc: 'Strikeouts' },
+  { key: 'BB',      label: 'BB',     desc: 'Walks allowed' },
+  { key: 'H',       label: 'H',      desc: 'Hits allowed' },
+  { key: 'R',       label: 'R',      desc: 'Runs allowed' },
+  { key: 'ER',      label: 'ER',     desc: 'Earned runs' },
+  { key: 'PC',      label: 'PC',     desc: 'Total pitches thrown' },
+  { key: 'WHIP',    label: 'WHIP',   desc: 'Walks + hits per inning pitched', fmt: v => v !== null ? v.toFixed(2) : '—', nullLow: true },
+  { key: 'pPerIP',  label: 'P/IP',   desc: 'Pitches per inning', fmt: v => v !== null ? v.toFixed(1) : '—' },
+  { key: 'pPerBF',  label: 'P/BP',   desc: 'Pitches per batter faced', fmt: v => v !== null ? v.toFixed(2) : '—' },
+  { key: 'sPct',    label: 'S%',     desc: 'Strike percentage', fmt: v => v !== null ? (v * 100).toFixed(1) + '%' : '—' },
+  { key: 'kPerBF',  label: 'K/BP',   desc: 'Strikeouts per batter faced', fmt: v => v !== null ? v.toFixed(3) : '—' },
+  { key: 'kPerInn', label: 'K/Inn',  desc: 'Strikeouts per inning', fmt: v => v !== null ? v.toFixed(2) : '—' },
+  { key: 'bbPerInn',label: 'BB/Inn', desc: 'Walks per inning', fmt: v => v !== null ? v.toFixed(2) : '—' },
 ];
 const FIELD_COLS = [
-  { key: 'GP',         label: 'GP' },
-  { key: 'PO',         label: 'PO' },
-  { key: 'E',          label: 'E'  },
-  { key: 'dpAttempts', label: 'DPA' },
-  { key: 'dpSuccesses',label: 'DP'  },
-  { key: 'dpPct',      label: 'DP%', fmt: v => v !== null ? (v * 100).toFixed(0) + '%' : '—' },
-  { key: 'tagAttempts',label: 'TAGA' },
-  { key: 'tagSuccesses',label:'TAG'  },
-  { key: 'tagPct',     label: 'TAG%', fmt: v => v !== null ? (v * 100).toFixed(0) + '%' : '—' },
+  { key: 'GP',          label: 'GP',   desc: 'Games fielded' },
+  { key: 'PO',          label: 'PO',   desc: 'Putouts' },
+  { key: 'E',           label: 'E',    desc: 'Errors' },
+  { key: 'dpAttempts',  label: 'DPA',  desc: 'Double play attempts' },
+  { key: 'dpSuccesses', label: 'DP',   desc: 'Double plays made' },
+  { key: 'dpPct',       label: 'DP%',  desc: 'Double play success rate', fmt: v => v !== null ? (v * 100).toFixed(0) + '%' : '—' },
+  { key: 'tagAttempts', label: 'TAGA', desc: 'Tag play attempts' },
+  { key: 'tagSuccesses',label: 'TAG',  desc: 'Successful tag outs' },
+  { key: 'tagPct',      label: 'TAG%', desc: 'Tag play success rate', fmt: v => v !== null ? (v * 100).toFixed(0) + '%' : '—' },
 ];
 const TEAM_RECORD_COLS = [
-  { key: 'GP', label: 'GP' },
-  { key: 'W',  label: 'W'  },
-  { key: 'L',  label: 'L'  },
-  { key: 'RF', label: 'RF' },
-  { key: 'RA', label: 'RA' },
+  { key: 'GP', label: 'GP', desc: 'Games played' },
+  { key: 'W',  label: 'W',  desc: 'Wins' },
+  { key: 'L',  label: 'L',  desc: 'Losses' },
+  { key: 'RF', label: 'RF', desc: 'Runs scored' },
+  { key: 'RA', label: 'RA', desc: 'Runs allowed' },
 ];
 
 // ── Normalize raw computePlayerStats result to unified column keys ──
@@ -204,6 +204,17 @@ function renderTeamStatRows(teamId) {
 // ── Single-row stats table helpers (home page + modal) ──────
 // Renders column headers + one data row using the same stats-table styling.
 // No name column — the caller provides context (card heading, modal title).
+function renderStatsLegend(cols) {
+  const items = cols.filter(c => c.desc).map(c =>
+    `<span><strong>${c.label}</strong> — ${c.desc}</span>`
+  ).join('');
+  if (!items) return '';
+  return `<div class="stats-legend-wrap">
+    <button class="stats-legend-btn" onclick="const o=this.classList.toggle('open');this.nextElementSibling.classList.toggle('open');this.textContent=(o?'▾':'▸')+' Legend'">▸ Legend</button>
+    <div class="stats-legend">${items}</div>
+  </div>`;
+}
+
 function renderStatTableRow(cols, data) {
   const ths = cols.map(c => `<th class="num-col">${c.label}</th>`).join('');
   const tds = cols.map(c => {
@@ -213,7 +224,7 @@ function renderStatTableRow(cols, data) {
   return `<div class="stats-table-wrap" style="-webkit-overflow-scrolling:touch"><table class="stats-table stats-table--noname" style="width:auto">
     <thead><tr>${ths}</tr></thead>
     <tbody><tr>${tds}</tr></tbody>
-  </table></div>`;
+  </table></div>${renderStatsLegend(cols)}`;
 }
 
 function renderPlayerStatTable(s) {
@@ -291,7 +302,7 @@ function renderHomeTeamsSection(teams, view) {
   return `<div class="stats-table-wrap"><table class="stats-table">
     <thead><tr><th onclick="sortHomeTeams('name','${view}')">Team${nameSortArr}</th>${cols.map(thArr).join('')}</tr></thead>
     <tbody>${trs}</tbody>
-  </table></div>`;
+  </table></div>${renderStatsLegend(cols)}`;
 }
 
 function showPlayerStatsModal(playerId) {
@@ -1091,7 +1102,7 @@ function renderTournPlayerStats(tournId) {
       ${cols.map(thArr).join('')}
     </tr></thead>
     <tbody>${tbody}</tbody>
-  </table></div>`;
+  </table></div>${renderStatsLegend(cols)}`;
 }
 
 function renderTournTeamStats(tournId) {
@@ -1147,7 +1158,7 @@ function renderTournTeamStats(tournId) {
       ${COLS.map(thArr).join('')}
     </tr></thead>
     <tbody>${tbody}</tbody>
-  </table></div>`;
+  </table></div>${renderStatsLegend(COLS)}`;
 }
 
 function setTournStatsView(tournId, view) {
@@ -1676,7 +1687,7 @@ const Render = {
         <thead>${headers}</thead>
         <tbody>${tBody}</tbody>
       </table>
-    </div>`;
+    </div>${renderStatsLegend(cols)}`;
   },
 
   teams() {
@@ -1733,7 +1744,7 @@ const Render = {
           ${teamNameCell(t)}
           ${COLS.map(col => `<td>${col.fmt ? col.fmt(d[col.key]) : (d[col.key] ?? '—')}</td>`).join('')}
         </tr>`).join('')}</tbody>
-      </table></div>`;
+      </table></div>${renderStatsLegend(COLS)}`;
       return;
     }
 
@@ -1761,7 +1772,7 @@ const Render = {
           ${teamNameCell(t)}
           ${COLS.map(col => `<td>${col.fmt ? col.fmt(d[col.key]) : (d[col.key] ?? '—')}</td>`).join('')}
         </tr>`).join('')}</tbody>
-      </table></div>`;
+      </table></div>${renderStatsLegend(COLS)}`;
       return;
     }
 
@@ -1786,7 +1797,7 @@ const Render = {
           ${teamNameCell(t)}
           ${COLS.map(col => `<td>${col.fmt ? col.fmt(d[col.key]) : (d[col.key] ?? '—')}</td>`).join('')}
         </tr>`).join('')}</tbody>
-      </table></div>`;
+      </table></div>${renderStatsLegend(COLS)}`;
       return;
     }
 
@@ -1814,7 +1825,7 @@ const Render = {
           ${teamNameCell(t)}
           ${COLS.map(col => `<td>${col.fmt ? col.fmt(d[col.key]) : (d[col.key] ?? '—')}</td>`).join('')}
         </tr>`).join('')}</tbody>
-      </table></div>`;
+      </table></div>${renderStatsLegend(COLS)}`;
       return;
     }
 
