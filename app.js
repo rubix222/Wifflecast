@@ -1553,7 +1553,7 @@ const Render = {
       const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
       const date = new Date(g.createdAt).toLocaleDateString();
       const statusLabel = g.status === 'completed' ? `Final ${g.score.away}–${g.score.home}`
-        : g.status === 'in_progress' ? 'In Progress'
+        : g.status === 'in_progress' ? 'Live'
         : 'Not Started';
       const eventName = g.tournamentId ? (State.getTournament(g.tournamentId)?.name || g.tournamentName || null) : null;
       return `<tr>
@@ -1915,7 +1915,7 @@ const Render = {
 
       // Status label
       const statusLabel = isSetup ? 'Not Started'
-        : isLive ? `In Progress${inningStr ? ' · ' + inningStr : ''}`
+        : isLive ? `Live${inningStr ? ' · ' + inningStr : ''}`
         : g.status === 'completed' ? 'Final'
         : g.status.replace('_', ' ');
 
@@ -2311,7 +2311,7 @@ function buildGameListItem(g) {
   const showScore = isLive || isCompleted;
   const date = new Date(g.createdAt).toLocaleDateString();
   const statusLabel = isSetup ? 'Not Started'
-    : isLive ? 'In Progress'
+    : isLive ? 'Live'
     : isCompleted ? 'Final'
     : g.status.replace('_', ' ');
   const setupActions = isSetup && canUserScore()
