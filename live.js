@@ -484,7 +484,7 @@ function liveGameHTML(g, home, away) {
                       <span class="spray-key-item"><span class="spray-key-dot" style="background:#4ade80"></span>Single</span>
                       <span class="spray-key-item"><span class="spray-key-dot" style="background:#60a5fa"></span>Double</span>
                       <span class="spray-key-item"><span class="spray-key-dot" style="background:#fde68a"></span>HR</span>
-                      <span class="spray-key-item"><span class="spray-key-dot" style="background:#fb923c"></span>Out</span>
+                      <span class="spray-key-item"><span class="spray-key-dot" style="background:#fb923c"></span>Out/Error</span>
                     </div>
                   </div>
                   <button class="btn-icon spray-toggle-btn${_sprayChartVisible ? ' active' : ''}" id="spray-toggle-btn" onclick="toggleSprayChart()" title="Toggle hit chart">📍 Hit Chart</button>
@@ -1283,11 +1283,8 @@ function getSprayData(playerId) {
   for (const g of State.games) {
     for (const e of (g.events || [])) {
       if (e.type !== 'pa_end' || e.batterId !== playerId || !e.location) continue;
-      // Errors are grouped with the base they resulted in (errBase)
-      let displayOutcome = e.outcome;
-      if (e.outcome === 'ERR_REACH') {
-        displayOutcome = e.errBase || '1B'; // treat as the base reached
-      }
+      // Errors are grouped with outs on the chart
+      let displayOutcome = e.outcome === 'ERR_REACH' ? 'OUT' : e.outcome;
       // Skip triples — not shown on spray chart
       if (displayOutcome === '3B') continue;
       results.push({ x: e.location.x, y: e.location.y, outcome: displayOutcome });
