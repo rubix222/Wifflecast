@@ -374,12 +374,11 @@ function renderFieldingStats(g, away, home) {
         if (e.fielderId === pid && (e.doublePlay || e.dpAttempted)) { dpAtt++; if (e.doublePlay) dpSuc++; }
         if (e.fielderId === pid && e.sacFly) { tagAtt++; if (e.sacFlyOut) tagSuc++; }
       });
-      if (po + err + dpAtt + tagAtt === 0) return null;
       const dpStr  = dpAtt  > 0 ? `${dpSuc}/${dpAtt}`  : '—';
       const tagStr = tagAtt > 0 ? `${tagSuc}/${tagAtt}` : '—';
       return `<tr><td>${escapeHtml(p?.name||'?')}</td><td>${po}</td><td>${err}</td><td>${dpStr}</td><td>${tagStr}</td></tr>`;
-    }).filter(Boolean).join('');
-    return rows || `<tr><td colspan="5" class="muted" style="padding:8px;text-align:center">No fielding events</td></tr>`;
+    }).join('');
+    return rows;
   };
   const hdr = (team) => `<tr class="stats-team-hdr"><th colspan="5">${teamSwatch(team)}${escapeHtml(team.name)}</th></tr>
     <tr class="stats-col-hdr"><th>Player</th><th>PO</th><th>E</th><th>DP</th><th>TAG</th></tr>`;
