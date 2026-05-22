@@ -297,7 +297,7 @@ function renderHomeTeamsSection(teams, view) {
   const trs = teamData.map(row => {
     const d = row[view];
     const tds = cols.map(c => `<td>${c.fmt ? c.fmt(d[c.key]) : (d[c.key] ?? '—')}</td>`).join('');
-    return `<tr style="cursor:pointer" onclick="showTeamStatsModal('${row.t.id}')"><td>${escapeHtml(row.t.name)}</td>${tds}</tr>`;
+    return `<tr style="cursor:pointer" onclick="showTeamStatsModal('${row.t.id}')"><td><span style="display:inline-flex;align-items:center;gap:5px">${teamSwatch(row.t)}${escapeHtml(row.t.name)}</span></td>${tds}</tr>`;
   }).join('');
   return `<div class="stats-table-wrap"><table class="stats-table">
     <thead><tr><th onclick="sortHomeTeams('name','${view}')">Team${nameSortArr}</th>${cols.map(thArr).join('')}</tr></thead>
@@ -1147,7 +1147,7 @@ function renderTournTeamStats(tournId) {
 
   const tbody = rows.map(({ team, d }) =>
     `<tr style="cursor:pointer" onclick="showTeamStatsModal('${team.id}')">
-      <td>${escapeHtml(team.name)}</td>
+      <td><span style="display:inline-flex;align-items:center;gap:5px">${teamSwatch(team)}${escapeHtml(team.name)}</span></td>
       ${COLS.map(col => `<td>${col.fmt ? col.fmt(d[col.key]) : (d[col.key] ?? '—')}</td>`).join('')}
     </tr>`
   ).join('');
@@ -1420,11 +1420,11 @@ const Render = {
       const actions = `<div style="display:flex;gap:6px;align-items:center" onclick="event.stopPropagation()">
         <div class="home-game-score ${isLive ? 'status-in_progress' : ''}">${score}</div>
         <button class="btn btn-sm" onclick="renderLiveGame('${g.id}',true)">👁 Watch</button>
-        ${isLive && canUserScore() ? `<button class="btn btn-sm btn-primary" onclick="openGameForScoring('${g.id}')">▶ Resume</button>` : ''}
+        ${isLive && canUserScore() ? `<button class="btn btn-sm btn-primary" onclick="openGameForScoring('${g.id}')">▶ Score</button>` : ''}
       </div>`;
       return `<div class="home-recent-game" onclick="selectGame('${g.id}');switchTab('games')">
         <div>
-          <div style="font-weight:600">${escapeHtml(away?.name||'?')} @ ${escapeHtml(home?.name||'?')}</div>
+          <div style="font-weight:600">${teamSwatch(away)}${escapeHtml(away?.name||'?')} @ ${teamSwatch(home)}${escapeHtml(home?.name||'?')}</div>
           <div style="font-size:12px;color:#9ca3af">${date}</div>
         </div>
         ${actions}
@@ -1534,7 +1534,7 @@ const Render = {
     const rows = sorted.map(t => {
       const playerCount = (t.playerIds || []).length;
       return `<tr>
-        <td>${escapeHtml(t.name)}</td>
+        <td><span style="display:inline-flex;align-items:center;gap:5px">${teamSwatch(t)}${escapeHtml(t.name)}</span></td>
         <td><span class="muted small">${playerCount} player${playerCount !== 1 ? 's' : ''}</span></td>
         <td style="white-space:nowrap">
           <button class="btn-icon" title="Edit" onclick="showTeamModal('${t.id}', true)">✎</button>
@@ -1564,7 +1564,7 @@ const Render = {
         : 'Not Started';
       const eventName = g.tournamentId ? (State.getTournament(g.tournamentId)?.name || g.tournamentName || null) : null;
       return `<tr>
-        <td>${escapeHtml(away?.name||'?')} @ ${escapeHtml(home?.name||'?')}<div class="muted small" style="margin-top:2px">${date}${eventName ? ` · 📋 ${escapeHtml(eventName)}` : ''}</div></td>
+        <td>${teamSwatch(away)}${escapeHtml(away?.name||'?')} @ ${teamSwatch(home)}${escapeHtml(home?.name||'?')}<div class="muted small" style="margin-top:2px">${date}${eventName ? ` · 📋 ${escapeHtml(eventName)}` : ''}</div></td>
         <td style="white-space:nowrap"><span class="game-card-status status-${g.status}" style="font-size:11px">${statusLabel}</span></td>
         <td style="white-space:nowrap">
           <button class="btn-icon" title="Open" onclick="selectGame('${g.id}');switchTab('games')">↗</button>
@@ -1717,7 +1717,7 @@ const Render = {
     const myPid = currentUserProfile?.playerId;
     const isMyTeam = (t) => !!(myPid && (t.playerIds || []).includes(myPid));
     const teamNameCell = (t) => {
-      return `<td><span style="cursor:pointer;border-bottom:1px dashed #9ca3af" onclick="event.stopPropagation();showTeamStatsModal('${t.id}')">${escapeHtml(t.name)}</span></td>`;
+      return `<td><span style="cursor:pointer;border-bottom:1px dashed #9ca3af;display:inline-flex;align-items:center;gap:5px" onclick="event.stopPropagation();showTeamStatsModal('${t.id}')">${teamSwatch(t)}${escapeHtml(t.name)}</span></td>`;
     };
     const teamRowClass = (t) => isMyTeam(t) ? 'mine' : '';
     const _gameIds = getFilteredGameIds();
@@ -1917,7 +1917,7 @@ const Render = {
       const liveActions = isLive ? `
         <div style="display:flex;gap:6px;margin-top:6px" onclick="event.stopPropagation()">
           <button class="btn btn-sm" onclick="renderLiveGame('${g.id}',true)">👁 Watch</button>
-          ${canUserScore() ? `<button class="btn btn-sm btn-primary" onclick="openGameForScoring('${g.id}')">▶ Resume</button>` : ''}
+          ${canUserScore() ? `<button class="btn btn-sm btn-primary" onclick="openGameForScoring('${g.id}')">▶ Score</button>` : ''}
         </div>` : '';
 
       // Status label
@@ -1933,7 +1933,7 @@ const Render = {
             <span class="game-card-status status-${g.status}" style="font-size:11px">${statusLabel}</span>
             <span style="font-size:11px;color:#9ca3af">${date}</span>
           </div>
-          <div style="font-weight:600;font-size:13px;margin-top:3px">${escapeHtml(away?.name||'?')} @ ${escapeHtml(home?.name||'?')}</div>
+          <div style="font-weight:600;font-size:13px;margin-top:3px">${teamSwatch(away)}${escapeHtml(away?.name||'?')} @ ${teamSwatch(home)}${escapeHtml(home?.name||'?')}</div>
           ${showScore ? `<div style="font-size:12px;color:#6b7280">${g.score.away} — ${g.score.home}</div>` : ''}
           ${eventBadge}
           ${scoringLine}
@@ -2060,6 +2060,12 @@ function _teamColor(team) {
   let h = 0;
   for (let i = 0; i < (team.id || '').length; i++) h = (h * 31 + team.id.charCodeAt(i)) & 0xffff;
   return palette[h % palette.length];
+}
+
+// Returns a small colored square HTML swatch for a team.
+function teamSwatch(team) {
+  const c = _teamColor(team);
+  return `<span class="team-swatch" style="background:${c}"></span>`;
 }
 
 function showTeamModal(id = null, forceAdmin = false) {
@@ -2228,7 +2234,7 @@ function openGame(id) {
       const eventName = g.tournamentId ? (State.getTournament(g.tournamentId)?.name || g.tournamentName || null) : null;
       detail.innerHTML = `
         <div class="inline-game-header">
-          <h3>${escapeHtml(away?.name||'?')} @ ${escapeHtml(home?.name||'?')}</h3>
+          <h3>${teamSwatch(away)}${escapeHtml(away?.name||'?')} @ ${teamSwatch(home)}${escapeHtml(home?.name||'?')}</h3>
           ${eventName ? `<div style="font-size:12px;color:#0369a1;margin-top:4px">📋 ${escapeHtml(eventName)}</div>` : ''}
         </div>
         <div style="padding:24px;text-align:center;color:#6b7280">
@@ -2287,9 +2293,9 @@ function buildChampSection(id, champGame, finalists, useGenerateFn) {
     <div class="champ-bracket-label">🏆 Championship</div>
     ${isComplete && winnerName ? `<div class="champ-winner">🎉 ${escapeHtml(winnerName)} wins the tournament!</div>` : ''}
     <div class="champ-finalists" style="cursor:pointer" onclick="openGame('${champGame.id}')">
-      <div class="champ-finalist${isComplete && champGame.score.away >= champGame.score.home ? ' champ-finalist-winner' : ''}">${escapeHtml(chAway?.name||'?')}</div>
+      <div class="champ-finalist${isComplete && champGame.score.away >= champGame.score.home ? ' champ-finalist-winner' : ''}">${teamSwatch(chAway)}${escapeHtml(chAway?.name||'?')}</div>
       <div class="champ-score">${isComplete ? `${champGame.score.away}–${champGame.score.home}` : champGame.status.replace('_',' ')}</div>
-      <div class="champ-finalist${isComplete && champGame.score.home >= champGame.score.away ? ' champ-finalist-winner' : ''}">${escapeHtml(chHome?.name||'?')}</div>
+      <div class="champ-finalist${isComplete && champGame.score.home >= champGame.score.away ? ' champ-finalist-winner' : ''}">${teamSwatch(chHome)}${escapeHtml(chHome?.name||'?')}</div>
     </div>
   </div>`;
 }
@@ -2304,11 +2310,11 @@ function buildGameListItem(g) {
     : g.status === 'in_progress'
     ? `<div style="margin-top:4px;display:flex;gap:6px" onclick="event.stopPropagation()">
          <button class="btn btn-sm" onclick="renderLiveGame('${g.id}',true)">👁 Watch</button>
-         ${canUserScore() ? `<button class="btn btn-sm btn-primary" onclick="openGameForScoring('${g.id}')">▶ Resume</button>` : ''}
+         ${canUserScore() ? `<button class="btn btn-sm btn-primary" onclick="openGameForScoring('${g.id}')">▶ Score</button>` : ''}
        </div>`
     : '';
   return `<div class="player-list-item" style="cursor:pointer" onclick="openGame('${g.id}')">
-    <div class="pli-name">${escapeHtml(away?.name||'?')} @ ${escapeHtml(home?.name||'?')}</div>
+    <div class="pli-name">${teamSwatch(away)}${escapeHtml(away?.name||'?')} @ ${teamSwatch(home)}${escapeHtml(home?.name||'?')}</div>
     <div class="pli-sub">${sub}</div>
     ${rowActions}
   </div>`;
@@ -2339,7 +2345,7 @@ function renderTournamentDetail(id) {
       const badge = row.eliminated ? `<span style="font-size:11px;color:#dc2626;font-weight:600;margin-left:4px">OUT</span>` : '';
       return `<tr class="${i === 0 && !row.eliminated ? 'tourn-leader' : ''}${row.eliminated ? ' tourn-eliminated' : ''}">
         <td>${row.eliminated ? '✗' : i+1}</td>
-        <td><strong>${escapeHtml(row.team.name)}</strong>${badge}</td>
+        <td><span style="display:inline-flex;align-items:center;gap:5px"><strong>${teamSwatch(row.team)}${escapeHtml(row.team.name)}</strong>${badge}</span></td>
         <td>${row.W}</td><td>${row.L}</td><td>${row.gamesPlayed}</td>
       </tr>`;
     }).join('');
@@ -2399,7 +2405,7 @@ function renderTournamentDetail(id) {
       const isFinalist = isPlayoff && i < 2;
       return `<tr class="${i === 0 ? 'tourn-leader' : ''}${isFinalist ? ' tourn-finalist' : ''}">
         <td>${isFinalist ? (i === 0 ? '🥇' : '🥈') : i+1}</td>
-        <td><strong>${escapeHtml(row.team.name)}</strong></td>
+        <td><span style="display:inline-flex;align-items:center;gap:5px"><strong>${teamSwatch(row.team)}${escapeHtml(row.team.name)}</strong></span></td>
         <td>${row.W}</td><td>${row.L}</td><td>${row.T}</td>
         <td>${row.pts}</td><td>${row.RF}</td><td>${row.RA}</td>
         <td>${row.rd >= 0 ? '+' : ''}${row.rd}</td>
@@ -2794,7 +2800,7 @@ function renderGameSetup(g) {
   if (!detail) return;
   detail.innerHTML = `
     <div class="inline-game-header">
-      <h3>${escapeHtml(away.name)} @ ${escapeHtml(home.name)}
+      <h3>${teamSwatch(away)}${escapeHtml(away.name)} @ ${teamSwatch(home)}${escapeHtml(home.name)}
         <span class="game-card-status status-setup" style="margin-left:8px">setup</span>
       </h3>
     </div>
@@ -2805,11 +2811,11 @@ function renderGameSetup(g) {
       </p>
       <div class="game-setup-grid">
         <div class="lineup-team-block">
-          <h4>${escapeHtml(away.name)} <span class="team-tag away">Away</span></h4>
+          <h4>${teamSwatch(away)}${escapeHtml(away.name)} <span class="team-tag away">Away</span></h4>
           <ul class="lineup-list" id="lineup-away" data-team="away" data-game="${g.id}"></ul>
         </div>
         <div class="lineup-team-block">
-          <h4>${escapeHtml(home.name)} <span class="team-tag">Home</span></h4>
+          <h4>${teamSwatch(home)}${escapeHtml(home.name)} <span class="team-tag">Home</span></h4>
           <ul class="lineup-list" id="lineup-home" data-team="home" data-game="${g.id}"></ul>
         </div>
       </div>
@@ -2844,7 +2850,7 @@ function showSetupModal(gameId) {
           <ul class="lineup-list" id="lineup-away" data-team="away" data-game="${g.id}"></ul>
         </div>
         <div class="lineup-team-block">
-          <h4>${escapeHtml(home.name)} <span class="team-tag">Home</span></h4>
+          <h4>${teamSwatch(home)}${escapeHtml(home.name)} <span class="team-tag">Home</span></h4>
           <ul class="lineup-list" id="lineup-home" data-team="home" data-game="${g.id}"></ul>
         </div>
       </div>

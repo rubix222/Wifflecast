@@ -744,6 +744,18 @@
   }
   .stats-key span strong { color: #374151; }
 
+  /* ── Team color swatch (small square next to team name) ── */
+  .team-swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+    vertical-align: middle;
+    border: 1px solid rgba(0,0,0,0.15);
+    margin-right: 4px;
+  }
+
   /* ── Stats legend (collapsible glossary under stat tables) ── */
   .stats-legend-wrap { margin-top: 4px; }
   .stats-legend-btn {

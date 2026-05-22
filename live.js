@@ -285,11 +285,11 @@ function renderHittingStats(g, away, home) {
       </tr>`;
     }).join('');
   };
-  const hdr = name => `<tr class="stats-team-hdr"><th colspan="12">${escapeHtml(name)}</th></tr>
+  const hdr = (team) => `<tr class="stats-team-hdr"><th colspan="12">${teamSwatch(team)}${escapeHtml(team.name)}</th></tr>
     <tr class="stats-col-hdr"><th>Player</th><th>AB</th><th>H</th><th>AVG</th><th>1B</th><th>2B</th><th>3B</th><th>HR</th><th>R</th><th>RBI</th><th>BB</th><th>K</th></tr>`;
   return `<table>
-    <thead>${hdr(away.name)}</thead><tbody>${renderTeam(away,'awayBattingOrder')}</tbody>
-    <thead>${hdr(home.name)}</thead><tbody>${renderTeam(home,'homeBattingOrder')}</tbody>
+    <thead>${hdr(away)}</thead><tbody>${renderTeam(away,'awayBattingOrder')}</tbody>
+    <thead>${hdr(home)}</thead><tbody>${renderTeam(home,'homeBattingOrder')}</tbody>
   </table>
   <div class="stats-key">
     <span><strong>AB</strong> At Bats</span>
@@ -342,11 +342,11 @@ function renderPitchingStats(g, away, home) {
       </tr>`;
     }).join('');
   };
-  const hdr = name => `<tr class="stats-team-hdr"><th colspan="9">${escapeHtml(name)}</th></tr>
+  const hdr = (team) => `<tr class="stats-team-hdr"><th colspan="9">${teamSwatch(team)}${escapeHtml(team.name)}</th></tr>
     <tr class="stats-col-hdr"><th>Player</th><th>IP</th><th>ERA</th><th>H</th><th>HR</th><th>BB</th><th>K</th><th>ER</th><th>PC</th></tr>`;
   return `<table>
-    <thead>${hdr(away.name)}</thead><tbody>${renderTeam(away, g.awayPositions, 'bottom')}</tbody>
-    <thead>${hdr(home.name)}</thead><tbody>${renderTeam(home, g.homePositions, 'top')}</tbody>
+    <thead>${hdr(away)}</thead><tbody>${renderTeam(away, g.awayPositions, 'bottom')}</tbody>
+    <thead>${hdr(home)}</thead><tbody>${renderTeam(home, g.homePositions, 'top')}</tbody>
   </table>
   <div class="stats-key">
     <span><strong>IP</strong> Innings Pitched</span>
@@ -381,11 +381,11 @@ function renderFieldingStats(g, away, home) {
     }).filter(Boolean).join('');
     return rows || `<tr><td colspan="5" class="muted" style="padding:8px;text-align:center">No fielding events</td></tr>`;
   };
-  const hdr = name => `<tr class="stats-team-hdr"><th colspan="5">${escapeHtml(name)}</th></tr>
+  const hdr = (team) => `<tr class="stats-team-hdr"><th colspan="5">${teamSwatch(team)}${escapeHtml(team.name)}</th></tr>
     <tr class="stats-col-hdr"><th>Player</th><th>PO</th><th>E</th><th>DP</th><th>TAG</th></tr>`;
   return `<table>
-    <thead>${hdr(away.name)}</thead><tbody>${renderTeam(away, g.awayPositions, 'bottom')}</tbody>
-    <thead>${hdr(home.name)}</thead><tbody>${renderTeam(home, g.homePositions, 'top')}</tbody>
+    <thead>${hdr(away)}</thead><tbody>${renderTeam(away, g.awayPositions, 'bottom')}</tbody>
+    <thead>${hdr(home)}</thead><tbody>${renderTeam(home, g.homePositions, 'top')}</tbody>
   </table>
   <div class="stats-key">
     <span><strong>PO</strong> Putouts</span>
@@ -413,7 +413,7 @@ function liveGameHTML(g, home, away) {
       <div class="lg-topbar">
         <button class="btn-icon lg-back-btn" onclick="exitLiveGame()" title="Back">←</button>
         <div class="lg-title">
-          <div>${escapeHtml(away.name)} @ ${escapeHtml(home.name)}
+          <div>${teamSwatch(away)}${escapeHtml(away.name)} @ ${teamSwatch(home)}${escapeHtml(home.name)}
             <span class="game-card-status status-${g.status}" style="margin-left:6px;font-size:11px">${isCompleted ? 'Final' : g.status.replace('_',' ')}</span>
           </div>
           ${g.tournamentId ? `<div style="font-size:11px;color:#0369a1;font-weight:500;margin-top:1px">📋 ${escapeHtml(State.getTournament(g.tournamentId)?.name || g.tournamentName || '')}</div>` : ''}
@@ -436,7 +436,7 @@ function liveGameHTML(g, home, away) {
 
       <div class="scoreboard">
         <div class="team-side ${battingSide === 'away' && !isCompleted ? 'batting' : ''}">
-          <div class="name">${escapeHtml(away.name)}</div>
+          <div class="name">${teamSwatch(away)}${escapeHtml(away.name)}</div>
           <div class="score" id="sb-score-away">${g.score.away}</div>
         </div>
         <div class="middle">
@@ -444,7 +444,7 @@ function liveGameHTML(g, home, away) {
           <div class="outs" id="sb-outs"><span class="outs-label">Outs</span><span class="out-dots"><span class="out-dot${g.outs >= 1 ? ' on' : ''}"></span><span class="out-dot${g.outs >= 2 ? ' on' : ''}"></span><span class="out-dot${g.outs >= 3 ? ' on' : ''}"></span></span></div>
         </div>
         <div class="team-side ${battingSide === 'home' && !isCompleted ? 'batting' : ''}">
-          <div class="name">${escapeHtml(home.name)}</div>
+          <div class="name">${teamSwatch(home)}${escapeHtml(home.name)}</div>
           <div class="score" id="sb-score-home">${g.score.home}</div>
         </div>
         ${!isCompleted ? `
