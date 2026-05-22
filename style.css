@@ -313,9 +313,11 @@
     transform: translate(-50%, -50%) scale(1);
     background: rgba(0, 0, 0, 0.78);
     border-radius: 16px;
-    padding: 14px 30px;
+    padding: 14px 24px;
     font-weight: 800;
-    white-space: nowrap;
+    white-space: normal;
+    max-width: 90vw;
+    text-align: center;
     letter-spacing: 0.3px;
     text-shadow: 0 2px 6px rgba(0,0,0,0.6);
     opacity: 0;
