@@ -10,8 +10,9 @@ let _sprayCachedDots  = null;  // snapshot of dots taken before save; prevents n
 let _scoringHeartbeat = null;
 let _selectedPlayTs = null;
 let _returnTab    = null;   // tab to return to after exiting live game overlay
-const _undoStack = [];
-const _redoStack = [];
+// Undo/redo stacks are stored on the game document in Firestore so any
+// authorized scorer on any device can undo/redo.  They are NOT in
+// _SNAPSHOT_KEYS so a snapshot restore never overwrites the stack itself.
 
 const _SNAPSHOT_KEYS = [
   // Core play state
@@ -34,14 +35,16 @@ function captureSnapshot(g) {
 
 async function undoPlay() {
   if (!assertScoringLock(LiveGameId)) return;
-  if (!_undoStack.length) { toast('Nothing to undo', 'error'); return; }
   const g = State.getGame(LiveGameId); if (!g) return;
-  const snap = _undoStack.pop();
-  _redoStack.push(captureSnapshot(g));
+  const undoStack = g.undoStack || [];
+  if (!undoStack.length) { toast('Nothing to undo', 'error'); return; }
+  const snap = undoStack[undoStack.length - 1];
+  // Mutate stacks on g BEFORE updateGame — Storage.saveGame(g) persists the full doc
+  g.undoStack = undoStack.slice(0, -1);
+  g.redoStack = [...(g.redoStack || []), captureSnapshot(g)].slice(-15);
   _cancelAnim();
-  await State.updateGame(g.id, snap);
+  await State.updateGame(g.id, snap);  // snap lacks undoStack/redoStack keys → stacks survive
   renderLiveGame(g.id);
-  // Re-render stat views immediately so player/team stats reflect the reverted events
   Render.players();
   Render.teams();
   toast('Undone');
@@ -49,14 +52,15 @@ async function undoPlay() {
 
 async function redoPlay() {
   if (!assertScoringLock(LiveGameId)) return;
-  if (!_redoStack.length) { toast('Nothing to redo', 'error'); return; }
   const g = State.getGame(LiveGameId); if (!g) return;
-  const snap = _redoStack.pop();
-  _undoStack.push(captureSnapshot(g));
+  const redoStack = g.redoStack || [];
+  if (!redoStack.length) { toast('Nothing to redo', 'error'); return; }
+  const snap = redoStack[redoStack.length - 1];
+  g.redoStack = redoStack.slice(0, -1);
+  g.undoStack = [...(g.undoStack || []), captureSnapshot(g)].slice(-15);
   _cancelAnim();
   await State.updateGame(g.id, snap);
   renderLiveGame(g.id);
-  // Re-render stat views immediately so player/team stats reflect the re-applied events
   Render.players();
   Render.teams();
   toast('Redone');
@@ -65,8 +69,6 @@ async function redoPlay() {
 function renderLiveGame(gameId, watchOnly = false) {
   const isNewGame = gameId !== _lastLiveGameId;
   if (isNewGame) {
-    _undoStack.length = 0;
-    _redoStack.length = 0;
     _liveTab = 'score';
     _prevGameSnap = null;
     _sprayChartVisible = false;
@@ -471,8 +473,8 @@ function liveGameHTML(g, home, away) {
                   <button class="bip-instruction-cancel" onclick="bipCancel()">✕</button>
                 </div>
                 ${!isCompleted && canScore ? `
-                <button class="btn-icon field-undo-btn" onclick="undoPlay()" ${_undoStack.length ? '' : 'disabled'} title="Undo">↩</button>
-                <button class="btn-icon field-redo-btn" onclick="redoPlay()" ${_redoStack.length ? '' : 'disabled'} title="Redo">↪</button>` : ''}
+                <button class="btn-icon field-undo-btn" onclick="undoPlay()" ${(g.undoStack?.length > 0) ? '' : 'disabled'} title="Undo">↩</button>
+                <button class="btn-icon field-redo-btn" onclick="redoPlay()" ${(g.redoStack?.length > 0) ? '' : 'disabled'} title="Redo">↪</button>` : ''}
                 ${batterId ? `
                 <div class="spray-chart-controls">
                   <div id="spray-chart-key" class="spray-chart-key" style="display:${_sprayChartVisible ? 'block' : 'none'}">
@@ -1625,8 +1627,8 @@ async function handlePitch(kind) {
   if (g.status === 'completed') return;
   if (!canUserScore()) { toast('You need scoring privilege to record plays', 'error'); return; }
   _cancelAnim();  // abort any in-progress animation before the new action
-  _undoStack.push(captureSnapshot(g));
-  _redoStack.length = 0;
+  g.undoStack = [...(g.undoStack || []).slice(-14), captureSnapshot(g)];
+  g.redoStack = [];
 
   if (kind === 'ball') {
     g.balls++;
@@ -1809,6 +1811,9 @@ function bipCancel() {
   __pendingPlay = null;
   __fieldClickMode = null;
   __bipStep = null; __bipKind = null; __bipDetail = null;
+  // Remove the phantom undo entry pushed when BIP was initiated but cancelled
+  const _gBip = State.getGame(LiveGameId);
+  if (_gBip) _gBip.undoStack = (_gBip.undoStack || []).slice(0, -1);
   Modal.hide();
   renderLiveGame(LiveGameId);
 }
@@ -2233,8 +2238,8 @@ async function skipBatter() {
   const g = State.getGame(LiveGameId); if (!g) return;
   if (!assertScoringLock(g.id)) return;
   _cancelAnim();
-  _undoStack.push(captureSnapshot(g));
-  _redoStack.length = 0;
+  g.undoStack = [...(g.undoStack || []).slice(-14), captureSnapshot(g)];
+  g.redoStack = [];
   const idxKey = battingIdxKey(g);
   await State.updateGame(g.id, { [idxKey]: g[idxKey] + 1, balls: 0, strikes: 0, fouls: 0 });
   renderLiveGame(g.id);
