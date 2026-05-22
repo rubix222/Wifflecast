@@ -2305,29 +2305,37 @@ function buildChampSection(id, champGame, finalists, useGenerateFn) {
 
 function buildGameListItem(g) {
   const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
-  const hasScore = g.status === 'completed' || g.status === 'in_progress';
-  const scoreHtml = hasScore
-    ? `<div style="font-size:14px;font-weight:700;color:#374151;text-align:right;line-height:1.4">${g.score.away}<br>${g.score.home}</div>`
-    : '';
+  const isLive  = g.status === 'in_progress';
+  const isSetup = g.status === 'setup';
+  const isCompleted = g.status === 'completed';
+  const showScore = isLive || isCompleted;
   const date = new Date(g.createdAt).toLocaleDateString();
-  const subLabel = g.status === 'completed' ? `Final · ${date}`
-                 : g.status === 'in_progress' ? `In Progress · ${date}`
-                 : `Not Started · ${date}`;
-  const rowActions = g.status === 'setup' && canUserScore()
+  const statusLabel = isSetup ? 'Not Started'
+    : isLive ? 'In Progress'
+    : isCompleted ? 'Final'
+    : g.status.replace('_', ' ');
+  const setupActions = isSetup && canUserScore()
     ? `<div style="margin-top:4px" onclick="event.stopPropagation()"><button class="btn btn-sm btn-primary" onclick="showSetupModal('${g.id}')">▶ Start Scoring</button></div>`
-    : g.status === 'in_progress'
+    : '';
+  const liveActions = isLive
     ? `<div style="margin-top:4px;display:flex;gap:6px" onclick="event.stopPropagation()">
          <button class="btn btn-sm" onclick="renderLiveGame('${g.id}',true)">👁 Watch</button>
          ${canUserScore() ? `<button class="btn btn-sm btn-primary" onclick="openGameForScoring('${g.id}')">▶ Score</button>` : ''}
        </div>`
     : '';
-  return `<div class="player-list-item" style="cursor:pointer" onclick="openGame('${g.id}')">
-    <div style="display:flex;justify-content:space-between;align-items:center">
-      <div class="pli-name">${matchupHtml(away, home)}</div>
-      ${scoreHtml}
+  const clickAttr = (isSetup && !canUserScore()) ? 'style="cursor:default;opacity:0.6"' : `onclick="openGame('${g.id}')"`;
+  return `<div class="player-list-item game-list-item" ${clickAttr}>
+    <div style="width:100%">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span class="game-card-status status-${g.status}" style="font-size:11px">${statusLabel}</span>
+        <span style="font-size:11px;color:#9ca3af">${date}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px">
+        <div style="font-weight:600;font-size:13px">${matchupHtml(away, home)}</div>
+        ${showScore ? `<div style="font-size:14px;font-weight:700;color:#374151;text-align:right;line-height:1.4">${g.score.away}<br>${g.score.home}</div>` : ''}
+      </div>
+      ${setupActions}${liveActions}
     </div>
-    <div class="pli-sub">${subLabel}</div>
-    ${rowActions}
   </div>`;
 }
 
