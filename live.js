@@ -343,7 +343,7 @@ function renderPitchingStats(g, away, home) {
     }).join('');
   };
   const hdr = name => `<tr class="stats-team-hdr"><th colspan="9">${escapeHtml(name)}</th></tr>
-    <tr class="stats-col-hdr"><th>Player</th><th>IP</th><th>ERA</th><th>H</th><th>HR</th><th>BB</th><th>K</th><th>ER</th><th>Pitches</th></tr>`;
+    <tr class="stats-col-hdr"><th>Player</th><th>IP</th><th>ERA</th><th>H</th><th>HR</th><th>BB</th><th>K</th><th>ER</th><th>PC</th></tr>`;
   return `<table>
     <thead>${hdr(away.name)}</thead><tbody>${renderTeam(away, g.awayPositions, 'bottom')}</tbody>
     <thead>${hdr(home.name)}</thead><tbody>${renderTeam(home, g.homePositions, 'top')}</tbody>
@@ -356,7 +356,7 @@ function renderPitchingStats(g, away, home) {
     <span><strong>BB</strong> Walks</span>
     <span><strong>K</strong> Strikeouts</span>
     <span><strong>ER</strong> Earned Runs</span>
-    <span><strong>Pitches</strong> Pitch Count</span>
+    <span><strong>PC</strong> Pitch Count</span>
   </div>`;
 }
 

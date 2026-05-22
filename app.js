@@ -38,6 +38,7 @@ const PITCH_COLS = [
   { key: 'H',      label: 'H'      },
   { key: 'R',      label: 'R'      },
   { key: 'ER',     label: 'ER'     },
+  { key: 'PC',     label: 'PC'     },
   { key: 'WHIP',   label: 'WHIP',  fmt: v => v !== null ? v.toFixed(2) : '—', nullLow: true },
   { key: 'pPerIP', label: 'P/IP',  fmt: v => v !== null ? v.toFixed(1) : '—' },
   { key: 'pPerBF', label: 'P/BP',  fmt: v => v !== null ? v.toFixed(2) : '—' },
@@ -73,7 +74,7 @@ function playerBattingData(s) {
 }
 function playerPitchingData(s) {
   return { GP: s.pGP, IP: s.IP, ERA: s.ERA, K: s.pK, BB: s.pBB, H: s.pH, R: s.pR, ER: s.pER,
-    WHIP: s.pWHIP, pPerIP: s.pPerIP, pPerBF: s.pPerBF, sPct: s.pSPct,
+    PC: s.pPitches, WHIP: s.pWHIP, pPerIP: s.pPerIP, pPerBF: s.pPerBF, sPct: s.pSPct,
     kPerBF: s.pKPerBF, kPerInn: s.pKPerInn, bbPerInn: s.pBBPerInn };
 }
 function playerFieldingData(s) {
@@ -88,7 +89,7 @@ function teamBattingData(bs, gp = 0) {
 }
 function teamPitchingData(ps, gp = 0) {
   return { GP: gp, IP: ps.IP, ERA: ps.ERA, K: ps.K, BB: ps.BB, H: ps.H, R: ps.R, ER: ps.ER,
-    WHIP: ps.WHIP, pPerIP: ps.pPerIP, pPerBF: ps.pPerBF, sPct: ps.sPct,
+    PC: ps.pitches, WHIP: ps.WHIP, pPerIP: ps.pPerIP, pPerBF: ps.pPerBF, sPct: ps.sPct,
     kPerBF: ps.kPerBF, kPerInn: ps.kPerInn, bbPerInn: ps.bbPerInn };
 }
 
@@ -134,6 +135,7 @@ function renderPlayerPitchingRow(s) {
     ${statTile('KF', s.pKF)}
     ${statTile('BB', s.pBB)}
     ${statTile('ER', s.pER)}
+    ${statTile('PC', s.pPitches)}
   </div>`;
 }
 

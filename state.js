@@ -597,7 +597,7 @@ const State = {
     const kPerBF  = BF > 0       ? K / BF               : null;
     const kPerInn = IP > 0       ? K / IP               : null;
     const bbPerInn = IP > 0      ? BB / IP              : null;
-    return { IP, ER, R, K, BB, H, ERA, WHIP, pPerIP, pPerBF, sPct, kPerBF, kPerInn, bbPerInn };
+    return { IP, ER, R, K, BB, H, ERA, WHIP, pitches, pPerIP, pPerBF, sPct, kPerBF, kPerInn, bbPerInn };
   },
 
   computeTeamFieldingStats(teamId, gameIds = null) {
