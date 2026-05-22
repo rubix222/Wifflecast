@@ -2308,8 +2308,9 @@ function buildGameListItem(g) {
   const isCompleted = g.status === 'completed';
   const showScore = isLive || isCompleted;
   const date = new Date(g.createdAt).toLocaleDateString();
+  const inningStr = isLive ? `${g.currentHalf === 'top' ? 'Top' : 'Bot'} ${g.currentInning}` : '';
   const statusLabel = isSetup ? 'Not Started'
-    : isLive ? 'Live'
+    : isLive ? `Live${inningStr ? ' · ' + inningStr : ''}`
     : isCompleted ? 'Final'
     : g.status.replace('_', ' ');
   const topActions = isLive
