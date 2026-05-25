@@ -2004,6 +2004,49 @@ async function submitPlayer(e, id) {
   Render.all();
   toast(id ? 'Player updated' : 'Player added', 'success');
 }
+
+function showCreateMyPlayerModal() {
+  if (!currentUser || currentUserProfile?.playerId) return;
+  Modal.show(`
+    <div class="modal-header">
+      <h3>Create my player</h3>
+      <button class="btn-icon" onclick="Modal.hide()">✕</button>
+    </div>
+    <form onsubmit="submitCreateMyPlayer(event)">
+      <div class="modal-body">
+        <p style="font-size:13px;color:#6b7280;margin:0 0 14px">Create your player profile to have your stats tracked.</p>
+        <div class="form-group">
+          <label for="cmp-name">Your name</label>
+          <input id="cmp-name" required autofocus value="${escapeHtml(currentUserProfile?.name || '')}" />
+        </div>
+        <div class="form-group">
+          <label for="cmp-jersey">Jersey number <span class="muted small">(optional)</span></label>
+          <input id="cmp-jersey" maxlength="4" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" onclick="Modal.hide()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create</button>
+      </div>
+    </form>`);
+}
+
+async function submitCreateMyPlayer(e) {
+  e.preventDefault();
+  if (!currentUser || !currentUserProfile) { toast('Not signed in', 'error'); return; }
+  if (currentUserProfile.playerId) { toast('You already have a player profile', 'error'); return; }
+  const name = $('#cmp-name').value.trim();
+  const jerseyNumber = $('#cmp-jersey').value.trim();
+  if (!name) return;
+  const p = await State.addPlayer({ name, jerseyNumber });
+  p.userId = currentUser.uid;
+  await Storage.savePlayer(p);
+  currentUserProfile.playerId = p.id;
+  await Storage.saveUser(currentUserProfile);
+  Modal.hide();
+  Render.all();
+  toast('Player created and linked to your account!', 'success');
+}
 async function deleteUser(uid) {
   if (!isAdminUser()) return;
   if (uid === currentUser?.uid) { toast('Cannot delete your own account', 'error'); return; }
@@ -3359,7 +3402,7 @@ Object.assign(window, {
   showForgotPasswordModal, submitForgotPassword,
   toggleUserMenu, closeUserMenu,
   showChangePasswordModal, submitChangePassword, adminResetPassword,
-  showPlayerModal, deletePlayer, deleteUser, showTeamModal, deleteTeam, cancelInvite, toggleAdminFeatures,
+  showPlayerModal, showCreateMyPlayerModal, submitCreateMyPlayer, deletePlayer, deleteUser, showTeamModal, deleteTeam, cancelInvite, toggleAdminFeatures,
   bipChooseKind, bipChooseDetail, bipCancel,
   showDoublePlayResult, applyDoublePlay,
   showTagUpResult, applyTagUp,
