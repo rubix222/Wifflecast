@@ -1663,6 +1663,20 @@
     text-transform: none;
     padding: 2px 0 3px;
   }
+  .play-pitcher-entry {
+    font-size: 11px;
+    color: #6b7280;
+    font-style: italic;
+    border-bottom: none;
+    padding: 2px 0 2px 4px;
+  }
+  .play-pitcher-change {
+    font-size: 11px;
+    color: #7c3aed;
+    font-style: italic;
+    border-bottom: none;
+    padding: 2px 0 2px 4px;
+  }
   .play-game-end {
     text-align: center;
     font-size: 11px;

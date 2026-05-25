@@ -124,7 +124,17 @@ function isScoringLockStale(g) {
 
 async function acquireScoringLock(gameId) {
   if (!currentUser) return false;
-  const g = State.getGame(gameId);
+  // Always read fresh from Firestore so a second device can't bypass a lock
+  // due to stale local state that hasn't received the onSnapshot update yet.
+  let g;
+  try {
+    const fs = window._fs;
+    const snap = await fs.getDoc(fs.doc(fs.db, 'games', gameId));
+    g = snap.exists() ? snap.data() : null;
+  } catch (e) {
+    // Fallback to local cache if offline / read fails
+    g = State.getGame(gameId);
+  }
   if (!g) return false;
   const now = Date.now();
   if (g.scoringLockedBy && g.scoringLockedBy !== currentUser.uid) {
@@ -320,6 +330,13 @@ function renderPitchingStats(g, away, home) {
       if (curPid) eventPids.push(curPid);
     }
     if (!eventPids.length) return `<tr><td colspan="9" class="muted" style="padding:8px;text-align:center">No pitcher assigned</td></tr>`;
+    // Determine if the game is currently mid-AB in this pitching half
+    const gameInProgress = g.status === 'in_progress';
+    const activePitcherId = gameInProgress && pitchingHalf === g.currentHalf
+      ? currentPitcherId(g) : null;
+    const liveExtraPitches = activePitcherId
+      ? (g.balls || 0) + (g.strikes || 0) + (g.fouls || 0) : 0;
+
     return eventPids.map(pid => {
       const p = State.getPlayer(pid);
       let outs=0, h=0, hr=0, bb=0, k=0, er=0, pitches=0;
@@ -333,6 +350,8 @@ function renderPitchingStats(g, away, home) {
         er += e.earnedRuns || 0;
         pitches += e.pitches || 0;
       });
+      // Add the current batter's in-progress pitch count to the active pitcher
+      if (pid === activePitcherId) pitches += liveExtraPitches;
       const ipOuts = outs;
       const ipStr = `${Math.floor(ipOuts/3)}${ipOuts%3 ? '.'+ipOuts%3 : ''}`;
       const era = ipOuts > 0 ? ((er * 27) / ipOuts).toFixed(2) : '—';
@@ -658,6 +677,7 @@ function renderPlayLog(g) {
   const isCompleted = g.status === 'completed';
   const parts = [];
   let lastKey = null;
+  let lastPitcherId = null;
 
   events.slice(-60).forEach(e => {
     const key = e.inning + '-' + e.half;
@@ -671,6 +691,18 @@ function renderPlayLog(g) {
       }
       parts.push(`<li class="play-inning-break">${e.half === 'top' ? 'Top' : 'Bottom'} ${ordinal(e.inning)}</li>`);
       lastKey = key;
+      lastPitcherId = null; // reset pitcher tracking for new half-inning
+      // Show starting pitcher for this half
+      if (e.pitcherId) {
+        const pitcher = State.getPlayer(e.pitcherId);
+        parts.push(`<li class="play-pitcher-entry">⚾ ${escapeHtml(pitcher?.name || '?')} pitching</li>`);
+        lastPitcherId = e.pitcherId;
+      }
+    } else if (e.pitcherId && e.pitcherId !== lastPitcherId) {
+      // Pitcher changed mid-inning — show a change entry between batters
+      const pitcher = State.getPlayer(e.pitcherId);
+      parts.push(`<li class="play-pitcher-change">🔄 ${escapeHtml(pitcher?.name || '?')} now pitching</li>`);
+      lastPitcherId = e.pitcherId;
     }
 
     const batter   = State.getPlayer(e.batterId);
@@ -952,6 +984,9 @@ function _getFielderInfo(fid, g) {
 }
 
 function _runAnim(item) {
+  // Only show animations when the user is on the Score tab
+  if (_liveTab !== 'score') { _nextAnim(); return; }
+
   const overlay    = document.getElementById('play-anim-overlay');
   const ballEl     = document.getElementById('anim-ball');
   const fielderEl  = document.getElementById('anim-fielder');

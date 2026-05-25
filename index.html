@@ -211,7 +211,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
-  import { getFirestore, collection, doc, getDocs, setDoc, deleteDoc, onSnapshot }
+  import { getFirestore, collection, doc, getDocs, getDoc, setDoc, deleteDoc, onSnapshot }
     from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
   import { getAuth, onAuthStateChanged, signInWithEmailAndPassword,
            createUserWithEmailAndPassword, signOut,
@@ -239,7 +239,7 @@
   if (['http:', 'https:', 'chrome-extension:'].includes(location.protocol)) {
     setPersistence(auth, browserLocalPersistence).catch(() => {});
   }
-  window._fs = { db, collection, doc, getDocs, setDoc, deleteDoc, onSnapshot,
+  window._fs = { db, collection, doc, getDocs, getDoc, setDoc, deleteDoc, onSnapshot,
                  auth, onAuthStateChanged, signInWithEmailAndPassword,
                  createUserWithEmailAndPassword, signOut,
                  sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink,
