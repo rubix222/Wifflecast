@@ -3000,12 +3000,25 @@ async function setPosition(gameId, side, playerId, position) {
   const positions = side === 'home' ? { ...g.homePositions } : { ...g.awayPositions };
   const prevPosition = positions[playerId] || 'BENCH'; // what this player had before
   positions[playerId] = position;
+
+  // Swap in both directions so P and CF are never left empty:
+  // 1. New position is P/CF → swap the player already there to the incoming player's old spot
   if (position === 'P' || position === 'CF') {
-    // Swap: give the displaced player the new player's old position rather than benching them
     Object.keys(positions).forEach(pid => {
       if (pid !== playerId && positions[pid] === position) positions[pid] = prevPosition;
     });
   }
+  // 2. Player was P/CF and is being moved away → swap the first available player into that spot
+  if ((prevPosition === 'P' || prevPosition === 'CF') && position !== prevPosition) {
+    const stillOccupied = Object.values(positions).includes(prevPosition);
+    if (!stillOccupied) {
+      // Find a bench player (or the player going to the new position's old spot) to fill the gap
+      const filler = Object.keys(positions).find(pid => pid !== playerId && positions[pid] === 'BENCH')
+                  || Object.keys(positions).find(pid => pid !== playerId && positions[pid] === position);
+      if (filler) positions[filler] = prevPosition;
+    }
+  }
+
   const patch = side === 'home' ? { homePositions: positions } : { awayPositions: positions };
   await State.updateGame(gameId, patch);
   const fresh = State.getGame(gameId);
@@ -3069,10 +3082,15 @@ async function startGame(gameId) {
    EMAILJS — recap delivery
    ============================================================ */
 function getEmailConfig() {
+  // Prefer Firestore-sourced config (available on all devices); fall back to localStorage
+  // for the brief window before the onSnapshot fires (or when offline).
+  if (State.emailConfig) return State.emailConfig;
   try { return JSON.parse(localStorage.getItem('wc_ejs') || 'null'); } catch (e) { return null; }
 }
-function saveEmailConfig(cfg) {
-  localStorage.setItem('wc_ejs', JSON.stringify(cfg));
+async function saveEmailConfig(cfg) {
+  State.emailConfig = cfg;
+  try { localStorage.setItem('wc_ejs', JSON.stringify(cfg)); } catch (_) {}
+  try { await Storage.saveEmailConfig(cfg); } catch (e) { console.warn('saveEmailConfig Firestore error:', e); }
 }
 
 function _toggleEmailSetup() {
@@ -3115,14 +3133,14 @@ function showEmailSetupModal() {
     </div>`);
 }
 
-function _saveEmailSetup() {
+async function _saveEmailSetup() {
   const serviceId        = document.getElementById('ejs-service')?.value.trim();
   const templateId       = document.getElementById('ejs-template')?.value.trim();
   const publicKey        = document.getElementById('ejs-key')?.value.trim();
   const recapTemplateId  = document.getElementById('ejs-recap-template')?.value.trim() || '';
   if (!serviceId || !publicKey) { toast('Service ID and Public Key are required', 'error'); return; }
-  saveEmailConfig({ serviceId, templateId, publicKey, recapTemplateId });
-  toast('Email settings saved', 'success');
+  await saveEmailConfig({ serviceId, templateId, publicKey, recapTemplateId });
+  toast('Email settings saved — synced to all devices', 'success');
   Modal.hide();
 }
 
@@ -3171,7 +3189,8 @@ async function sendRecapEmails(gameId) {
 /* Auto-send recap to all users linked to players in the game when a game finishes */
 async function autoSendRecapEmails(gameId) {
   const cfg = getEmailConfig();
-  if (!cfg || !cfg.recapTemplateId) return; // recap template not configured — skip silently
+  if (!cfg) { console.warn('autoSendRecapEmails: no email config found'); return; }
+  if (!cfg.recapTemplateId) { console.warn('autoSendRecapEmails: no recap template ID configured'); return; }
   const g = State.getGame(gameId); if (!g) return;
   const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
   const allPids = new Set([...(home?.playerIds || []), ...(away?.playerIds || [])]);
@@ -3179,8 +3198,8 @@ async function autoSendRecapEmails(gameId) {
   const recipients = State.users
     .filter(u => u.playerId && allPids.has(u.playerId) && u.email)
     .map(u => ({ email: u.email, name: u.name || u.email }));
-  if (!recipients.length) return;
-  try { emailjs.init(cfg.publicKey); } catch (e) { return; }
+  if (!recipients.length) { console.warn('autoSendRecapEmails: no recipients found (users need a linked player + email)'); return; }
+  try { emailjs.init(cfg.publicKey); } catch (e) { console.warn('autoSendRecapEmails: emailjs.init failed:', e); return; }
   const plainText = buildRecapText(g);
   const subject = away.name + ' @ ' + home.name + ' — WiffleCast Recap';
   let sent = 0, failed = 0;
@@ -3195,12 +3214,12 @@ async function autoSendRecapEmails(gameId) {
       });
       sent++;
     } catch (e) {
-      console.warn('Recap email failed for', r.email, e);
+      console.error('Recap email failed for', r.email, e?.status, e?.text || e?.message || e);
       failed++;
     }
   }
   if (sent) toast(sent + ' recap email' + (sent !== 1 ? 's' : '') + ' sent', 'success');
-  if (failed) console.warn('autoSendRecapEmails: ' + failed + ' failed');
+  if (failed) { console.error('autoSendRecapEmails: ' + failed + ' failed'); toast(failed + ' recap email' + (failed !== 1 ? 's' : '') + ' failed to send', 'error'); }
 }
 
 function showRecapModal(gameId) {
@@ -3423,7 +3442,7 @@ Object.assign(window, {
   showNewTournamentModal, submitNewTournament, showTournamentModal, submitTournament, selectTournament, tournamentBack,
   generateTournamentGames, generateChampionshipGame, autoGenerateTournamentRound, deleteTournamentUI,
   selectPlay, clearPlaySelection,
-  onFielderClick, swapFielder, swapFielderGuarded,
+  onFielderClick, swapFielder, swapFielderGuarded, showAssignPositionModal, assignPositionFromModal,
   switchLiveStatsTab,
   renderLiveGame, rerenderLive,
   bipStart, bipEnterLocate, bipConfirm,

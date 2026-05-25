@@ -499,7 +499,7 @@ function liveGameHTML(g, home, away) {
                   }</span>
                   <button class="bip-instruction-cancel" onclick="bipCancel()">✕</button>
                 </div>
-                ${batterId ? `
+                ${!isCompleted && batterId ? `
                 <div class="spray-chart-controls">
                   <button class="btn-icon spray-toggle-btn${_sprayChartVisible ? ' active' : ''}" id="spray-toggle-btn" onclick="toggleSprayChart()" title="Toggle hit chart">📍 Hit Chart</button>
                   <div id="spray-chart-key" class="spray-chart-key" style="display:${_sprayChartVisible ? 'block' : 'none'}">
@@ -1420,8 +1420,18 @@ function drawField(overrideBases = null) {
   const batterFill  = _teamColor(State.getTeam(battingTeamId(g)));
 
   const fielderMarker = (pid, player, pos, cx, cy, fillColor, hidden = false) => {
-    if (!pid || !player) return '';
     if (hidden) return '';
+    // No player assigned: show a dashed placeholder that can be tapped to assign one
+    if (!player) {
+      const canScoreNow = !LiveGameWatchOnly && canUserScore() && !isCompleted;
+      if (!canScoreNow) return '';
+      return `<g class="fielder" data-pid="" data-pos="${pos}" transform="translate(${cx},${cy})" style="cursor:pointer">
+        <circle cx="0" cy="0" r="16" style="fill:#f3f4f6;stroke:#9ca3af;stroke-width:1.5;stroke-dasharray:4,3"/>
+        <text class="pos" x="0" y="0" style="fill:#9ca3af">${pos}</text>
+        <text class="name bg" y="26" style="fill:#9ca3af">?</text>
+        <text class="name" y="26" style="fill:#9ca3af">?</text>
+      </g>`;
+    }
     const gloveMode = __fieldClickMode && __fieldClickMode.needFielder;
     if (gloveMode) {
       // Out/error drag mode: glove image only, no circle.
@@ -1605,10 +1615,11 @@ function attachSvgLocationHandlers(svgEl) {
         __fieldClickMode.onDragEnd(null, loc);
       }
     } else {
-      // Not in BIP mode — short tap on a fielder opens the swap modal
-      if (!isDrag && start.fielderId) {
+      // Not in BIP mode — short tap on a fielder opens the swap/assign modal
+      // Also fires for placeholder markers where fielderId is '' (empty position)
+      if (!isDrag && start.fielderEl) {
         e.preventDefault(); // suppress synthetic click that would immediately close the modal
-        onFielderClick(start.fielderId, start.fielderEl?.dataset.pos || '');
+        onFielderClick(start.fielderId || '', start.fielderEl?.dataset.pos || '');
       }
     }
   };
@@ -1623,10 +1634,63 @@ function attachSvgLocationHandlers(svgEl) {
 
 function onFielderClick(pid, pos) {
   if (__fieldClickMode && __fieldClickMode.onPickFielder) {
-    __fieldClickMode.onPickFielder(pid);
+    if (pid) __fieldClickMode.onPickFielder(pid);
+    return;
+  }
+  if (!pid) {
+    // Placeholder tapped — show an assignment modal to fill the empty position
+    showAssignPositionModal(pos);
     return;
   }
   showSwapFielderModal(pid, pos);
+}
+
+function showAssignPositionModal(pos) {
+  const g = State.getGame(LiveGameId); if (!g) return;
+  const team = State.getTeam(fieldingTeamId(g));
+  if (!team) return;
+  const positions = fieldingPositions(g);
+  const label = pos === 'P' ? 'Pitcher' : 'Center Fielder';
+
+  const list = (team.playerIds || []).map(pid => {
+    const p = State.getPlayer(pid);
+    const curPos = positions[pid] || 'BENCH';
+    return `<button class="btn" style="display:flex;justify-content:space-between;width:100%;margin-bottom:6px"
+        onclick="assignPositionFromModal('${pid}','${pos}')">
+      <span>${escapeHtml(p?.name || '?')}</span>
+      <span class="pill">${curPos}</span>
+    </button>`;
+  }).join('');
+
+  Modal.show(`
+    <div class="modal-header">
+      <h3>Assign ${label}</h3>
+      <button class="btn-icon" onclick="Modal.hide(); renderLiveGame('${g.id}')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="help-text" style="margin-bottom:10px">Pick a player to fill the ${label} position. Their current position will be swapped.</p>
+      ${list || '<div class="muted">No players available.</div>'}
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="Modal.hide(); renderLiveGame('${g.id}')">Cancel</button>
+    </div>
+  `);
+}
+
+async function assignPositionFromModal(newPid, pos) {
+  const g = State.getGame(LiveGameId); if (!g) return;
+  const positions = { ...(g.currentHalf === 'top' ? g.homePositions : g.awayPositions) };
+  const newOldPos = positions[newPid] || 'BENCH';
+  positions[newPid] = pos;
+  // The old holder of this position (if any) gets the incoming player's old spot
+  Object.keys(positions).forEach(pid => {
+    if (pid !== newPid && positions[pid] === pos) positions[pid] = newOldPos;
+  });
+  const posKey = g.currentHalf === 'top' ? 'homePositions' : 'awayPositions';
+  await State.updateGame(g.id, { [posKey]: positions });
+  Modal.hide();
+  renderLiveGame(g.id);
+  toast(`${State.getPlayer(newPid)?.name || '?'} assigned to ${pos}`, 'success');
 }
 
 /* ----- Swap fielder positions ----- */

@@ -68,6 +68,8 @@ const Storage = {
       if (r.status === 'rejected')
         console.warn('loadAll collection', i, 'failed:', r.reason?.code, r.reason?.message);
     });
+    // Load email config separately — it lives in a config document, not a collection
+    await Storage.loadEmailConfig();
   },
 
   unsubAll() {
@@ -144,7 +146,15 @@ const Storage = {
           p.invitePending = false;
           Storage.savePlayer(p);
         });
-      }, err => console.warn('users listener:', err.message))
+      }, err => console.warn('users listener:', err.message)),
+
+      // Email config — single document listener so all devices share the same settings
+      fs.onSnapshot(fs.doc(fs.db, 'config', 'email'), snap => {
+        if (snap.exists()) {
+          State.emailConfig = snap.data();
+          try { localStorage.setItem('wc_ejs', JSON.stringify(State.emailConfig)); } catch (_) {}
+        }
+      }, err => console.warn('email config listener:', err.message))
     );
   },
 
@@ -197,6 +207,26 @@ const Storage = {
     await fs.deleteDoc(fs.doc(fs.db, 'tournaments', id));
   },
 
+  async saveEmailConfig(cfg) {
+    const fs = window._fs;
+    await fs.setDoc(fs.doc(fs.db, 'config', 'email'), cfg);
+    // Also cache in localStorage for fast offline reads
+    try { localStorage.setItem('wc_ejs', JSON.stringify(cfg)); } catch (_) {}
+  },
+  async loadEmailConfig() {
+    try {
+      const fs = window._fs;
+      const snap = await fs.getDoc(fs.doc(fs.db, 'config', 'email'));
+      if (snap.exists()) {
+        State.emailConfig = snap.data();
+        try { localStorage.setItem('wc_ejs', JSON.stringify(State.emailConfig)); } catch (_) {}
+      }
+    } catch (e) {
+      // Fall back to localStorage if Firestore read fails (offline / permission denied)
+      try { State.emailConfig = JSON.parse(localStorage.getItem('wc_ejs') || 'null'); } catch (_) {}
+    }
+  },
+
   async exportJson() {
     const blob = new Blob([JSON.stringify({ ...State.snapshot(), tournaments: State.tournaments }, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -228,6 +258,7 @@ const State = {
   games: [],
   users: [],
   tournaments: [],
+  emailConfig: null,  // loaded from Firestore so all devices share the same config
 
   snapshot() { return { players: this.players, teams: this.teams, games: this.games }; },
   getUser(uid)         { return this.users.find(u => u.uid === uid) || null; },
