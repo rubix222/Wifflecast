@@ -2038,14 +2038,19 @@ async function submitCreateMyPlayer(e) {
   const name = $('#cmp-name').value.trim();
   const jerseyNumber = $('#cmp-jersey').value.trim();
   if (!name) return;
-  const p = await State.addPlayer({ name, jerseyNumber });
-  p.userId = currentUser.uid;
-  await Storage.savePlayer(p);
-  currentUserProfile.playerId = p.id;
-  await Storage.saveUser(currentUserProfile);
-  Modal.hide();
-  Render.all();
-  toast('Player created and linked to your account!', 'success');
+  try {
+    // Build the player with userId set upfront (single write, matches sign-up flow)
+    const p = { id: uid(), name, jerseyNumber: jerseyNumber || '', createdAt: Date.now(), userId: currentUser.uid };
+    State.players.push(p);
+    await Storage.savePlayer(p);
+    currentUserProfile.playerId = p.id;
+    await Storage.saveUser(currentUserProfile);
+    Modal.hide();
+    Render.all();
+    toast('Player created!', 'success');
+  } catch (err) {
+    toast('Error: ' + (err.message || err), 'error');
+  }
 }
 async function deleteUser(uid) {
   if (!isAdminUser()) return;
