@@ -443,6 +443,7 @@ function liveGameHTML(g, home, away) {
         <div class="lg-title">
           <span class="game-card-status status-${g.status}" style="font-size:11px">${isCompleted ? 'Final' : canScore ? 'Scoring' : 'Live'}</span>
           ${g.tournamentId ? `<div style="font-size:11px;color:#0369a1;font-weight:500;margin-top:2px">📋 ${escapeHtml(State.getTournament(g.tournamentId)?.name || g.tournamentName || '')}</div>` : ''}
+          ${renderLastScorerPill(g)}
         </div>
         ${isCompleted && isAdmin() ? `
         <div style="display:flex;gap:6px;flex-shrink:0">
@@ -483,7 +484,6 @@ function liveGameHTML(g, home, away) {
 
       <div class="lg-tab-body">
         <div class="lg-pane" data-tab="score" ${scorePaneHidden ? 'hidden' : ''}>
-          ${renderLastScorerPill(g)}
           ${canScore && isScoringLockStale(g) ? `<div style="background:#fef9c3;border-bottom:1px solid #fde68a;padding:8px 14px;font-size:12px;color:#92400e">⚠️ Your scoring session was inactive. Resume scoring to stay active — another scorer can take over until you do.</div>` : ''}
           ${!isCompleted && !_betweenInnings ? renderMatchupStrip(g) : ''}
           <div class="field-wrap">
@@ -687,6 +687,17 @@ function renderPlayLog(g) {
   let lastKey = null;
   let lastPitcherId = null;
 
+  // Pre-compute the score at the START of each half-inning.
+  // For each half, the start score = score after the last event of the PREVIOUS half
+  // (or 0-0 for the very first half).
+  const halfStartScores = {};
+  let prevScore = { away: 0, home: 0 };
+  events.forEach(e => {
+    const k = e.inning + '-' + e.half;
+    if (!halfStartScores[k]) halfStartScores[k] = { ...prevScore };
+    if (e.scoreAfter) prevScore = e.scoreAfter;
+  });
+
   events.slice(-60).forEach(e => {
     const key = e.inning + '-' + e.half;
 
@@ -697,7 +708,11 @@ function renderPlayLog(g) {
         const prevLabel = prevHalf === 'top' ? 'Top' : 'Bottom';
         parts.push(`<li class="play-inning-break play-inning-end">— End of ${prevLabel} ${ordinal(parseInt(prevInn))} —</li>`);
       }
-      parts.push(`<li class="play-inning-break">${e.half === 'top' ? 'Top' : 'Bottom'} ${ordinal(e.inning)}</li>`);
+      const startScore = halfStartScores[key];
+      const scoreTag = startScore
+        ? ` <span class="play-inning-score">${startScore.away}–${startScore.home}</span>`
+        : '';
+      parts.push(`<li class="play-inning-break">${e.half === 'top' ? 'Top' : 'Bottom'} ${ordinal(e.inning)}${scoreTag}</li>`);
       lastKey = key;
       lastPitcherId = null; // reset pitcher tracking for new half-inning
       // Show starting pitcher for this half
@@ -761,7 +776,10 @@ function renderPlayLog(g) {
       : '';
     const tsAttr = isCompleted ? `data-ts="${e.ts}"` : '';
 
-    parts.push(`<li class="play-entry${isCompleted ? ' clickable' : ''}" ${tsAttr}>${escapeHtml(batter?.name || '?')} — <span class="play-outcome ${outcomeClass}">${desc}</span>${fielderStr}${runsPill} ${countStr}${scorerTag}${extrasStr}</li>`);
+    // Out outcomes get a red row background — K, OUT (standard/DP/sac-fly-out/tag-out)
+    const isOut = e.outcome === 'K' || e.outcome === 'OUT';
+
+    parts.push(`<li class="play-entry${isCompleted ? ' clickable' : ''}${isOut ? ' play-entry--out' : ''}" ${tsAttr}>${escapeHtml(batter?.name || '?')} — <span class="play-outcome ${outcomeClass}">${desc}</span>${fielderStr}${runsPill} ${countStr}${scorerTag}${extrasStr}</li>`);
   });
 
   // Close out the last half-inning
@@ -1126,8 +1144,11 @@ function _runAnim(item) {
       const runDur  = item.phase2Dur || 450; // match ball phase-2 duration
       const startDelay = item.viaSvg ? (item.phase1Dur || 350) : 0;
 
-      // Suppress this fielder's static circle in drawField() for the duration of the animation
+      // Suppress this fielder's static circle in drawField() for the duration of the animation.
+      // Call drawField() immediately so the static SVG circle is removed before the
+      // animated one starts moving — without this, watchers see two circles.
       _animFielderPid = fi.pid;
+      drawField();
 
       // Place fielder SVG at start position (viewBox is -30 -30 60 60, so circle centre = top-left corner)
       fielderEl.style.cssText = `
@@ -2104,24 +2125,25 @@ async function applyPaEnd(g, ev) {
   const newBases = { 1: g.bases[1], 2: g.bases[2], 3: g.bases[3] };
   let runs = [];
   let outsToAdd = 0;
+  let batterRunner = null;  // tracked so HR batter-runner is included in allRunners lookup
 
   if (ev.outcome === 'BB') {
-    const r = makeRunner(g, batterId);
-    const res = walkAdvance(newBases, r);
+    batterRunner = makeRunner(g, batterId);
+    const res = walkAdvance(newBases, batterRunner);
     Object.assign(newBases, res.newBases);
     runs = res.runnerIdsScored;
   } else if (ev.outcome === 'K' || ev.outcome === 'OUT') {
     outsToAdd = 1;
   } else if (['1B','2B','3B','HR'].includes(ev.outcome)) {
     const target = ({ '1B': 1, '2B': 2, '3B': 3, 'HR': 4 })[ev.outcome];
-    const r = makeRunner(g, batterId);
-    const res = hitAdvance(newBases, target, r);
+    batterRunner = makeRunner(g, batterId);
+    const res = hitAdvance(newBases, target, batterRunner);
     Object.assign(newBases, res.newBases);
     runs = res.runnerIdsScored;
   } else if (ev.outcome === 'ERR_REACH') {
     const target = ({ '1B': 1, '2B': 2, '3B': 3, 'HR': 4 })[ev.errBase] || 1;
-    const r = makeRunner(g, batterId);
-    const res = advanceRunners(newBases, target, r);
+    batterRunner = makeRunner(g, batterId);
+    const res = advanceRunners(newBases, target, batterRunner);
     Object.assign(newBases, res.newBases);
     runs = res.runnerIdsScored;
   }
@@ -2143,10 +2165,13 @@ async function applyPaEnd(g, ev) {
     outsToAdd += 1;
   }
 
-  // Map runner ids back to player ids for R stat
+  // Map runner ids back to player ids for R stat.
+  // batterRunner is included so HR grand slams count the batter's own run — the
+  // batter runner scores immediately and is never placed in newBases.
   const allRunners = [
     g.bases[1], g.bases[2], g.bases[3],
     newBases[1], newBases[2], newBases[3],
+    batterRunner,
   ].filter(Boolean);
   const findRunner = (rid) => allRunners.find(r => r.id === rid);
   event.runsScoredBy = runs.map(rid => {

@@ -95,6 +95,7 @@ const Storage = {
           Render.adminTeams();
           Render.home();
         });
+        rerenderLive(); // reflect team name changes immediately in any open live game
       }, err => console.warn('teams listener:', err.message)),
 
       fs.onSnapshot(fs.collection(fs.db, 'games'), snap => {
