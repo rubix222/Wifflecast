@@ -948,8 +948,8 @@
     margin-bottom: 10px;
   }
   .field-undo-redo { display: flex; gap: 6px; }
-  .field-undo-btn { position: absolute; bottom: 22px; left: 6px; z-index: 5; background: rgba(0,0,0,0.75); color: #fff; border-color: rgba(255,255,255,0.3); }
-  .field-redo-btn { position: absolute; bottom: 22px; right: 6px; z-index: 5; background: rgba(0,0,0,0.75); color: #fff; border-color: rgba(255,255,255,0.3); }
+  .field-undo-btn { position: absolute; bottom: 8px; left: 6px; z-index: 5; background: rgba(0,0,0,0.75); color: #fff; border-color: rgba(255,255,255,0.3); }
+  .field-redo-btn { position: absolute; bottom: 8px; right: 6px; z-index: 5; background: rgba(0,0,0,0.75); color: #fff; border-color: rgba(255,255,255,0.3); }
   .field-undo-btn:hover:not(:disabled), .field-redo-btn:hover:not(:disabled) { background: rgba(0,0,0,0.9); }
   .btn-icon {
     background: none;
@@ -1091,7 +1091,7 @@
   }
   /* ── Spray chart toggle + key (bottom-left above undo) ── */
   .spray-chart-controls {
-    position: absolute; bottom: 60px; left: 6px; z-index: 5;
+    position: absolute; bottom: 50px; left: 6px; z-index: 5;
     display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
   }
   .spray-chart-key {

@@ -2998,10 +2998,12 @@ function renderLineup(g, side) {
 async function setPosition(gameId, side, playerId, position) {
   const g = State.getGame(gameId); if (!g) return;
   const positions = side === 'home' ? { ...g.homePositions } : { ...g.awayPositions };
+  const prevPosition = positions[playerId] || 'BENCH'; // what this player had before
   positions[playerId] = position;
   if (position === 'P' || position === 'CF') {
+    // Swap: give the displaced player the new player's old position rather than benching them
     Object.keys(positions).forEach(pid => {
-      if (pid !== playerId && positions[pid] === position) positions[pid] = 'BENCH';
+      if (pid !== playerId && positions[pid] === position) positions[pid] = prevPosition;
     });
   }
   const patch = side === 'home' ? { homePositions: positions } : { awayPositions: positions };

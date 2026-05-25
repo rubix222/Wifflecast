@@ -74,6 +74,9 @@ function renderLiveGame(gameId, watchOnly = false) {
     _sprayChartVisible = false;
     _sprayBatterId     = null;
     _sprayCachedDots   = null;
+    _frozenScore    = null;
+    _frozenOuts     = null;
+    _betweenInnings = false;
   }
   _lastLiveGameId = gameId;
   LiveGameId = gameId;
@@ -222,6 +225,11 @@ function renderLastScorerPill(g) {
 }
 
 let _liveTab = 'score';
+
+// Deferred-display state — score/outs shown during animations, cleared after
+let _frozenScore    = null;   // {away, home} — if set, overrides g.score in scoreboard
+let _frozenOuts     = null;   // number — if set, overrides g.outs in scoreboard
+let _betweenInnings = false;  // true while blank-field transition plays between halves
 
 function switchLiveTab(tab) {
   _liveTab = tab;
@@ -455,15 +463,15 @@ function liveGameHTML(g, home, away) {
       <div class="scoreboard">
         <div class="team-side ${battingSide === 'away' && !isCompleted ? 'batting' : ''}">
           <div class="name">${teamSwatch(away)}${escapeHtml(away.name)}</div>
-          <div class="score" id="sb-score-away">${g.score.away}</div>
+          <div class="score" id="sb-score-away">${(_frozenScore || g.score).away}</div>
         </div>
         <div class="middle">
           <div class="inning" id="sb-inning">${isCompleted ? 'FINAL' : inningStr}</div>
-          <div class="outs" id="sb-outs"><span class="outs-label">Outs</span><span class="out-dots"><span class="out-dot${g.outs >= 1 ? ' on' : ''}"></span><span class="out-dot${g.outs >= 2 ? ' on' : ''}"></span><span class="out-dot${g.outs >= 3 ? ' on' : ''}"></span></span></div>
+          <div class="outs" id="sb-outs">${(function(){const o=_frozenOuts??g.outs;return`<span class="outs-label">Outs</span><span class="out-dots"><span class="out-dot${o>=1?' on':''}"></span><span class="out-dot${o>=2?' on':''}"></span><span class="out-dot${o>=3?' on':''}"></span></span>`;})()}</div>
         </div>
         <div class="team-side ${battingSide === 'home' && !isCompleted ? 'batting' : ''}">
           <div class="name">${teamSwatch(home)}${escapeHtml(home.name)}</div>
-          <div class="score" id="sb-score-home">${g.score.home}</div>
+          <div class="score" id="sb-score-home">${(_frozenScore || g.score).home}</div>
         </div>
         ${!isCompleted ? `
         <div class="sb-counts">
@@ -477,7 +485,7 @@ function liveGameHTML(g, home, away) {
         <div class="lg-pane" data-tab="score" ${scorePaneHidden ? 'hidden' : ''}>
           ${renderLastScorerPill(g)}
           ${canScore && isScoringLockStale(g) ? `<div style="background:#fef9c3;border-bottom:1px solid #fde68a;padding:8px 14px;font-size:12px;color:#92400e">⚠️ Your scoring session was inactive. Resume scoring to stay active — another scorer can take over until you do.</div>` : ''}
-          ${!isCompleted ? renderMatchupStrip(g) : ''}
+          ${!isCompleted && !_betweenInnings ? renderMatchupStrip(g) : ''}
           <div class="field-wrap">
             <div class="field-and-bases">
               <div class="field-panel">
@@ -491,11 +499,9 @@ function liveGameHTML(g, home, away) {
                   }</span>
                   <button class="bip-instruction-cancel" onclick="bipCancel()">✕</button>
                 </div>
-                ${!isCompleted && canScore ? `
-                <button class="btn-icon field-undo-btn" onclick="undoPlay()" ${(g.undoStack?.length > 0) ? '' : 'disabled'} title="Undo">↩</button>
-                <button class="btn-icon field-redo-btn" onclick="redoPlay()" ${(g.redoStack?.length > 0) ? '' : 'disabled'} title="Redo">↪</button>` : ''}
                 ${batterId ? `
                 <div class="spray-chart-controls">
+                  <button class="btn-icon spray-toggle-btn${_sprayChartVisible ? ' active' : ''}" id="spray-toggle-btn" onclick="toggleSprayChart()" title="Toggle hit chart">📍 Hit Chart</button>
                   <div id="spray-chart-key" class="spray-chart-key" style="display:${_sprayChartVisible ? 'block' : 'none'}">
                     <div class="spray-key-title">HIT CHART</div>
                     <div class="spray-key-grid">
@@ -505,8 +511,10 @@ function liveGameHTML(g, home, away) {
                       <span class="spray-key-item"><span class="spray-key-dot" style="background:#fb923c"></span>Out/Error</span>
                     </div>
                   </div>
-                  <button class="btn-icon spray-toggle-btn${_sprayChartVisible ? ' active' : ''}" id="spray-toggle-btn" onclick="toggleSprayChart()" title="Toggle hit chart">📍 Hit Chart</button>
                 </div>` : ''}
+                ${!isCompleted && canScore ? `
+                <button class="btn-icon field-undo-btn" onclick="undoPlay()" ${(g.undoStack?.length > 0) ? '' : 'disabled'} title="Undo">↩</button>
+                <button class="btn-icon field-redo-btn" onclick="redoPlay()" ${(g.redoStack?.length > 0) ? '' : 'disabled'} title="Redo">↪</button>` : ''}
               </div>
             </div>
           </div>
@@ -931,7 +939,10 @@ function _queueAnim(item) {
 function _nextAnim() {
   if (!_animQueue.length) { _animRunning = false; return; }
   _animRunning = true;
-  _runAnim(_animQueue.shift());
+  const item = _animQueue.shift();
+  // fn items are synchronous callbacks — run immediately and advance queue
+  if (typeof item.fn === 'function') { item.fn(); _nextAnim(); return; }
+  _runAnim(item);
 }
 
 // Immediately abort any running/queued animation (used by scorer on new action).
@@ -939,6 +950,10 @@ function _cancelAnim() {
   _animGen++;           // invalidate all pending setTimeout / rAF callbacks
   _animQueue.length = 0;
   _animRunning = false;
+  // Clear any frozen display state — the new action will set its own
+  _frozenScore    = null;
+  _frozenOuts     = null;
+  _betweenInnings = false;
   const overlay   = document.getElementById('play-anim-overlay');
   const ballEl    = document.getElementById('anim-ball');
   const fielderEl = document.getElementById('anim-fielder');
@@ -983,9 +998,23 @@ function _getFielderInfo(fid, g) {
   return { pid: fid, initials, name, pos, teamColor, startSvg };
 }
 
+function _unfreezeDisplay() {
+  _frozenScore    = null;
+  _frozenOuts     = null;
+  _betweenInnings = false;
+  if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly);
+}
+
 function _runAnim(item) {
   // Only show animations when the user is on the Score tab
   if (_liveTab !== 'score') { _nextAnim(); return; }
+
+  // Blank hold: timed pause with no visual output (used between innings)
+  if (item.blank) {
+    const myGen = _animGen;
+    setTimeout(() => { if (_animGen === myGen) _nextAnim(); }, item.holdMs ?? 3000);
+    return;
+  }
 
   const overlay    = document.getElementById('play-anim-overlay');
   const ballEl     = document.getElementById('anim-ball');
@@ -1167,11 +1196,24 @@ function _detectAndQueueAnims(newG, prev) {
 
   // ── 1. New plate-appearance outcomes ────────────────────────
   if (hasNewEvents) {
+    let frozeDisplay = false;
     events.slice(prev.eventsLen).forEach(ev => {
       if (ev.type !== 'pa_end') return;
       const anim = _buildOutcomeAnim(ev, newG);
-      if (anim) _queueAnim(anim);
+      if (anim) {
+        if (!frozeDisplay) {
+          // Freeze scoreboard at pre-play values for the duration of the animation
+          _frozenScore = { ...prev.score };
+          _frozenOuts  = prev.outs;
+          frozeDisplay = true;
+        }
+        _queueAnim(anim);
+      }
     });
+    // If we froze AND there's no inning/game change, unfreeze after outcome anims
+    if (frozeDisplay && !inningChanged && !gameJustFinished) {
+      _queueAnim({ fn: _unfreezeDisplay });
+    }
     // fall through — same Firestore push may also contain inning/status change
   }
 
@@ -1194,11 +1236,17 @@ function _detectAndQueueAnims(newG, prev) {
   if (inningChanged) {
     const prevHalf = prev.currentHalf === 'top' ? 'Top' : 'Bottom';
     _queueAnim({ text: `End of ${prevHalf} ${ordinal(prev.currentInning)}`, color: '#60a5fa', holdMs: 1400 });
+    // Blank field for 3 s between halves — clear score freeze first so real score is visible
+    _queueAnim({ fn: () => {
+      _frozenScore    = null;
+      _frozenOuts     = null;
+      _betweenInnings = true;
+      if (LiveGameId) renderLiveGame(LiveGameId, true);
+    }});
+    _queueAnim({ blank: true, holdMs: 3000 });
     const halfLabel = newG.currentHalf === 'top' ? '▲ Top' : '▼ Bottom';
-    _queueAnim({
-      text: `${halfLabel} of the ${ordinal(newG.currentInning)}`,
-      color: '#60a5fa', holdMs: 1800,
-    });
+    _queueAnim({ text: `${halfLabel} of the ${ordinal(newG.currentInning)}`, color: '#60a5fa', holdMs: 1800 });
+    _queueAnim({ fn: _unfreezeDisplay });
     return; // pitcher swap after an inning flip is expected — don't fire that too
   }
 
@@ -1338,12 +1386,12 @@ function drawField(overrideBases = null) {
               : isCompleted            ? { 1: null, 2: null, 3: null }
               : g.bases;
 
-  const fieldingPos = fieldingPositions(g);
+  const fieldingPos = _betweenInnings ? {} : fieldingPositions(g);
   const pitcherId = Object.keys(fieldingPos).find(pid => fieldingPos[pid] === 'P');
   const cfId = Object.keys(fieldingPos).find(pid => fieldingPos[pid] === 'CF');
   const pitcher = pitcherId ? State.getPlayer(pitcherId) : null;
   const cf = cfId ? State.getPlayer(cfId) : null;
-  const batterId = isCompleted ? null : currentBatterId(g);
+  const batterId = (isCompleted || _betweenInnings) ? null : currentBatterId(g);
   const batter = batterId ? State.getPlayer(batterId) : null;
 
   // Team colors for fielder/batter circles
@@ -1618,8 +1666,8 @@ function swapFielderGuarded(currentPid, newPid, faced) {
 async function swapFielder(currentPid, newPid) {
   const g = State.getGame(LiveGameId); if (!g) return;
   const positions = { ...(g.currentHalf === 'top' ? g.homePositions : g.awayPositions) };
-  const oldPos = positions[currentPid];
-  const newOldPos = positions[newPid];
+  const oldPos = positions[currentPid] || 'BENCH';
+  const newOldPos = positions[newPid] || 'BENCH'; // guard: bench players may be absent from map
   positions[currentPid] = newOldPos;
   positions[newPid] = oldPos;
   const posKey = g.currentHalf === 'top' ? 'homePositions' : 'awayPositions';
@@ -1997,6 +2045,9 @@ async function finishError(errBase, errorById, location) {
 
 async function applyPaEnd(g, ev) {
   if (!assertScoringLock(g.id)) return;
+  // Snapshot pre-play display state — scoreboard is frozen at these values until animations complete
+  const preScore = { ...g.score };
+  const preOuts  = g.outs;
   const batterId = currentBatterId(g);
   const pitcherId = currentPitcherId(g);
   const inning = g.currentInning;
@@ -2035,6 +2086,9 @@ async function applyPaEnd(g, ev) {
   if (!LiveGameWatchOnly) {
     const anim = _buildOutcomeAnim(event, g);
     if (anim) {
+      // Freeze scoreboard at pre-play state while animation plays
+      _frozenScore = preScore;
+      _frozenOuts  = preOuts;
       _queueAnim(anim);
       // Lock spray chart to current batter's PRIOR history while animation plays.
       // Snapshot the dot array NOW (before State.updateGame) so the new hit is excluded.
@@ -2144,6 +2198,10 @@ async function applyPaEnd(g, ev) {
   await postPlayCheck(fresh);
   Modal.hide();
   renderLiveGame(g.id);
+  // Queue unfreeze AFTER all play + inning-transition animations complete
+  if (!LiveGameWatchOnly && _frozenScore !== null) {
+    _queueAnim({ fn: _unfreezeDisplay });
+  }
 }
 
 function ensureLineScore(g) {
@@ -2159,8 +2217,23 @@ async function postPlayCheck(g) {
     if (!LiveGameWatchOnly) {
       const halfLabel = g.currentHalf === 'top' ? 'Top' : 'Bottom';
       _queueAnim({ text: `End of ${halfLabel} ${ordinal(g.currentInning)}`, color: '#60a5fa', holdMs: 1400 });
+      // After "End of half" text: blank the field for 3 s before showing new team
+      _queueAnim({ fn: () => {
+        _frozenScore = null; // real score visible during blank (outcome anim already done)
+        _frozenOuts  = null;
+        _betweenInnings = true;
+        if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly);
+      }});
+      _queueAnim({ blank: true, holdMs: 3000 });
     }
     await endHalfInningInternal(g);
+    if (!LiveGameWatchOnly) {
+      const fresh = State.getGame(g.id);
+      if (fresh && fresh.status === 'in_progress') {
+        const halfLabel2 = fresh.currentHalf === 'top' ? '▲ Top' : '▼ Bottom';
+        _queueAnim({ text: `${halfLabel2} of the ${ordinal(fresh.currentInning)}`, color: '#60a5fa', holdMs: 1800 });
+      }
+    }
     return;
   }
   // Walk-off: home batting in final inning or extras and they've taken the lead
