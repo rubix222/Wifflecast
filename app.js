@@ -1339,8 +1339,6 @@ const Render = {
   all() { this.home(); this.players(); this.teams(); this.games(); this.users(); this.adminPlayers(); this.adminTeams(); this.adminGames(); this.adminEvents(); this.tournaments(); },
 
   tournaments() {
-    const btnAdd = $('#btn-add-tournament');
-    if (btnAdd) btnAdd.style.display = isAdmin() ? '' : 'none';
     const listEl = $('#tournaments-list'); if (!listEl) return;
     const sorted = [...State.tournaments].sort((a, b) => b.createdAt - a.createdAt);
     if (!sorted.length) {
@@ -3323,7 +3321,7 @@ $$('.tab-btn').forEach(btn => {
 
 // btn-add-player and btn-add-team are dynamically rendered — no static listeners needed
 $('#btn-add-game').addEventListener('click', () => showNewGameModal());
-$('#btn-add-tournament').addEventListener('click', () => showNewTournamentModal());
+// btn-add-tournament moved to admin panel; no static listener needed
 
 $('#btn-sign-in').addEventListener('click', () => showAuthModal('signin'));
 $('#btn-sign-out').addEventListener('click', () => { closeUserMenu(); signOutUser(); });

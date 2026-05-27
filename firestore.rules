@@ -25,10 +25,19 @@ service cloud.firestore {
     }
 
     // ── Private: user profiles ────────────────────────────────────
-    // Users can only see their own profile; admin reads all profiles.
+    // Users can only see their own profile; admin reads/writes all profiles.
     match /users/{uid} {
       allow read:  if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == uid;
+      allow write: if request.auth != null &&
+                     (request.auth.uid == uid ||
+                      request.auth.token.email == 'rubix222@gmail.com');
+    }
+
+    // ── App-wide config (email settings, etc.) ────────────────────
+    match /config/{docId} {
+      allow read:  if true;
+      allow write: if request.auth != null &&
+                     request.auth.token.email == 'rubix222@gmail.com';
     }
   }
 }

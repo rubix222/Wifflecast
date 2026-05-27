@@ -66,9 +66,6 @@
   </section>
 
   <section id="view-tournaments" class="view">
-    <div class="toolbar">
-      <button id="btn-add-tournament" class="btn btn-primary" style="display:none">+ New Event</button>
-    </div>
     <div class="player-split" id="tournaments-split">
       <div class="player-list-panel" id="tournaments-list"></div>
       <div class="player-detail-panel" id="tournaments-detail"></div>
@@ -102,7 +99,10 @@
       <div id="admin-games-container"></div>
     </div>
     <div class="admin-panel-section">
-      <h3 class="admin-panel-heading">Events</h3>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <h3 class="admin-panel-heading" style="margin:0">Events</h3>
+        <button class="btn btn-primary" onclick="showNewTournamentModal()">+ New Event</button>
+      </div>
       <div id="admin-events-container"></div>
     </div>
     <div class="admin-panel-section">
