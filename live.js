@@ -791,7 +791,7 @@ function renderPlayLog(g) {
       const home  = State.getTeam(g.homeTeamId);
       const winner = g.score.away > g.score.home ? away
                    : g.score.home > g.score.away ? home : null;
-      const gameEndText = winner ? `🏆 ${escapeHtml(winner.name)} wins! ${g.score.away}–${g.score.home}` : `🏁 Final — Tie ${g.score.away}–${g.score.home}`;
+      const gameEndText = winner ? `🏆 ${escapeHtml(winner.name)} win! ${g.score.away}–${g.score.home}` : `🏁 Final — Tie ${g.score.away}–${g.score.home}`;
       parts.push(`<li class="play-inning-break play-inning-end">— End of ${lastLabel} ${ordinal(parseInt(lastInn))} —</li>`);
       parts.push(`<li class="play-game-end">${gameEndText}</li>`);
     }
