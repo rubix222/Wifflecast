@@ -1180,6 +1180,8 @@
     grid-template-columns: 230px 1fr;
     gap: 14px;
     align-items: start;
+    min-width: 0;
+    width: 100%;
   }
   @media (max-width: 600px) {
     .player-split, .games-split { grid-template-columns: 1fr; }
@@ -1312,6 +1314,8 @@
     border: 1px solid #e5e7eb;
     padding: 20px;
     min-height: 340px;
+    min-width: 0;
+    overflow-x: hidden;
   }
   .player-detail-empty {
     display: flex;
@@ -1812,7 +1816,7 @@
   #tournaments-split:not(.tourn-has-detail) .player-detail-panel { display: none; }
   #tournaments-split.tourn-has-detail .player-list-panel { display: none; }
   #tournaments-split.tourn-has-detail .player-detail-panel { padding: 0; min-height: 0; }
-  .tourn-detail-body { padding: 16px; max-width: 100%; }
+  .tourn-detail-body { padding: 16px; max-width: 100%; box-sizing: border-box; overflow-x: hidden; }
 
   /* Event header row: name left, admin actions right */
   .tourn-header-row {
