@@ -1248,7 +1248,7 @@ function _detectAndQueueAnims(newG, prev) {
     const winner = newG.score.away > newG.score.home ? away
                  : newG.score.home > newG.score.away ? home : null;
     _queueAnim({
-      text: winner ? `${winner.name} wins! 🏆` : "It's a tie! 🏁",
+      text: winner ? `${winner.name} win! 🏆` : "It's a tie! 🏁",
       color: '#fde68a', big: true, holdMs: 2400,
     });
     return; // skip inning / pitcher checks — game is over
@@ -2403,7 +2403,7 @@ async function finishGame(g, _reason) {
     const winner = g.score.away > g.score.home ? away
                  : g.score.home > g.score.away ? home : null;
     _queueAnim({
-      text: winner ? `${winner.name} wins! 🏆` : "It's a tie! 🏁",
+      text: winner ? `${winner.name} win! 🏆` : "It's a tie! 🏁",
       color: '#fde68a', big: true, holdMs: 2400,
     });
   }
