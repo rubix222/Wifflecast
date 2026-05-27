@@ -1645,9 +1645,7 @@
   .play-outcome--error  { color: #ca8a04; }
   .play-outcome--hit    { color: #16a34a; }
   .play-outcome--walk   { color: #0d9488; }
-  /* Out rows get a subtle red tint so you can count 3 per inning at a glance */
-  .play-entry--out { background: rgba(254,226,226,0.55); }
-  .play-entry--out.clickable:hover { background: rgba(254,202,202,0.7); }
+  .play-extras--out { color: #dc2626; }
   /* Running score shown at the start of each half-inning header */
   .play-inning-score {
     font-size: 10px;

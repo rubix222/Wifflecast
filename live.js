@@ -767,8 +767,9 @@ function renderPlayLog(g) {
     else if (e.dpAttempted)        extraParts.push('DP attempted — runner safe');
     if (e.sacFly && !e.sacFlyOut) extraParts.push('Runner tagged up and scored');
     else if (e.sacFlyOut)         extraParts.push('Runner tagged up — thrown out');
+    const extrasIsOut = e.doublePlay || e.sacFlyOut;
     const extrasStr = extraParts.length
-      ? `<span class="play-extras">${extraParts.join(' · ')}</span>`
+      ? `<span class="play-extras${extrasIsOut ? ' play-extras--out' : ''}">${extraParts.join(' · ')}</span>`
       : '';
 
     const scorerTag = isAdmin() && e.scoredByName
