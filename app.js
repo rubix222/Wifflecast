@@ -1280,35 +1280,51 @@ function showLinkPlayerModal(uid) {
 
 async function submitLinkPlayer(uid) {
   if (!isAdminUser()) return;
-  const user = State.getUser(uid); if (!user) return;
+  // Fall back to a fresh Firestore read in case State.users hasn't populated yet
+  // (e.g. user just signed in and the snapshot hasn't fired on this device)
+  let user = State.getUser(uid);
+  if (!user) {
+    try { user = await Storage.getUser(uid); } catch (_) {}
+  }
+  if (!user) { toast('User not found — try refreshing the page', 'error'); return; }
+
   const newPlayerId = document.getElementById('link-player-select')?.value || null;
   const oldPlayerId = user.playerId || null;
   if (newPlayerId === oldPlayerId) { Modal.hide(); return; }
 
-  // Clear old player's userId if it was set to this user
-  if (oldPlayerId) {
-    const oldP = State.getPlayer(oldPlayerId);
-    if (oldP && oldP.userId === uid) {
-      oldP.userId = null;
-      oldP.invitePending = false;
-      await Storage.savePlayer(oldP);
-    }
-  }
+  const saveBtn = document.querySelector('#modal .btn-primary');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
 
-  // Link new player
-  if (newPlayerId) {
-    const newP = State.getPlayer(newPlayerId);
-    if (newP) {
-      newP.userId = uid;
-      newP.invitePending = false;
-      await Storage.savePlayer(newP);
+  try {
+    // Clear old player's userId if it was set to this user
+    if (oldPlayerId) {
+      const oldP = State.getPlayer(oldPlayerId);
+      if (oldP && oldP.userId === uid) {
+        oldP.userId = null;
+        oldP.invitePending = false;
+        await Storage.savePlayer(oldP);
+      }
     }
-  }
 
-  const updated = { ...user, playerId: newPlayerId || null };
-  await Storage.saveUser(updated);
-  Modal.hide();
-  toast('Player link updated', 'success');
+    // Link new player
+    if (newPlayerId) {
+      const newP = State.getPlayer(newPlayerId);
+      if (newP) {
+        newP.userId = uid;
+        newP.invitePending = false;
+        await Storage.savePlayer(newP);
+      }
+    }
+
+    const updated = { ...user, playerId: newPlayerId || null };
+    await Storage.saveUser(updated);
+    Modal.hide();
+    toast('Player link updated', 'success');
+  } catch (e) {
+    console.error('submitLinkPlayer error:', e);
+    toast('Failed to update: ' + (e?.message || e), 'error');
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save'; }
+  }
 }
 
 async function toggleCanScore(uid) {
