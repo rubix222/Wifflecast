@@ -1477,7 +1477,7 @@ const Render = {
           ${u.email === ADMIN_EMAIL
             ? '<span style="font-size:13px;color:#6b7280">Admin</span>'
             : `<label style="display:flex;align-items:center;justify-content:flex-end;gap:6px;cursor:pointer">
-                <span style="font-size:13px">${u.canScore ? 'Allowed' : 'Not allowed'}</span>
+                <span style="font-size:13px">Can Score</span>
                 <input type="checkbox" ${u.canScore ? 'checked' : ''} onchange="toggleCanScore('${u.uid}')" />
               </label>`}
         </td>
