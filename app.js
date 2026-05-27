@@ -2449,11 +2449,11 @@ function renderTournamentDetail(id) {
     if (isAdmin()) {
       const showGenBtn = curRoundDone && !champGame && activeCount > 2;
       const nextRound  = maxRound + 1;
-      adminBtn = `<div class="tourn-admin-actions">
-        ${showGenBtn ? `<button class="btn btn-sm btn-primary" onclick="generateTournamentGames('${id}')">⚙ Generate Round ${nextRound}</button>` : ''}
-        <button class="btn-icon" title="Edit" onclick="showTournamentModal('${id}')">✎</button>
-        <button class="btn-icon" title="Delete" onclick="deleteTournamentUI('${id}')">🗑</button>
-      </div>`;
+      if (showGenBtn) {
+        adminBtn = `<div class="tourn-admin-actions">
+          <button class="btn btn-sm btn-primary" onclick="generateTournamentGames('${id}')">⚙ Generate Round ${nextRound}</button>
+        </div>`;
+      }
     }
 
     // Games grouped by round
@@ -2514,12 +2514,10 @@ function renderTournamentDetail(id) {
       }
     }
 
-    // Admin button
-    if (isAdmin()) {
+    // Admin button — generate games only; edit/delete are on the Admin page
+    if (isAdmin() && rrPairsLeft > 0) {
       adminBtn = `<div class="tourn-admin-actions">
-        ${rrPairsLeft > 0 ? `<button class="btn btn-sm btn-primary" onclick="generateTournamentGames('${id}')">⚙ Generate ${rrPairsLeft} game${rrPairsLeft>1?'s':''}</button>` : ''}
-        <button class="btn-icon" title="Edit" onclick="showTournamentModal('${id}')">✎</button>
-        <button class="btn-icon" title="Delete" onclick="deleteTournamentUI('${id}')">🗑</button>
+        <button class="btn btn-sm btn-primary" onclick="generateTournamentGames('${id}')">⚙ Generate ${rrPairsLeft} game${rrPairsLeft>1?'s':''}</button>
       </div>`;
     }
 
