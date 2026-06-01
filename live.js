@@ -194,6 +194,9 @@ function assertScoringLock(gameId) {
   // Still our lock — clear stale state by refreshing the timestamp if needed
   if (isScoringLockStale(g)) {
     State.updateGame(gameId, { scoringLockedAt: Date.now() }).catch(() => {});
+    // Immediately remove the banner from the DOM — don't wait for Firestore round-trip
+    const banner = document.getElementById('stale-scoring-banner');
+    if (banner) banner.remove();
   }
   return true;
 }
@@ -486,7 +489,7 @@ function liveGameHTML(g, home, away) {
 
       <div class="lg-tab-body">
         <div class="lg-pane" data-tab="score" ${scorePaneHidden ? 'hidden' : ''}>
-          ${canScore && isScoringLockStale(g) ? `<div style="background:#fef9c3;border-bottom:1px solid #fde68a;padding:8px 14px;font-size:12px;color:#92400e">⚠️ Your scoring session was inactive. Resume scoring to stay active — another scorer can take over until you do.</div>` : ''}
+          ${canScore && isScoringLockStale(g) ? `<div id="stale-scoring-banner" style="background:#fef9c3;border-bottom:1px solid #fde68a;padding:8px 14px;font-size:12px;color:#92400e">⚠️ Your scoring session was inactive. Resume scoring to stay active — another scorer can take over until you do.</div>` : ''}
           ${!isCompleted && !_betweenInnings ? renderMatchupStrip(g) : ''}
           <div class="field-wrap">
             <div class="field-and-bases">
