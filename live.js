@@ -209,7 +209,7 @@ async function openGameForScoring(gameId) {
     const lockerProfile = g?.scoringLockedBy ? State.getUser(g.scoringLockedBy) : null;
     const name = lockerProfile?.name || 'Someone';
     toast(`${name} is already scoring this game`, 'error');
-    renderLiveGame(gameId, true);
+    // Do NOT open the game — leave the user on the current screen
     return;
   }
   startScoringHeartbeat(gameId);
@@ -803,6 +803,23 @@ function renderPlayLog(g) {
     }
   }
 
+  // For in-progress games: show the current inning header immediately when the inning
+  // switches — even before any plays are recorded in that new half-inning.
+  if (!isCompleted) {
+    const curKey = g.currentInning + '-' + g.currentHalf;
+    if (lastKey !== curKey) {
+      // The current inning has no events yet — show its header now
+      if (lastKey !== null) {
+        const [prevInn, prevHalf] = lastKey.split('-');
+        const prevLabel = prevHalf === 'top' ? 'Top' : 'Bottom';
+        parts.push(`<li class="play-inning-break play-inning-end">— End of ${prevLabel} ${ordinal(parseInt(prevInn))} —</li>`);
+      }
+      const curHalf  = g.currentHalf === 'top' ? 'Top' : 'Bottom';
+      const scoreTag = ` <span class="play-inning-score">${g.score.away}–${g.score.home}</span>`;
+      parts.push(`<li class="play-inning-break">${curHalf} ${ordinal(g.currentInning)}${scoreTag}</li>`);
+    }
+  }
+
   return parts.join('');
 }
 
@@ -1243,9 +1260,18 @@ function _detectAndQueueAnims(newG, prev) {
         _queueAnim(anim);
       }
     });
-    // If we froze AND there's no inning/game change, unfreeze after outcome anims
+    // If we froze AND there's no inning/game change, unfreeze after outcome anims.
+    // Guard against the race where a second snapshot (inning advance) arrives before
+    // the unfreezeDisplay fn fires — if the inning has already changed, skip the
+    // unfreeze and let the inning-change handler manage the transition instead.
     if (frozeDisplay && !inningChanged && !gameJustFinished) {
-      _queueAnim({ fn: _unfreezeDisplay });
+      const expectedInning = newG.currentInning;
+      const expectedHalf   = newG.currentHalf;
+      _queueAnim({ fn: () => {
+        const g = State.getGame(LiveGameId);
+        if (g && (g.currentInning !== expectedInning || g.currentHalf !== expectedHalf)) return;
+        _unfreezeDisplay();
+      }});
     }
     // fall through — same Firestore push may also contain inning/status change
   }
@@ -1268,6 +1294,11 @@ function _detectAndQueueAnims(newG, prev) {
   // ── 3. Inning / half change ──────────────────────────────────
   if (inningChanged) {
     const prevHalf = prev.currentHalf === 'top' ? 'Top' : 'Bottom';
+    // Show the 3rd out in the scoreboard before the "End of" banner fires.
+    // prev.outs reflects the post-play state (should be 3) from the snapshot
+    // taken right after the inning-ending play landed.
+    const endOuts = prev.outs;
+    _queueAnim({ fn: () => { _frozenOuts = endOuts; } });
     _queueAnim({ text: `End of ${prevHalf} ${ordinal(prev.currentInning)}`, color: '#60a5fa', holdMs: 1400 });
     // Blank field for 3 s between halves — clear frozen display so real state is visible
     _queueAnim({ fn: () => {
@@ -2330,6 +2361,9 @@ async function postPlayCheck(g) {
   if (g.outs >= 3) {
     if (!LiveGameWatchOnly) {
       const halfLabel = g.currentHalf === 'top' ? 'Top' : 'Bottom';
+      // Show the 3rd out on the scoreboard (unfreeze outs only) before the banner
+      const thirdOutCount = g.outs;
+      _queueAnim({ fn: () => { _frozenOuts = thirdOutCount; } });
       _queueAnim({ text: `End of ${halfLabel} ${ordinal(g.currentInning)}`, color: '#60a5fa', holdMs: 1400 });
       // After "End of half" text: blank the field for 3 s before showing new team
       _queueAnim({ fn: () => {

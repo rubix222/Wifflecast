@@ -3202,15 +3202,35 @@ async function sendRecapEmails(gameId) {
 async function autoSendRecapEmails(gameId) {
   const cfg = getEmailConfig();
   if (!cfg) { console.warn('autoSendRecapEmails: no email config found'); return; }
-  if (!cfg.recapTemplateId) { console.warn('autoSendRecapEmails: no recap template ID configured'); return; }
+  if (!cfg.recapTemplateId) {
+    console.warn('autoSendRecapEmails: no recap template ID configured');
+    toast('Recap email skipped — no recap template configured in Email Settings', 'error');
+    return;
+  }
   const g = State.getGame(gameId); if (!g) return;
   const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
   const allPids = new Set([...(home?.playerIds || []), ...(away?.playerIds || [])]);
-  // Only email users who have a linked player in this game
+
+  // Primary: users who have a linked player in this game and an email on their account
+  const seen = new Set();
   const recipients = State.users
     .filter(u => u.playerId && allPids.has(u.playerId) && u.email)
-    .map(u => ({ email: u.email, name: u.name || u.email }));
-  if (!recipients.length) { console.warn('autoSendRecapEmails: no recipients found (users need a linked player + email)'); return; }
+    .map(u => { seen.add(u.email); return { email: u.email, name: u.name || u.email }; });
+
+  // Fallback: players with an inviteEmail not already covered by a linked account
+  for (const pid of allPids) {
+    const p = State.getPlayer(pid);
+    if (p?.inviteEmail && !seen.has(p.inviteEmail)) {
+      recipients.push({ email: p.inviteEmail, name: p.name || p.inviteEmail });
+      seen.add(p.inviteEmail);
+    }
+  }
+
+  if (!recipients.length) {
+    console.warn('autoSendRecapEmails: no recipients found (users need a linked player + email)');
+    toast('Recap email skipped — no email addresses on file for players in this game', 'error');
+    return;
+  }
   try { emailjs.init(cfg.publicKey); } catch (e) { console.warn('autoSendRecapEmails: emailjs.init failed:', e); return; }
   const plainText = buildRecapText(g);
   const subject = away.name + ' @ ' + home.name + ' — WiffleCast Recap';
