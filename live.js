@@ -762,21 +762,26 @@ function renderPlayLog(g) {
     if (e.outcome === 'OUT' && e.fielderId)          fielderStr = _fielderSpan(e.fielderId);
     else if (e.outcome === 'ERR_REACH' && e.errorById) fielderStr = _fielderSpan(e.errorById);
 
-    // Runs scored pill
+    // Runs scored pill — suppressed from main line when a sac-fly tag-up scored
+    // (the pill moves to the extras line in that case)
     const runsScored = (e.runsScoredBy || []).length;
-    const runsPill = runsScored > 0
+    const sacFlyScored = e.sacFly && !e.sacFlyOut && runsScored > 0;
+    const runsPill = runsScored > 0 && !sacFlyScored
       ? `<span class="play-runs-pill">+${runsScored} run${runsScored !== 1 ? 's' : ''}</span>`
       : '';
 
     // Extra detail line: DP, tag play
     const extraParts = [];
-    if (e.doublePlay)              extraParts.push('Double play');
-    else if (e.dpAttempted)        extraParts.push('DP attempted — runner safe');
-    if (e.sacFly && !e.sacFlyOut) extraParts.push('Runner tagged up and scored');
-    else if (e.sacFlyOut)         extraParts.push('Runner tagged up — thrown out');
-    const extrasIsOut = e.doublePlay || e.sacFlyOut;
+    if (e.doublePlay)        extraParts.push('Double play');
+    else if (e.dpAttempted)  extraParts.push('DP attempted — runner safe');
+    if (sacFlyScored) {
+      const pill = `<span class="play-runs-pill" style="vertical-align:middle">+${runsScored} run${runsScored !== 1 ? 's' : ''}</span>`;
+      extraParts.push(`Runner tagged up and scored ${pill}`);
+    } else if (e.sacFlyOut)  extraParts.push('Runner tagged up — thrown out');
+    const extrasIsOut  = e.doublePlay || e.sacFlyOut;
+    const extrasIsRun  = sacFlyScored && !extrasIsOut;
     const extrasStr = extraParts.length
-      ? `<span class="play-extras${extrasIsOut ? ' play-extras--out' : ''}">${extraParts.join(' · ')}</span>`
+      ? `<span class="play-extras${extrasIsOut ? ' play-extras--out' : extrasIsRun ? ' play-extras--run' : ''}">${extraParts.join(' · ')}</span>`
       : '';
 
     const scorerTag = isAdmin() && e.scoredByName

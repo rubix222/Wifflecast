@@ -1671,6 +1671,7 @@
   }
   .play-extras { font-size: 11px; color: #6b7280; display: block; margin-top: 1px; padding-left: 2px; }
   .play-extras--out { color: #dc2626; font-weight: 600; font-size: inherit; } /* must come after .play-extras to win specificity race */
+  .play-extras--run { color: #16a34a; font-weight: 600; font-size: inherit; } /* tag-up scored — green, matches hit outcome style */
   .play-inning-end {
     color: #9ca3af;
     background: transparent;
