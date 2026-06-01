@@ -762,37 +762,44 @@ function renderPlayLog(g) {
     if (e.outcome === 'OUT' && e.fielderId)          fielderStr = _fielderSpan(e.fielderId);
     else if (e.outcome === 'ERR_REACH' && e.errorById) fielderStr = _fielderSpan(e.errorById);
 
-    // Runs scored pill — suppressed from main line when a sac-fly tag-up scored
-    // (the pill moves to the extras line in that case)
+    // Runs scored pill — suppressed from main outcome when a sac-fly tag-up scored
     const runsScored = (e.runsScoredBy || []).length;
     const sacFlyScored = e.sacFly && !e.sacFlyOut && runsScored > 0;
     const runsPill = runsScored > 0 && !sacFlyScored
       ? `<span class="play-runs-pill">+${runsScored} run${runsScored !== 1 ? 's' : ''}</span>`
       : '';
 
-    // Extra detail line: DP, tag play
-    const extraParts = [];
-    if (e.doublePlay)        extraParts.push('Double play');
-    else if (e.dpAttempted)  extraParts.push('DP attempted — runner safe');
+    // Extras — each item is its own block line within the outcome column
+    let extrasStr = '';
+    if (e.doublePlay) {
+      extrasStr += `<span class="play-extras play-extras--out">Double play</span>`;
+    } else if (e.dpAttempted) {
+      extrasStr += `<span class="play-extras">DP attempted — runner safe</span>`;
+    }
     if (sacFlyScored) {
-      const pill = `<span class="play-runs-pill" style="vertical-align:middle">+${runsScored} run${runsScored !== 1 ? 's' : ''}</span>`;
-      extraParts.push(`Runner tagged up and scored ${pill}`);
-    } else if (e.sacFlyOut)  extraParts.push('Runner tagged up — thrown out');
-    const extrasIsOut  = e.doublePlay || e.sacFlyOut;
-    const extrasIsRun  = sacFlyScored && !extrasIsOut;
-    const extrasStr = extraParts.length
-      ? `<span class="play-extras${extrasIsOut ? ' play-extras--out' : extrasIsRun ? ' play-extras--run' : ''}">${extraParts.join(' · ')}</span>`
+      const pill = `<span class="play-runs-pill">+${runsScored} run${runsScored !== 1 ? 's' : ''}</span>`;
+      extrasStr += `<span class="play-extras play-extras--run">Runner tagged up ${pill}</span>`;
+    } else if (e.sacFlyOut) {
+      extrasStr += `<span class="play-extras play-extras--out">Runner tagged up — thrown out</span>`;
+    }
+
+    // Count column value (balls-strikes, optional fouls)
+    const countVal = e.countBalls !== undefined
+      ? `${e.countBalls}-${e.countStrikes}${e.countFouls ? ` ${e.countFouls}F` : ''}`
       : '';
 
-    const scorerTag = isAdmin() && e.scoredByName
-      ? ` <span class="play-scorer" title="Scored by ${escapeHtml(e.scoredByName)}">✎${escapeHtml(e.scoredByName)}</span>`
-      : '';
     const tsAttr = isCompleted ? `data-ts="${e.ts}"` : '';
-
-    // Out outcomes get a red row background — K, OUT (standard/DP/sac-fly-out/tag-out)
     const isOut = e.outcome === 'K' || e.outcome === 'OUT';
 
-    parts.push(`<li class="play-entry${isCompleted ? ' clickable' : ''}${isOut ? ' play-entry--out' : ''}" ${tsAttr}>${escapeHtml(batter?.name || '?')} — <span class="play-outcome ${outcomeClass}">${desc}</span>${fielderStr}${runsPill} ${countStr}${scorerTag}${extrasStr}</li>`);
+    // Outcome text without RBI (keep RBI out of the plays feed)
+    const outcomeText = (() => {
+      const map = { BB:'Walk', K:'Strikeout', '1B':'Single', '2B':'Double', '3B':'Triple',
+        HR:'Home Run', OUT:`Out${e.hitType ? ' (' + hitTypeLabel(e.hitType) + ')' : ''}`,
+        ERR_REACH:`Reached on error${e.errBase ? ' (' + e.errBase + ')' : ''}` };
+      return map[e.outcome] || e.outcome;
+    })();
+
+    parts.push(`<li class="play-entry${isCompleted ? ' clickable' : ''}${isOut ? ' play-entry--out' : ''}" ${tsAttr}><span class="pe-name">${escapeHtml(batter?.name || '?')}</span><span class="pe-mid"><span class="play-outcome ${outcomeClass}">${outcomeText}</span>${fielderStr}${runsPill}${extrasStr}</span><span class="pe-count">${countVal}</span></li>`);
   });
 
   // Close out the last half-inning
