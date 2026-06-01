@@ -3211,13 +3211,31 @@ async function autoSendRecapEmails(gameId) {
   const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
   const allPids = new Set([...(home?.playerIds || []), ...(away?.playerIds || [])]);
 
-  // Primary: users who have a linked player in this game and an email on their account
   const seen = new Set();
-  const recipients = State.users
-    .filter(u => u.playerId && allPids.has(u.playerId) && u.email)
-    .map(u => { seen.add(u.email); return { email: u.email, name: u.name || u.email }; });
+  const recipients = [];
 
-  // Fallback: players with an inviteEmail not already covered by a linked account
+  // Method 1: user account has u.playerId pointing into this game
+  for (const u of State.users) {
+    if (u.playerId && allPids.has(u.playerId) && u.email && !seen.has(u.email)) {
+      recipients.push({ email: u.email, name: u.name || u.email });
+      seen.add(u.email);
+    }
+  }
+
+  // Method 2: player in this game has p.userId → look up that user's email.
+  // This catches the inverse direction (player was linked to user via admin tools).
+  for (const pid of allPids) {
+    const p = State.getPlayer(pid);
+    if (p?.userId) {
+      const u = State.getUser(p.userId);
+      if (u?.email && !seen.has(u.email)) {
+        recipients.push({ email: u.email, name: u.name || p.name || u.email });
+        seen.add(u.email);
+      }
+    }
+  }
+
+  // Method 3: player has an inviteEmail (invited but may not have signed up yet)
   for (const pid of allPids) {
     const p = State.getPlayer(pid);
     if (p?.inviteEmail && !seen.has(p.inviteEmail)) {
@@ -3226,12 +3244,22 @@ async function autoSendRecapEmails(gameId) {
     }
   }
 
+  console.log('autoSendRecapEmails: found', recipients.length, 'recipient(s):', recipients.map(r => r.email));
+
   if (!recipients.length) {
-    console.warn('autoSendRecapEmails: no recipients found (users need a linked player + email)');
-    toast('Recap email skipped — no email addresses on file for players in this game', 'error');
+    console.warn('autoSendRecapEmails: no recipients — players need a linked account or inviteEmail');
+    toast('Recap email skipped — no email addresses found for players in this game', 'error');
     return;
   }
-  try { emailjs.init(cfg.publicKey); } catch (e) { console.warn('autoSendRecapEmails: emailjs.init failed:', e); return; }
+
+  try {
+    emailjs.init(cfg.publicKey);
+  } catch (e) {
+    console.error('autoSendRecapEmails: emailjs.init failed:', e);
+    toast('Recap email failed — EmailJS init error. Check Email Settings.', 'error');
+    return;
+  }
+
   const plainText = buildRecapText(g);
   const subject = away.name + ' @ ' + home.name + ' — WiffleCast Recap';
   let sent = 0, failed = 0;
