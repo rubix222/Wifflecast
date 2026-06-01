@@ -76,6 +76,7 @@ function renderLiveGame(gameId, watchOnly = false) {
     _sprayCachedDots   = null;
     _frozenScore    = null;
     _frozenOuts     = null;
+    _frozenBases    = null;
     _betweenInnings = false;
   }
   _lastLiveGameId = gameId;
@@ -226,9 +227,10 @@ function renderLastScorerPill(g) {
 
 let _liveTab = 'score';
 
-// Deferred-display state — score/outs shown during animations, cleared after
+// Deferred-display state — score/outs/bases shown during animations, cleared after
 let _frozenScore    = null;   // {away, home} — if set, overrides g.score in scoreboard
 let _frozenOuts     = null;   // number — if set, overrides g.outs in scoreboard
+let _frozenBases    = null;   // {1,2,3} — if set, overrides g.bases in field SVG
 let _betweenInnings = false;  // true while blank-field transition plays between halves
 
 function switchLiveTab(tab) {
@@ -943,6 +945,9 @@ function _snapGame(g) {
     balls:         g.balls   || 0,
     strikes:       g.strikes || 0,
     fouls:         g.fouls   || 0,
+    score:         { ...(g.score || { away: 0, home: 0 }) },
+    outs:          g.outs    || 0,
+    bases:         JSON.parse(JSON.stringify(g.bases || {})),
     status:        g.status  || 'setup',
     currentInning: g.currentInning || 1,
     currentHalf:   g.currentHalf   || 'top',
@@ -972,6 +977,7 @@ function _cancelAnim() {
   // Clear any frozen display state — the new action will set its own
   _frozenScore    = null;
   _frozenOuts     = null;
+  _frozenBases    = null;
   _betweenInnings = false;
   const overlay   = document.getElementById('play-anim-overlay');
   const ballEl    = document.getElementById('anim-ball');
@@ -1020,6 +1026,7 @@ function _getFielderInfo(fid, g) {
 function _unfreezeDisplay() {
   _frozenScore    = null;
   _frozenOuts     = null;
+  _frozenBases    = null;
   _betweenInnings = false;
   if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly);
 }
@@ -1224,9 +1231,10 @@ function _detectAndQueueAnims(newG, prev) {
       const anim = _buildOutcomeAnim(ev, newG);
       if (anim) {
         if (!frozeDisplay) {
-          // Freeze scoreboard at pre-play values for the duration of the animation
+          // Freeze scoreboard + bases at pre-play values for the duration of the animation
           _frozenScore = { ...prev.score };
           _frozenOuts  = prev.outs;
+          _frozenBases = { ...prev.bases };
           frozeDisplay = true;
         }
         _queueAnim(anim);
@@ -1258,10 +1266,11 @@ function _detectAndQueueAnims(newG, prev) {
   if (inningChanged) {
     const prevHalf = prev.currentHalf === 'top' ? 'Top' : 'Bottom';
     _queueAnim({ text: `End of ${prevHalf} ${ordinal(prev.currentInning)}`, color: '#60a5fa', holdMs: 1400 });
-    // Blank field for 3 s between halves — clear score freeze first so real score is visible
+    // Blank field for 3 s between halves — clear frozen display so real state is visible
     _queueAnim({ fn: () => {
       _frozenScore    = null;
       _frozenOuts     = null;
+      _frozenBases    = null;
       _betweenInnings = true;
       if (LiveGameId) renderLiveGame(LiveGameId, true);
     }});
@@ -1405,6 +1414,7 @@ function drawField(overrideBases = null) {
 
   const isCompleted = g.status === 'completed';
   const bases = overrideBases !== null ? overrideBases
+              : _frozenBases  !== null ? _frozenBases
               : isCompleted            ? { 1: null, 2: null, 3: null }
               : g.bases;
 
@@ -2131,9 +2141,10 @@ async function finishError(errBase, errorById, location) {
 
 async function applyPaEnd(g, ev) {
   if (!assertScoringLock(g.id)) return;
-  // Snapshot pre-play display state — scoreboard is frozen at these values until animations complete
+  // Snapshot pre-play display state — scoreboard + bases are frozen until animations complete
   const preScore = { ...g.score };
   const preOuts  = g.outs;
+  const preBases = JSON.parse(JSON.stringify(g.bases || {}));
   const batterId = currentBatterId(g);
   const pitcherId = currentPitcherId(g);
   const inning = g.currentInning;
@@ -2172,9 +2183,10 @@ async function applyPaEnd(g, ev) {
   if (!LiveGameWatchOnly) {
     const anim = _buildOutcomeAnim(event, g);
     if (anim) {
-      // Freeze scoreboard at pre-play state while animation plays
+      // Freeze scoreboard + bases at pre-play state while animation plays
       _frozenScore = preScore;
       _frozenOuts  = preOuts;
+      _frozenBases = preBases;
       _queueAnim(anim);
       // Lock spray chart to current batter's PRIOR history while animation plays.
       // Snapshot the dot array NOW (before State.updateGame) so the new hit is excluded.
@@ -2311,6 +2323,7 @@ async function postPlayCheck(g) {
       _queueAnim({ fn: () => {
         _frozenScore = null; // real score visible during blank (outcome anim already done)
         _frozenOuts  = null;
+        _frozenBases = null; // bases clear when field goes blank between innings
         _betweenInnings = true;
         if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly);
       }});
