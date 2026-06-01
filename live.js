@@ -531,7 +531,7 @@ function liveGameHTML(g, home, away) {
 
         <div class="lg-pane" data-tab="plays" ${playsPaneHidden ? 'hidden' : ''}>
           <div class="play-log" style="flex:1;overflow-y:auto;border-radius:0;box-shadow:none;background:#fff">
-            <ul id="play-log-list">${renderPlayLog(g)}</ul>
+            <table id="play-log-list" style="width:100%;border-collapse:collapse">${renderPlayLog(g)}</table>
           </div>
         </div>
 
@@ -688,15 +688,13 @@ function renderBatterRow(g) {
 
 function renderPlayLog(g) {
   const events = (g.events || []).filter(e => e.type === 'pa_end');
-  if (!events.length) return '<li class="muted small">No plays yet.</li>';
+  if (!events.length) return '<tr><td colspan="3" class="muted small" style="padding:8px;text-align:center">No plays yet.</td></tr>';
   const isCompleted = g.status === 'completed';
   const parts = [];
   let lastKey = null;
   let lastPitcherId = null;
 
   // Pre-compute the score at the START of each half-inning.
-  // For each half, the start score = score after the last event of the PREVIOUS half
-  // (or 0-0 for the very first half).
   const halfStartScores = {};
   let prevScore = { away: 0, home: 0 };
   events.forEach(e => {
@@ -705,93 +703,74 @@ function renderPlayLog(g) {
     if (e.scoreAfter) prevScore = e.scoreAfter;
   });
 
+  const _span3 = (cls, content) => `<tr class="${cls}"><td colspan="3">${content}</td></tr>`;
+
   events.slice(-60).forEach(e => {
     const key = e.inning + '-' + e.half;
 
     if (key !== lastKey) {
-      // Close out the previous half-inning with an "End of" separator
       if (lastKey !== null) {
         const [prevInn, prevHalf] = lastKey.split('-');
         const prevLabel = prevHalf === 'top' ? 'Top' : 'Bottom';
-        parts.push(`<li class="play-inning-break play-inning-end">— End of ${prevLabel} ${ordinal(parseInt(prevInn))} —</li>`);
+        parts.push(_span3('play-inning-break play-inning-end', `— End of ${prevLabel} ${ordinal(parseInt(prevInn))} —`));
       }
       const startScore = halfStartScores[key];
-      const scoreTag = startScore
-        ? ` <span class="play-inning-score">${startScore.away}–${startScore.home}</span>`
-        : '';
-      parts.push(`<li class="play-inning-break">${e.half === 'top' ? 'Top' : 'Bottom'} ${ordinal(e.inning)}${scoreTag}</li>`);
+      const scoreTag = startScore ? ` <span class="play-inning-score">${startScore.away}–${startScore.home}</span>` : '';
+      parts.push(_span3('play-inning-break', `${e.half === 'top' ? 'Top' : 'Bottom'} ${ordinal(e.inning)}${scoreTag}`));
       lastKey = key;
-      lastPitcherId = null; // reset pitcher tracking for new half-inning
-      // Show starting pitcher for this half
+      lastPitcherId = null;
       if (e.pitcherId) {
         const pitcher = State.getPlayer(e.pitcherId);
-        parts.push(`<li class="play-pitcher-entry">⚾ ${escapeHtml(pitcher?.name || '?')} pitching</li>`);
+        parts.push(_span3('play-pitcher-entry', `⚾ ${escapeHtml(pitcher?.name || '?')} pitching`));
         lastPitcherId = e.pitcherId;
       }
     } else if (e.pitcherId && e.pitcherId !== lastPitcherId) {
-      // Pitcher changed mid-inning — show a change entry between batters
       const pitcher = State.getPlayer(e.pitcherId);
-      parts.push(`<li class="play-pitcher-change">🔄 ${escapeHtml(pitcher?.name || '?')} now pitching</li>`);
+      parts.push(_span3('play-pitcher-change', `🔄 ${escapeHtml(pitcher?.name || '?')} now pitching`));
       lastPitcherId = e.pitcherId;
     }
 
-    const batter   = State.getPlayer(e.batterId);
-    const desc     = describeOutcome(e);
+    const batter = State.getPlayer(e.batterId);
 
-    // Count: shown as "2-1" (balls-strikes) with optional foul count
-    let countStr = '';
-    if (e.countBalls !== undefined) {
-      let c = `${e.countBalls}-${e.countStrikes}`;
-      if (e.countFouls) c += ` ${e.countFouls}F`;
-      countStr = `<span class="play-count">${c}</span>`;
-    }
-
-    // Outcome color class
     const outcomeClass = { K: 'play-outcome--out', OUT: 'play-outcome--out',
       ERR_REACH: 'play-outcome--error',
       '1B': 'play-outcome--hit', '2B': 'play-outcome--hit',
       '3B': 'play-outcome--hit', HR: 'play-outcome--hit',
       BB: 'play-outcome--walk' }[e.outcome] || '';
 
-    // Fielder name (plain, no team color)
-    const _fielderSpan = (pid) => {
-      const f = State.getPlayer(pid);
-      return f ? ` <span class="play-fielder">by ${escapeHtml(f.name)}</span>` : '';
-    };
+    const _fielderSpan = (pid) => { const f = State.getPlayer(pid); return f ? ` <span class="play-fielder">by ${escapeHtml(f.name)}</span>` : ''; };
     let fielderStr = '';
-    if (e.outcome === 'OUT' && e.fielderId)          fielderStr = _fielderSpan(e.fielderId);
+    if (e.outcome === 'OUT' && e.fielderId)            fielderStr = _fielderSpan(e.fielderId);
     else if (e.outcome === 'ERR_REACH' && e.errorById) fielderStr = _fielderSpan(e.errorById);
 
-    // Runs scored pill — suppressed from main outcome when a sac-fly tag-up scored
-    const runsScored = (e.runsScoredBy || []).length;
+    const runsScored  = (e.runsScoredBy || []).length;
     const sacFlyScored = e.sacFly && !e.sacFlyOut && runsScored > 0;
     const runsPill = runsScored > 0 && !sacFlyScored
-      ? `<span class="play-runs-pill">+${runsScored} run${runsScored !== 1 ? 's' : ''}</span>`
-      : '';
+      ? `<span class="play-runs-pill">+${runsScored} run${runsScored !== 1 ? 's' : ''}</span>` : '';
 
-    // Extras — each item is its own block line within the outcome column
-    let extrasStr = '';
+    // Extras as separate <tr> rows so they align under the outcome column
+    const extraRows = [];
+    const isOut = e.outcome === 'K' || e.outcome === 'OUT';
+    const rowCls = `play-entry-extra${isOut ? ' play-entry--out' : ''}`;
     if (e.doublePlay) {
-      extrasStr += `<span class="play-extras play-extras--out">Double play</span>`;
+      extraRows.push(`<tr class="${rowCls}"><td></td><td colspan="2"><span class="play-extras play-extras--out">Double play</span></td></tr>`);
     } else if (e.dpAttempted) {
-      extrasStr += `<span class="play-extras">DP attempted — runner safe</span>`;
+      extraRows.push(`<tr class="play-entry-extra"><td></td><td colspan="2"><span class="play-extras">DP attempted — runner safe</span></td></tr>`);
     }
     if (sacFlyScored) {
       const pill = `<span class="play-runs-pill">+${runsScored} run${runsScored !== 1 ? 's' : ''}</span>`;
-      extrasStr += `<span class="play-extras play-extras--run">Runner tagged up ${pill}</span>`;
+      extraRows.push(`<tr class="play-entry-extra"><td></td><td colspan="2"><span class="play-extras play-extras--run">Runner tagged up ${pill}</span></td></tr>`);
     } else if (e.sacFlyOut) {
-      extrasStr += `<span class="play-extras play-extras--out">Runner caught tagging up</span>`;
+      extraRows.push(`<tr class="${rowCls}"><td></td><td colspan="2"><span class="play-extras play-extras--out">Runner caught tagging up</span></td></tr>`);
     }
+    const hasExtras = extraRows.length > 0;
 
-    // Count column value (balls-strikes, optional fouls)
     const countVal = e.countBalls !== undefined
-      ? `${e.countBalls}-${e.countStrikes}${e.countFouls ? ` ${e.countFouls}F` : ''}`
-      : '';
+      ? `${e.countBalls}-${e.countStrikes}${e.countFouls ? ` ${e.countFouls}F` : ''}` : '';
 
-    const tsAttr = isCompleted ? `data-ts="${e.ts}"` : '';
-    const isOut = e.outcome === 'K' || e.outcome === 'OUT';
+    const tsAttr    = isCompleted ? `data-ts="${e.ts}"` : '';
+    const clickAttr = isCompleted ? `onclick="selectPlay(${e.ts})"` : '';
 
-    // Outcome text without RBI (keep RBI out of the plays feed)
     const outcomeText = (() => {
       const map = { BB:'Walk', K:'Strikeout', '1B':'Single', '2B':'Double', '3B':'Triple',
         HR:'Home Run', OUT:`Out${e.hitType ? ' (' + hitTypeLabel(e.hitType) + ')' : ''}`,
@@ -799,7 +778,15 @@ function renderPlayLog(g) {
       return map[e.outcome] || e.outcome;
     })();
 
-    parts.push(`<li class="play-entry${isCompleted ? ' clickable' : ''}${isOut ? ' play-entry--out' : ''}" ${tsAttr}><span class="pe-name">${escapeHtml(batter?.name || '?')}</span><span class="pe-mid"><span class="play-outcome ${outcomeClass}">${outcomeText}</span>${fielderStr}${runsPill}${extrasStr}</span><span class="pe-count">${countVal}</span></li>`);
+    const mainCls = `play-entry${isCompleted ? ' clickable' : ''}${isOut ? ' play-entry--out' : ''}${hasExtras ? ' has-extras' : ''}`;
+    parts.push(
+      `<tr class="${mainCls}" ${tsAttr} ${clickAttr}>` +
+        `<td class="pe-name">${escapeHtml(batter?.name || '?')}</td>` +
+        `<td class="pe-mid"><span class="play-outcome ${outcomeClass}">${outcomeText}</span>${fielderStr}${runsPill}</td>` +
+        `<td class="pe-count">${countVal}</td>` +
+      `</tr>`,
+      ...extraRows
+    );
   });
 
   // Close out the last half-inning
@@ -807,30 +794,27 @@ function renderPlayLog(g) {
     const [lastInn, lastHalf] = lastKey.split('-');
     const lastLabel = lastHalf === 'top' ? 'Top' : 'Bottom';
     if (isCompleted) {
-      const away  = State.getTeam(g.awayTeamId);
-      const home  = State.getTeam(g.homeTeamId);
-      const winner = g.score.away > g.score.home ? away
-                   : g.score.home > g.score.away ? home : null;
+      const away   = State.getTeam(g.awayTeamId);
+      const home   = State.getTeam(g.homeTeamId);
+      const winner = g.score.away > g.score.home ? away : g.score.home > g.score.away ? home : null;
       const gameEndText = winner ? `🏆 ${escapeHtml(winner.name)} win! ${g.score.away}–${g.score.home}` : `🏁 Final — Tie ${g.score.away}–${g.score.home}`;
-      parts.push(`<li class="play-inning-break play-inning-end">— End of ${lastLabel} ${ordinal(parseInt(lastInn))} —</li>`);
-      parts.push(`<li class="play-game-end">${gameEndText}</li>`);
+      parts.push(_span3('play-inning-break play-inning-end', `— End of ${lastLabel} ${ordinal(parseInt(lastInn))} —`));
+      parts.push(_span3('play-game-end', gameEndText));
     }
   }
 
-  // For in-progress games: show the current inning header immediately when the inning
-  // switches — even before any plays are recorded in that new half-inning.
+  // For in-progress games: show current inning header before any plays are recorded
   if (!isCompleted) {
     const curKey = g.currentInning + '-' + g.currentHalf;
     if (lastKey !== curKey) {
-      // The current inning has no events yet — show its header now
       if (lastKey !== null) {
         const [prevInn, prevHalf] = lastKey.split('-');
         const prevLabel = prevHalf === 'top' ? 'Top' : 'Bottom';
-        parts.push(`<li class="play-inning-break play-inning-end">— End of ${prevLabel} ${ordinal(parseInt(prevInn))} —</li>`);
+        parts.push(_span3('play-inning-break play-inning-end', `— End of ${prevLabel} ${ordinal(parseInt(prevInn))} —`));
       }
       const curHalf  = g.currentHalf === 'top' ? 'Top' : 'Bottom';
       const scoreTag = ` <span class="play-inning-score">${g.score.away}–${g.score.home}</span>`;
-      parts.push(`<li class="play-inning-break">${curHalf} ${ordinal(g.currentInning)}${scoreTag}</li>`);
+      parts.push(_span3('play-inning-break', `${curHalf} ${ordinal(g.currentInning)}${scoreTag}`));
     }
   }
 
