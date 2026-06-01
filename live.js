@@ -780,7 +780,7 @@ function renderPlayLog(g) {
       const pill = `<span class="play-runs-pill">+${runsScored} run${runsScored !== 1 ? 's' : ''}</span>`;
       extrasStr += `<span class="play-extras play-extras--run">Runner tagged up ${pill}</span>`;
     } else if (e.sacFlyOut) {
-      extrasStr += `<span class="play-extras play-extras--out">Runner tagged up — thrown out</span>`;
+      extrasStr += `<span class="play-extras play-extras--out">Runner caught tagging up</span>`;
     }
 
     // Count column value (balls-strikes, optional fouls)
