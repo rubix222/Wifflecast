@@ -2307,7 +2307,7 @@ function openGame(id) {
         </div>`;
     }
   } else {
-    renderLiveGame(g.id);
+    renderLiveGame(g.id, true); // watch-only — use Score button to take scoring lock
   }
 }
 
