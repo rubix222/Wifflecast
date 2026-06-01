@@ -1651,7 +1651,6 @@
   .play-outcome--error  { color: #ca8a04; }
   .play-outcome--hit    { color: #16a34a; }
   .play-outcome--walk   { color: #0d9488; }
-  .play-extras--out { color: #dc2626; }
   /* Running score shown at the start of each half-inning header */
   .play-inning-score {
     font-size: 10px;
@@ -1671,6 +1670,7 @@
     border-radius: 8px; margin-left: 5px; vertical-align: middle;
   }
   .play-extras { font-size: 11px; color: #6b7280; display: block; margin-top: 1px; padding-left: 2px; }
+  .play-extras--out { color: #dc2626; } /* must come after .play-extras to win specificity race */
   .play-inning-end {
     color: #9ca3af;
     background: transparent;
