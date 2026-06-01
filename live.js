@@ -220,12 +220,12 @@ window.addEventListener('beforeunload', () => {
   if (LiveGameId) releaseScoringLock(LiveGameId);
 });
 
-function renderLastScorerPill(g) {
-  if (g.status === 'completed') return '';   // don't show scorer on finished games
-  const lastPa = [...(g.events || [])].reverse().find(e => e.type === 'pa_end');
-  const name = lastPa?.scoredByName;
-  const notMe = lastPa?.scoredBy && lastPa.scoredBy !== currentUser?.uid;
-  return (name && notMe) ? '<div class="last-scorer-pill">🟢 ' + escapeHtml(name) + ' is scoring</div>' : '';
+function renderScorerName(g) {
+  // Returns the display name of whoever currently holds the scoring lock,
+  // or empty string if the game is completed or nobody has the lock.
+  if (g.status === 'completed' || !g.scoringLockedBy) return '';
+  const scorer = State.getUser(g.scoringLockedBy);
+  return scorer?.name || '';
 }
 
 let _liveTab = 'score';
@@ -446,9 +446,11 @@ function liveGameHTML(g, home, away) {
       <div class="lg-topbar">
         <button class="btn-icon lg-back-btn" onclick="exitLiveGame()" title="Back">←</button>
         <div class="lg-title">
-          <span class="game-card-status status-${g.status}" style="font-size:11px">${isCompleted ? 'Final' : canScore ? 'Scoring' : 'Live'}</span>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:nowrap;min-width:0">
+            <span class="game-card-status status-${g.status}" style="font-size:11px;flex-shrink:0">${isCompleted ? 'Final' : canScore ? 'Scoring' : 'Live'}</span>
+            ${(function(){ const n = renderScorerName(g); return n ? `<span style="font-size:11px;color:#166534;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🟢 ${escapeHtml(n)}</span>` : ''; })()}
+          </div>
           ${g.tournamentId ? `<div style="font-size:11px;color:#0369a1;font-weight:500;margin-top:2px">📋 ${escapeHtml(State.getTournament(g.tournamentId)?.name || g.tournamentName || '')}</div>` : ''}
-          ${renderLastScorerPill(g)}
         </div>
         ${isCompleted && isAdmin() ? `
         <div style="display:flex;gap:6px;flex-shrink:0">
