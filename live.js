@@ -502,7 +502,7 @@ function liveGameHTML(g, home, away) {
                 ${!isCompleted && batterId ? `
                 <div class="spray-chart-controls">
                   <button class="btn-icon spray-toggle-btn${_sprayChartVisible ? ' active' : ''}" id="spray-toggle-btn" onclick="toggleSprayChart()" title="Toggle hit chart">📍 Hit Chart</button>
-                  <div id="spray-chart-key" class="spray-chart-key" style="display:${_sprayChartVisible ? 'block' : 'none'}">
+                  <div id="spray-chart-key" class="spray-chart-key" style="visibility:${_sprayChartVisible ? 'visible' : 'hidden'}">
                     <div class="spray-key-title">HIT CHART</div>
                     <div class="spray-key-grid">
                       <span class="spray-key-item"><span class="spray-key-dot" style="background:#4ade80"></span>Single</span>
@@ -1378,7 +1378,7 @@ function toggleSprayChart() {
   drawField();
   const keyEl = document.getElementById('spray-chart-key');
   const btnEl = document.getElementById('spray-toggle-btn');
-  if (keyEl) keyEl.style.display = _sprayChartVisible ? 'block' : 'none';
+  if (keyEl) keyEl.style.visibility = _sprayChartVisible ? 'visible' : 'hidden';
   if (btnEl) btnEl.classList.toggle('active', _sprayChartVisible);
 }
 
