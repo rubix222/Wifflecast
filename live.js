@@ -1712,10 +1712,11 @@ function showSwapFielderModal(currentPid, currentPos) {
   const others = team.playerIds.filter(pid => pid !== currentPid);
   const cur = State.getPlayer(currentPid);
 
-  // Check 4-batter rule if swapping the pitcher
-  const isPitcher = currentPos === 'P';
+  // Always get the real batters-faced count so we can warn even when the
+  // pitcher is the *target* of a non-pitcher swap (e.g. CF ↔ P).
   const fieldingSide = g.currentHalf === 'top' ? 'home' : 'away';
-  const faced = isPitcher ? (g[fieldingSide === 'home' ? 'homeBattersFaced' : 'awayBattersFaced'] || 0) : 4;
+  const faced = g[fieldingSide === 'home' ? 'homeBattersFaced' : 'awayBattersFaced'] || 0;
+  const isPitcher = currentPos === 'P';
 
   const list = others.map(pid => {
     const p = State.getPlayer(pid);
@@ -1726,11 +1727,18 @@ function showSwapFielderModal(currentPid, currentPos) {
     </button>`;
   }).join('');
 
-  const warningBanner = isPitcher && faced < 4
-    ? `<div style="background:#fef9c3;border:1px solid #fde68a;border-radius:6px;padding:8px 10px;font-size:12px;color:#92400e;margin-bottom:10px">
-        ⚠️ Pitcher has only faced <strong>${faced}</strong> of 4 required batters this inning.
-       </div>`
-    : '';
+  // Show warning whenever the pitcher hasn't faced 4 batters yet.
+  // Text differs depending on whether we're directly swapping the pitcher
+  // or swapping another fielder who could displace the pitcher.
+  let warningBanner = '';
+  if (faced < 4) {
+    const msg = isPitcher
+      ? `Pitcher has only faced <strong>${faced}</strong> of 4 required batters this inning.`
+      : `The current pitcher has only faced <strong>${faced}</strong> of 4 required batters. Swapping them in would violate the pitching rule.`;
+    warningBanner = `<div style="background:#fef9c3;border:1px solid #fde68a;border-radius:6px;padding:8px 10px;font-size:12px;color:#92400e;margin-bottom:10px">
+        ⚠️ ${msg}
+       </div>`;
+  }
 
   Modal.show(`
     <div class="modal-header">
@@ -1748,13 +1756,14 @@ function showSwapFielderModal(currentPid, currentPos) {
   `);
 }
 
-// Handles the 4-batter confirmation for pitcher swaps
+// Handles the 4-batter confirmation for pitcher swaps.
+// The pitcher may be currentPid (direct swap) OR newPid (e.g. CF picking the pitcher as target).
 function swapFielderGuarded(currentPid, newPid, faced) {
   const g = State.getGame(LiveGameId); if (!g) return;
   const positions = fieldingPositions(g);
-  const isPitcher = positions[currentPid] === 'P';
-  if (isPitcher && faced < 4) {
-    if (!confirm(`This pitcher has only faced ${faced} batter${faced === 1 ? '' : 's'} (minimum 4 required). Swap anyway?`)) return;
+  const pitcherInvolved = positions[currentPid] === 'P' || positions[newPid] === 'P';
+  if (pitcherInvolved && faced < 4) {
+    if (!confirm(`The current pitcher has only faced ${faced} batter${faced === 1 ? '' : 's'} (minimum 4 required). Swap anyway?`)) return;
   }
   swapFielder(currentPid, newPid);
 }
