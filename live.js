@@ -1810,16 +1810,17 @@ async function swapFielder(currentPid, newPid) {
   const posKey = g.currentHalf === 'top' ? 'homePositions' : 'awayPositions';
   const patch = { [posKey]: positions };
 
-  // If this is a pitcher swap, reset the pitching index to point at newPid and clear faced count
+  // If this is a pitcher swap, update the pitching index to point at newPid.
+  // Do NOT reset facedKey — it tracks batters faced in the current half-inning
+  // (not per-pitcher) so the 4-batter warning only applies to the first 4 batters
+  // of each inning regardless of how many pitcher changes happen after that.
   if (oldPos === 'P') {
     const fieldingSide = g.currentHalf === 'top' ? 'home' : 'away';
     const orderKey  = fieldingSide === 'home' ? 'homePitchingOrder' : 'awayPitchingOrder';
     const idxKey    = fieldingSide === 'home' ? 'homePitcherIdx'    : 'awayPitcherIdx';
-    const facedKey  = fieldingSide === 'home' ? 'homeBattersFaced'  : 'awayBattersFaced';
     const order = g[orderKey] || [];
     const newIdx = order.indexOf(newPid);
     if (newIdx >= 0) patch[idxKey] = newIdx;
-    patch[facedKey] = 0;
   }
 
   await State.updateGame(g.id, patch);
