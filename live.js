@@ -1282,12 +1282,11 @@ function _detectAndQueueAnims(newG, prev) {
       const anim = _buildOutcomeAnim(ev, newG);
       if (anim) {
         if (!frozeDisplay) {
-          // Show post-play score/outs/bases immediately (new out, new runner, etc.),
-          // but hold the final count + old batter/pitcher until the toast dismisses —
-          // matching scorer-path behaviour.
-          _frozenScore     = { ...newG.score };
-          _frozenOuts      = newG.outs;
-          _frozenBases     = JSON.parse(JSON.stringify(newG.bases || {}));
+          // Freeze PRE-play score/outs/bases during the toast — reveals POST-play
+          // after toast dismisses, matching scorer-path behaviour.
+          _frozenScore     = { ...prev.score };
+          _frozenOuts      = prev.outs;
+          _frozenBases     = JSON.parse(JSON.stringify(prev.bases || {}));
           _frozenCount     = { balls: ev.countBalls ?? 0, strikes: ev.countStrikes ?? 0, fouls: ev.countFouls ?? 0 };
           _frozenBatterId  = prev.batterId  || null;
           _frozenPitcherId = prev.pitcherId || null;
@@ -1372,8 +1371,9 @@ function _detectAndQueueAnims(newG, prev) {
 
   // ── 5. Pitch-count changes (ball / strike / foul) ────────────
   // Only fires when there are no new pa_end events (counts reset to 0 on each PA end).
-  // Each pitch freezes the BEFORE count during its toast, then unfreezes after so
-  // the count ticks up exactly when the word "Ball"/"Strike"/"Foul!" appears.
+  // For each pitch: a synchronous fn sets _frozenCount to the NEW (post-pitch) value and
+  // re-renders, so the count ticks up at the exact moment the toast banner appears —
+  // matching scorer-path behaviour in handlePitch.
   if (!hasNewEvents) {
     // A foul with < 2 strikes increments BOTH fouls and strikes — subtract the
     // foul-caused bump so we don't fire a duplicate Strike animation.
@@ -1382,24 +1382,24 @@ function _detectAndQueueAnims(newG, prev) {
     const dStrikes = Math.max(0, rawDS - dFouls);  // pure strike presses only
     const dBalls   = (newG.balls   || 0) - prev.balls;
 
-    const _clearCount = () => { _frozenCount = null; if (LiveGameId) renderLiveGame(LiveGameId, true); };
-
     for (let i = 0; i < dBalls; i++) {
-      const frozen = { balls: prev.balls + i, strikes: prev.strikes, fouls: prev.fouls };
-      _queueAnim({ fn: () => { _frozenCount = frozen; } });
+      const afterCount = { balls: prev.balls + i + 1, strikes: prev.strikes, fouls: prev.fouls };
+      _queueAnim({ fn: () => { _frozenCount = afterCount; if (LiveGameId) renderLiveGame(LiveGameId, true); } });
       _queueAnim({ text: 'Ball', color: '#fbbf24', fromSvg: FIELD.MOUND, toSvg: { x: 200, y: 368 } });
-      _queueAnim({ fn: _clearCount });
     }
+    if (dBalls > 0) _queueAnim({ fn: () => { _frozenCount = null; } });
+
     for (let i = 0; i < dStrikes; i++) {
-      const frozen = { balls: prev.balls, strikes: prev.strikes + i, fouls: prev.fouls };
-      _queueAnim({ fn: () => { _frozenCount = frozen; } });
+      const afterCount = { balls: prev.balls, strikes: prev.strikes + i + 1, fouls: prev.fouls };
+      _queueAnim({ fn: () => { _frozenCount = afterCount; if (LiveGameId) renderLiveGame(LiveGameId, true); } });
       _queueAnim({ text: 'Strike ⚡', color: '#f87171', fromSvg: FIELD.MOUND, toSvg: FIELD.HOME });
-      _queueAnim({ fn: _clearCount });
     }
+    if (dStrikes > 0) _queueAnim({ fn: () => { _frozenCount = null; } });
+
     for (let i = 0; i < dFouls; i++) {
       const goRight = Math.random() < 0.5;
-      const frozen = { balls: prev.balls, strikes: prev.strikes, fouls: prev.fouls + i };
-      _queueAnim({ fn: () => { _frozenCount = frozen; } });
+      // For fouls: unfreeze to show actual game state (includes any strike bump if < 2 strikes)
+      _queueAnim({ fn: () => { _frozenCount = null; if (LiveGameId) renderLiveGame(LiveGameId, true); } });
       _queueAnim({
         text: 'Foul!', color: '#fb923c',
         fromSvg:  FIELD.MOUND,
@@ -1407,7 +1407,6 @@ function _detectAndQueueAnims(newG, prev) {
         toSvg:    goRight ? { x: 338, y: 352 } : { x: 62, y: 352 },
         phase1Dur: 380, phase2Dur: 340,
       });
-      _queueAnim({ fn: _clearCount });
     }
   }
 }
@@ -1914,12 +1913,10 @@ async function handlePitch(kind) {
   g.undoStack = [...(g.undoStack || []).slice(-14), captureSnapshot(g)];
   g.redoStack = [];
 
-  // Capture count BEFORE any increment so we can hold the old value during the toast
+  // Capture count BEFORE any increment so we can hold the old value until the toast appears.
+  // The fn queued before each toast clears the freeze so the count ticks up simultaneously
+  // with the banner — matching the watcher path behaviour in _detectAndQueueAnims section 5.
   const prevCount = { balls: g.balls, strikes: g.strikes, fouls: g.fouls || 0 };
-  const _unfreezeCount = () => {
-    _frozenCount = null;
-    if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly);
-  };
 
   if (kind === 'ball') {
     g.balls++;
@@ -1928,8 +1925,8 @@ async function handlePitch(kind) {
       await applyPaEnd(g, { outcome: 'BB' });
     } else {
       _frozenCount = prevCount;
+      _queueAnim({ fn: () => { _frozenCount = null; if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly); } });
       _queueAnim({ text: 'Ball', color: '#fbbf24', fromSvg: FIELD.MOUND, toSvg: { x: 200, y: 368 } });
-      _queueAnim({ fn: _unfreezeCount });
       await State.updateGame(g.id, { balls: g.balls });
       renderLiveGame(g.id);
     }
@@ -1942,8 +1939,8 @@ async function handlePitch(kind) {
       await applyPaEnd(g, { outcome: 'K', kType: kind === 'strike_swinging' ? 'swinging' : 'looking' });
     } else {
       _frozenCount = prevCount;
+      _queueAnim({ fn: () => { _frozenCount = null; if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly); } });
       _queueAnim({ text: 'Strike ⚡', color: '#f87171', fromSvg: FIELD.MOUND, toSvg: FIELD.HOME });
-      _queueAnim({ fn: _unfreezeCount });
       await State.updateGame(g.id, { strikes: g.strikes });
       renderLiveGame(g.id);
     }
@@ -1958,6 +1955,7 @@ async function handlePitch(kind) {
       if (g.strikes < 2) g.strikes++;
       _frozenCount = prevCount;
       const goRight = Math.random() < 0.5;
+      _queueAnim({ fn: () => { _frozenCount = null; if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly); } });
       _queueAnim({
         text: 'Foul!', color: '#fb923c',
         fromSvg:  FIELD.MOUND,
@@ -1965,7 +1963,6 @@ async function handlePitch(kind) {
         toSvg:    goRight ? { x: 338, y: 352 } : { x: 62, y: 352 },
         phase1Dur: 380, phase2Dur: 340,
       });
-      _queueAnim({ fn: _unfreezeCount });
       await State.updateGame(g.id, { strikes: g.strikes, fouls: g.fouls });
       renderLiveGame(g.id);
     }
@@ -2371,9 +2368,9 @@ async function applyPaEnd(g, ev) {
   const facedKey = fieldingSide === 'home' ? 'homeBattersFaced' : 'awayBattersFaced';
 
   // ── Queue outcome animation for the scorer ────────────────────────────────
-  // Now that we know post-play state, freeze display:
+  // Freeze PRE-play display state while the toast shows:
   //   • count: stays at the FINAL count (3 strikes / 4 balls etc.) until toast dismisses
-  //   • score / outs / bases: frozen at POST-play values so they update immediately
+  //   • score / outs / bases: frozen at PRE-play values — reveals POST-play after toast
   //   • batter / pitcher: frozen at pre-play values so they stay visible during toast
   //   • input: locked so no buttons can be pressed during the toast
   if (!LiveGameWatchOnly) {
@@ -2383,9 +2380,9 @@ async function applyPaEnd(g, ev) {
       _frozenCount      = { balls: g.balls, strikes: g.strikes, fouls: g.fouls || 0 };
       _frozenBatterId   = batterId;
       _frozenPitcherId  = pitcherId;
-      _frozenScore      = { ...newScore };
-      _frozenOuts       = newOuts;
-      _frozenBases      = JSON.parse(JSON.stringify(newBases));
+      _frozenScore      = { ...g.score };
+      _frozenOuts       = g.outs;
+      _frozenBases      = JSON.parse(JSON.stringify(g.bases || {}));
       _queueAnim(anim);
       // Snapshot spray chart BEFORE the save so the new dot is excluded during animation
       if (_sprayChartVisible && batterId) {
