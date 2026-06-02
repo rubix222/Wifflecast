@@ -448,7 +448,7 @@ function liveGameHTML(g, home, away) {
         <div class="lg-title">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:nowrap;min-width:0">
             <span class="game-card-status status-${g.status}" style="font-size:11px;flex-shrink:0">${isCompleted ? 'Final' : canScore ? 'Scoring' : 'Live'}</span>
-            ${(function(){ const n = renderScorerName(g); return n ? `<span style="font-size:11px;color:#166534;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🟢 ${escapeHtml(n)}</span>` : ''; })()}
+            ${(function(){ const n = !canScore && renderScorerName(g); return n ? `<span style="font-size:11px;color:#166534;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🟢 ${escapeHtml(n)}</span>` : ''; })()}
           </div>
           ${g.tournamentId ? `<div style="font-size:11px;color:#0369a1;font-weight:500;margin-top:2px">📋 ${escapeHtml(State.getTournament(g.tournamentId)?.name || g.tournamentName || '')}</div>` : ''}
         </div>
