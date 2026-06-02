@@ -172,11 +172,11 @@ function stopScoringHeartbeat() {
   if (_scoringHeartbeat) { clearInterval(_scoringHeartbeat); _scoringHeartbeat = null; }
 }
 
-// Returns true if the current user still owns the scoring lock.
-// If the lock was taken over, switches the user to watch-only and returns false.
-// If the lock is stale but still ours, refreshes the timestamp so it is no
-// longer stale — this covers the case where the heartbeat lagged but the
-// scorer is clearly still active.
+// Returns true if the current user still owns a valid (non-stale) scoring lock.
+// If the lock was taken over, or if our own lock has gone stale (we were
+// backgrounded ≥90 s and someone may have taken over), switches to watch-only
+// and returns false.  Never refreshes a stale lock — doing so would overwrite
+// another user's lock that was taken while local state was out of date.
 function assertScoringLock(gameId) {
   if (!gameId || !currentUser) return false;
   const g = State.getGame(gameId);
@@ -191,12 +191,15 @@ function assertScoringLock(gameId) {
     renderLiveGame(gameId, true);
     return false;
   }
-  // Still our lock — clear stale state by refreshing the timestamp if needed
+  // Our lock is stale — the heartbeat lapsed (tab was backgrounded ≥90 s).
+  // Local state may not reflect reality; someone else may have taken over.
+  // Drop to watch-only so we never overwrite their state.
   if (isScoringLockStale(g)) {
-    State.updateGame(gameId, { scoringLockedAt: Date.now() }).catch(() => {});
-    // Immediately remove the banner from the DOM — don't wait for Firestore round-trip
-    const banner = document.getElementById('stale-scoring-banner');
-    if (banner) banner.remove();
+    stopScoringHeartbeat();
+    LiveGameWatchOnly = true;
+    toast('Your scoring session timed out. Open the game again to resume scoring.', 'error');
+    renderLiveGame(gameId, true);
+    return false;
   }
   return true;
 }
@@ -218,6 +221,23 @@ async function openGameForScoring(gameId) {
 
 window.addEventListener('beforeunload', () => {
   if (LiveGameId) releaseScoringLock(LiveGameId);
+});
+
+// When the user returns to the tab after the phone/browser was backgrounded,
+// check immediately whether our scoring lock has gone stale.  If it has, drop
+// to watch-only before any user interaction — prevents overwriting a lock that
+// another scorer acquired while local state was frozen.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  if (!LiveGameId || LiveGameWatchOnly || !currentUser) return;
+  const g = State.getGame(LiveGameId);
+  if (!g || g.status === 'completed') return;
+  if (g.scoringLockedBy === currentUser.uid && isScoringLockStale(g)) {
+    stopScoringHeartbeat();
+    LiveGameWatchOnly = true;
+    toast('Your scoring session timed out. Open the game again to resume scoring.', 'error');
+    renderLiveGame(LiveGameId, true);
+  }
 });
 
 function renderScorerName(g) {
@@ -497,7 +517,7 @@ function liveGameHTML(g, home, away) {
 
       <div class="lg-tab-body">
         <div class="lg-pane" data-tab="score" ${scorePaneHidden ? 'hidden' : ''}>
-          ${canScore && isScoringLockStale(g) ? `<div id="stale-scoring-banner" style="background:#fef9c3;border-bottom:1px solid #fde68a;padding:8px 14px;font-size:12px;color:#92400e">⚠️ Your scoring session was inactive. Resume scoring to stay active — another scorer can take over until you do.</div>` : ''}
+          ${canScore && isScoringLockStale(g) ? `<div id="stale-scoring-banner" style="background:#fee2e2;border-bottom:1px solid #fca5a5;padding:8px 14px;font-size:12px;color:#991b1b">⚠️ Your scoring session has timed out — another scorer may have taken over. Close and reopen the game to resume scoring.</div>` : ''}
           ${!isCompleted ? renderMatchupStrip(g, _betweenInnings) : ''}
           <div class="field-wrap">
             <div class="field-and-bases">
