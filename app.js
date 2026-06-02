@@ -1904,14 +1904,17 @@ const Render = {
         ? `<div style="font-size:11px;color:#0369a1;margin-top:2px">📋 ${escapeHtml(eventName)}</div>`
         : '';
 
-      // Scoring lock info for live games
+      // Scoring lock info for live games — always reserve the row so card height stays fixed
       const lockStale   = isLive && isScoringLockStale(g);
       const lockHolder  = isLive && g.scoringLockedBy ? State.getUser(g.scoringLockedBy) : null;
       const scorerName  = lockHolder && !lockStale ? lockHolder.name || null : null;
-      const scoringLine = scorerName
-        ? `<div style="font-size:11px;color:#059669;margin-top:3px">🟢 ${escapeHtml(scorerName)} is scoring</div>`
+      const scoringLineContent = scorerName
+        ? `<span style="color:#059669">🟢 ${escapeHtml(scorerName)} is scoring</span>`
         : lockStale && g.scoringLockedBy
-        ? `<div style="font-size:11px;color:#d97706;margin-top:3px">⚠️ Scoring session inactive</div>`
+        ? `<span style="color:#d97706">⚠️ Scoring session inactive</span>`
+        : '';
+      const scoringLine = isLive
+        ? `<div style="font-size:11px;margin-top:3px;min-height:1.4em">${scoringLineContent}</div>`
         : '';
 
       // Top-right action buttons
@@ -2383,6 +2386,14 @@ function buildGameListItem(g) {
     : isSetup && canUserScore()
       ? `<div onclick="event.stopPropagation()"><button class="btn btn-sm btn-primary" onclick="showSetupModal('${g.id}')">▶ Start</button></div>`
       : '';
+  const lockStale2  = isLive && isScoringLockStale(g);
+  const lockHolder2 = isLive && g.scoringLockedBy ? State.getUser(g.scoringLockedBy) : null;
+  const scorerName2 = lockHolder2 && !lockStale2 ? lockHolder2.name || null : null;
+  const scoringContent2 = scorerName2
+    ? `<span style="color:#059669">🟢 ${escapeHtml(scorerName2)} is scoring</span>`
+    : lockStale2 && g.scoringLockedBy
+    ? `<span style="color:#d97706">⚠️ Scoring session inactive</span>`
+    : '';
   const clickAttr = (isSetup && !canUserScore()) ? 'style="cursor:default;opacity:0.6"' : `onclick="openGame('${g.id}')"`;
   return `<div class="player-list-item game-list-item" ${clickAttr}>
     <div style="width:100%">
@@ -2394,6 +2405,7 @@ function buildGameListItem(g) {
         <div style="font-weight:600;font-size:13px">${matchupHtml(away, home)}</div>
         ${showScore ? `<div style="font-size:14px;font-weight:700;color:#374151;text-align:right;line-height:1.4">${g.score.away}<br>${g.score.home}</div>` : ''}
       </div>
+      ${isLive ? `<div style="font-size:11px;margin-top:3px;min-height:1.4em">${scoringContent2}</div>` : ''}
       <div style="text-align:right;margin-top:3px">
         <span style="font-size:11px;color:#9ca3af">${date}</span>
       </div>
