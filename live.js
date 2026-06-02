@@ -512,6 +512,9 @@ function liveGameHTML(g, home, away) {
           <div class="lg-menu" id="lg-menu" hidden>
             <button onclick="endHalfInning('${g.id}');closeLiveMenu()">End half inning</button>
             <button onclick="endGameEarly('${g.id}');closeLiveMenu()" style="color:#dc2626">End game</button>
+            <div class="lg-menu-divider"></div>
+            <button onclick="swapHomeAway('${g.id}');closeLiveMenu()"
+              ${(g.events||[]).length > 0 ? 'disabled' : ''}>⇄ Swap Home/Away</button>
           </div>
         </div>` : ''}
       </div>
@@ -1656,9 +1659,9 @@ function drawField(overrideBases = null) {
       ${sq(FIELD.FIRST.x,  FIELD.FIRST.y,  bases && bases[1])}
       ${sq(FIELD.SECOND.x, FIELD.SECOND.y, bases && bases[2])}
       ${sq(FIELD.THIRD.x,  FIELD.THIRD.y,  bases && bases[3])}
-      <!-- Fielder markers -->
-      ${isCompleted ? '' : fielderMarker(pitcherId, pitcher, 'P',  FIELD.MOUND.x,   FIELD.MOUND.y,   fielderFill, pitcherId === _animFielderPid)}
-      ${isCompleted ? '' : fielderMarker(cfId,      cf,      'CF', FIELD.CF_HOME.x, FIELD.CF_HOME.y, fielderFill, cfId      === _animFielderPid)}
+      <!-- Fielder markers (hidden between innings so the field is blank) -->
+      ${(isCompleted || _betweenInnings) ? '' : fielderMarker(pitcherId, pitcher, 'P',  FIELD.MOUND.x,   FIELD.MOUND.y,   fielderFill, pitcherId === _animFielderPid)}
+      ${(isCompleted || _betweenInnings) ? '' : fielderMarker(cfId,      cf,      'CF', FIELD.CF_HOME.x, FIELD.CF_HOME.y, fielderFill, cfId      === _animFielderPid)}
       <!-- Batter marker (team color circle, just below home plate) -->
       ${batter ? (() => {
         const canScoreNow = !LiveGameWatchOnly && canUserScore() && !__bipStep;
@@ -2666,6 +2669,31 @@ async function endGameEarly(gameId) {
     Render.tournaments();
     await autoGenerateTournamentRound(g.tournamentId);
   }
+}
+
+async function swapHomeAway(gameId) {
+  const g = State.getGame(gameId); if (!g) return;
+  if ((g.events || []).length > 0) { toast('Cannot swap after scoring has begun', 'error'); return; }
+  if (!await assertScoringLock(gameId)) return;
+  // Swap every home/away field so the teams simply change sides
+  await State.updateGame(gameId, {
+    homeTeamId:         g.awayTeamId,
+    awayTeamId:         g.homeTeamId,
+    homeBattingOrder:   g.awayBattingOrder   || [],
+    awayBattingOrder:   g.homeBattingOrder   || [],
+    homePositions:      g.awayPositions      || {},
+    awayPositions:      g.homePositions      || {},
+    homePitchingOrder:  g.awayPitchingOrder  || [],
+    awayPitchingOrder:  g.homePitchingOrder  || [],
+    homePitcherIdx:     g.awayPitcherIdx     ?? 0,
+    awayPitcherIdx:     g.homePitcherIdx     ?? 0,
+    homeBatterIdx:      g.awayBatterIdx      ?? 0,
+    awayBatterIdx:      g.homeBatterIdx      ?? 0,
+    homeBattersFaced:   g.awayBattersFaced   ?? 0,
+    awayBattersFaced:   g.homeBattersFaced   ?? 0,
+  });
+  renderLiveGame(gameId, LiveGameWatchOnly);
+  toast('Home and away teams swapped');
 }
 
 /* ============================================================

@@ -660,6 +660,9 @@
   }
   .lg-menu button:last-child { border-bottom: none; }
   .lg-menu button:hover { background: #f9fafb; }
+  .lg-menu button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .lg-menu button:disabled:hover { background: none; }
+  .lg-menu-divider { height: 1px; background: #e5e7eb; margin: 4px 0; }
   .lg-tab-body {
     flex: 1;
     min-height: 0;

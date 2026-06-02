@@ -3489,7 +3489,7 @@ Object.assign(window, {
   showNewGameModal, openGame, selectGame, deselectGame, deleteGame, openGameForScoring, showSetupModal,
   submitPlayer, submitTeam, submitNewGame,
   startGame, setPosition, moveBatter,
-  endHalfInning, endGameEarly, showSkipBatterModal, skipBatter,
+  endHalfInning, endGameEarly, swapHomeAway, showSkipBatterModal, skipBatter,
   showEditScoreModal, reopenGame, _esAdj, _esSave,
   showRecapModal, _copyRecap, _shareRecap, sendRecapEmails, autoSendRecapEmails, showEmailSetupModal, _saveEmailSetup, _toggleEmailSetup,
   showNewTournamentModal, submitNewTournament, showTournamentModal, submitTournament, selectTournament, tournamentBack,
