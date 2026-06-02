@@ -657,6 +657,18 @@ function pitcherGameStats(g, pitcherId) {
 function rerenderLive() {
   if (!LiveGameId) return;
   const g = State.getGame(LiveGameId);
+
+  // If we think we're scoring but another user just took our lock, switch to watch-only
+  // immediately on snapshot arrival — before any render — so the UI is correct.
+  if (!LiveGameWatchOnly && currentUser && g) {
+    if (g.scoringLockedBy && g.scoringLockedBy !== currentUser.uid) {
+      stopScoringHeartbeat();
+      LiveGameWatchOnly = true;
+      const name = State.getUser(g.scoringLockedBy)?.name || 'Another user';
+      toast(`${name} took over scoring. You are now watching.`, 'error');
+    }
+  }
+
   // Detect changes and queue animations (watch-only mode only)
   if (g && _prevGameSnap && LiveGameWatchOnly) {
     _detectAndQueueAnims(g, _prevGameSnap);
@@ -1883,6 +1895,7 @@ async function handlePitch(kind) {
   const g = State.getGame(LiveGameId); if (!g) return;
   if (g.status === 'completed') return;
   if (!canUserScore()) { toast('You need scoring privilege to record plays', 'error'); return; }
+  if (!assertScoringLock(LiveGameId)) return;  // kicks to watch-only if lock was taken over
   _cancelAnim();  // abort any in-progress animation before the new action
   g.undoStack = [...(g.undoStack || []).slice(-14), captureSnapshot(g)];
   g.redoStack = [];
