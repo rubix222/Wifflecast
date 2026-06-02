@@ -982,6 +982,7 @@ function _snapGame(g) {
     currentInning: g.currentInning || 1,
     currentHalf:   g.currentHalf   || 'top',
     pitcherId,
+    batterId:      currentBatterId(g) || null,
   };
 }
 
@@ -1269,10 +1270,15 @@ function _detectAndQueueAnims(newG, prev) {
       const anim = _buildOutcomeAnim(ev, newG);
       if (anim) {
         if (!frozeDisplay) {
-          // Freeze scoreboard + bases at pre-play values for the duration of the animation
-          _frozenScore = { ...prev.score };
-          _frozenOuts  = prev.outs;
-          _frozenBases = { ...prev.bases };
+          // Show post-play score/outs/bases immediately (new out, new runner, etc.),
+          // but hold the final count + old batter/pitcher until the toast dismisses —
+          // matching scorer-path behaviour.
+          _frozenScore     = { ...newG.score };
+          _frozenOuts      = newG.outs;
+          _frozenBases     = JSON.parse(JSON.stringify(newG.bases || {}));
+          _frozenCount     = { balls: ev.countBalls ?? 0, strikes: ev.countStrikes ?? 0, fouls: ev.countFouls ?? 0 };
+          _frozenBatterId  = prev.batterId  || null;
+          _frozenPitcherId = prev.pitcherId || null;
           frozeDisplay = true;
         }
         _queueAnim(anim);
@@ -1316,14 +1322,23 @@ function _detectAndQueueAnims(newG, prev) {
     // prev.outs reflects the post-play state (should be 3) from the snapshot
     // taken right after the inning-ending play landed.
     const endOuts = prev.outs;
-    _queueAnim({ fn: () => { _frozenOuts = endOuts; } });
-    _queueAnim({ text: `End of ${prevHalf} ${ordinal(prev.currentInning)}`, color: '#60a5fa', holdMs: 1400 });
-    // Blank field for 3 s between halves — clear frozen display so real state is visible
+    // Clear count/batter before EOI banner, then show 3rd out (matches scorer-path timing)
     _queueAnim({ fn: () => {
-      _frozenScore    = null;
-      _frozenOuts     = null;
-      _frozenBases    = null;
-      _betweenInnings = true;
+      _frozenCount     = null;
+      _frozenBatterId  = null;
+      _frozenPitcherId = null;
+      _frozenOuts      = endOuts;
+    }});
+    _queueAnim({ text: `End of ${prevHalf} ${ordinal(prev.currentInning)}`, color: '#60a5fa', holdMs: 1400 });
+    // Blank field between halves — clear all frozen display state so real state shows
+    _queueAnim({ fn: () => {
+      _frozenCount     = null;
+      _frozenBatterId  = null;
+      _frozenPitcherId = null;
+      _frozenScore     = null;
+      _frozenOuts      = null;
+      _frozenBases     = null;
+      _betweenInnings  = true;
       if (LiveGameId) renderLiveGame(LiveGameId, true);
     }});
     _queueAnim({ blank: true, holdMs: 3000 });
