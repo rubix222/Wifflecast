@@ -1894,27 +1894,14 @@ const Render = {
       const isLive  = g.status === 'in_progress';
       const showScore = !isSetup;
       const inningStr = isLive
-        ? `${g.currentHalf === 'top' ? 'Top' : 'Bot'} ${g.currentInning}`
+        ? `${g.currentHalf === 'top' ? '▲' : '▼'}${g.currentInning}`
         : (g.status === 'completed' ? 'Final' : '');
       const active = g.id === selectedGameId ? 'selected' : '';
 
-      // Event badge (tournament-linked games)
+      // Event badge + date on same line
       const eventName = g.tournamentId ? (State.getTournament(g.tournamentId)?.name || g.tournamentName || null) : null;
       const eventBadge = eventName
-        ? `<div style="font-size:11px;color:#0369a1;margin-top:2px">📋 ${escapeHtml(eventName)}</div>`
-        : '';
-
-      // Scoring lock info for live games — always reserve the row so card height stays fixed
-      const lockStale   = isLive && isScoringLockStale(g);
-      const lockHolder  = isLive && g.scoringLockedBy ? State.getUser(g.scoringLockedBy) : null;
-      const scorerName  = lockHolder && !lockStale ? lockHolder.name || null : null;
-      const scoringLineContent = scorerName
-        ? `<span style="color:#059669">🟢 ${escapeHtml(scorerName)} is scoring</span>`
-        : lockStale && g.scoringLockedBy
-        ? `<span style="color:#d97706">⚠️ Scoring session inactive</span>`
-        : '';
-      const scoringLine = isLive
-        ? `<div style="font-size:11px;margin-top:3px;min-height:1.4em">${scoringLineContent}</div>`
+        ? `<span style="font-size:11px;color:#0369a1">📋 ${escapeHtml(eventName)}</span>`
         : '';
 
       // Top-right action buttons
@@ -1944,10 +1931,8 @@ const Render = {
             <div style="font-weight:600;font-size:13px">${matchupHtml(away, home)}</div>
             ${showScore ? `<div style="font-size:14px;font-weight:700;color:#374151;text-align:right;line-height:1.4">${g.score.away}<br>${g.score.home}</div>` : ''}
           </div>
-          ${eventBadge}
-          ${scoringLine}
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px">
-            <span></span>
+            <span>${eventBadge}</span>
             <span style="font-size:11px;color:#9ca3af">${date}</span>
           </div>
         </div>
@@ -2373,7 +2358,7 @@ function buildGameListItem(g) {
   const isCompleted = g.status === 'completed';
   const showScore = isLive || isCompleted;
   const date = new Date(g.createdAt).toLocaleDateString();
-  const inningStr = isLive ? `${g.currentHalf === 'top' ? 'Top' : 'Bot'} ${g.currentInning}` : '';
+  const inningStr = isLive ? `${g.currentHalf === 'top' ? '▲' : '▼'}${g.currentInning}` : '';
   const statusLabel = isSetup ? 'Not Started'
     : isLive ? `Live${inningStr ? ' · ' + inningStr : ''}`
     : isCompleted ? 'Final'
@@ -2386,13 +2371,9 @@ function buildGameListItem(g) {
     : isSetup && canUserScore()
       ? `<div onclick="event.stopPropagation()"><button class="btn btn-sm btn-primary" onclick="showSetupModal('${g.id}')">▶ Start</button></div>`
       : '';
-  const lockStale2  = isLive && isScoringLockStale(g);
-  const lockHolder2 = isLive && g.scoringLockedBy ? State.getUser(g.scoringLockedBy) : null;
-  const scorerName2 = lockHolder2 && !lockStale2 ? lockHolder2.name || null : null;
-  const scoringContent2 = scorerName2
-    ? `<span style="color:#059669">🟢 ${escapeHtml(scorerName2)} is scoring</span>`
-    : lockStale2 && g.scoringLockedBy
-    ? `<span style="color:#d97706">⚠️ Scoring session inactive</span>`
+  const eventName2 = g.tournamentId ? (State.getTournament(g.tournamentId)?.name || g.tournamentName || null) : null;
+  const eventBadge2 = eventName2
+    ? `<span style="font-size:11px;color:#0369a1">📋 ${escapeHtml(eventName2)}</span>`
     : '';
   const clickAttr = (isSetup && !canUserScore()) ? 'style="cursor:default;opacity:0.6"' : `onclick="openGame('${g.id}')"`;
   return `<div class="player-list-item game-list-item" ${clickAttr}>
@@ -2405,8 +2386,8 @@ function buildGameListItem(g) {
         <div style="font-weight:600;font-size:13px">${matchupHtml(away, home)}</div>
         ${showScore ? `<div style="font-size:14px;font-weight:700;color:#374151;text-align:right;line-height:1.4">${g.score.away}<br>${g.score.home}</div>` : ''}
       </div>
-      ${isLive ? `<div style="font-size:11px;margin-top:3px;min-height:1.4em">${scoringContent2}</div>` : ''}
-      <div style="text-align:right;margin-top:3px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px">
+        <span>${eventBadge2}</span>
         <span style="font-size:11px;color:#9ca3af">${date}</span>
       </div>
     </div>

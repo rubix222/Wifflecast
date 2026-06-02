@@ -240,6 +240,7 @@ let _frozenCount     = null;   // { balls, strikes, fouls } — shown during out
 let _frozenBatterId  = null;   // batter to display during outcome toast (pre-play)
 let _frozenPitcherId = null;   // pitcher to display during outcome toast (pre-play)
 let _animInputLocked = false;  // true while any scoring toast is showing (buttons disabled)
+let _pitcherSwapWarningDismissed = false; // true after user confirms early swap; reset each half-inning
 
 function switchLiveTab(tab) {
   _liveTab = tab;
@@ -436,7 +437,7 @@ function renderFieldingStats(g, away, home) {
 function liveGameHTML(g, home, away) {
   const battingSide = g.currentHalf === 'top' ? 'away' : 'home';
   const fieldingTeam = battingSide === 'away' ? home : away;
-  const inningStr = (g.currentHalf === 'top' ? '▲ Top ' : '▼ Bot ') + g.currentInning;
+  const inningStr = (g.currentHalf === 'top' ? '▲' : '▼') + g.currentInning;
   const isCompleted = g.status === 'completed';
   const canScore = !LiveGameWatchOnly && canUserScore();
   const batterId = currentBatterId(g);
@@ -773,7 +774,7 @@ function renderPlayLog(g) {
     const hasExtras = extraRows.length > 0;
 
     const countVal = e.countBalls !== undefined
-      ? `${e.countBalls}-${e.countStrikes}${e.countFouls ? ` ${e.countFouls}F` : ''}` : '';
+      ? `${e.countBalls}-${e.countStrikes}-${e.countFouls ?? 0}` : '';
 
     const tsAttr    = isCompleted ? `data-ts="${e.ts}"` : '';
     const clickAttr = isCompleted ? `onclick="selectPlay(${e.ts})"` : '';
@@ -911,7 +912,7 @@ function selectPlay(ts) {
   if (sbAway) sbAway.textContent = score.away;
   if (sbHome) sbHome.textContent = score.home;
   const sbInning = $('#sb-inning');
-  if (sbInning) sbInning.textContent = (event.half === 'top' ? '▲ Top ' : '▼ Bot ') + event.inning;
+  if (sbInning) sbInning.textContent = (event.half === 'top' ? '▲' : '▼') + event.inning;
   const sbOuts = $('#sb-outs');
   if (sbOuts) sbOuts.innerHTML = `<span class="outs-label">Outs</span><span class="out-dots"><span class="out-dot${outs >= 1 ? ' on' : ''}"></span><span class="out-dot${outs >= 2 ? ' on' : ''}"></span><span class="out-dot${outs >= 3 ? ' on' : ''}"></span></span>`;
 
@@ -1813,8 +1814,9 @@ function swapFielderGuarded(currentPid, newPid, faced) {
   const g = State.getGame(LiveGameId); if (!g) return;
   const positions = fieldingPositions(g);
   const pitcherInvolved = positions[currentPid] === 'P' || positions[newPid] === 'P';
-  if (pitcherInvolved && faced < 4) {
+  if (pitcherInvolved && faced < 4 && !_pitcherSwapWarningDismissed) {
     if (!confirm(`The current pitcher has only faced ${faced} batter${faced === 1 ? '' : 's'} (minimum 4 required). Swap anyway?`)) return;
+    _pitcherSwapWarningDismissed = true;
   }
   swapFielder(currentPid, newPid);
 }
@@ -2465,6 +2467,7 @@ function buildPitcherCyclePatch(g, side) {
 }
 
 async function endHalfInningInternal(g) {
+  _pitcherSwapWarningDismissed = false;
   let { currentInning, currentHalf } = g;
   if (currentHalf === 'top') {
     currentHalf = 'bottom';
