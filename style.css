@@ -1649,9 +1649,9 @@
   .play-entry.has-extras td { border-bottom: none; }
   /* Extra row (double play, tag-up) bottom border */
   .play-entry-extra td { border-bottom: 1px solid #f3f4f6; padding-top: 0; }
-  .pe-name  { font-size: 13px; white-space: nowrap; width: 1%; }
-  .pe-mid   { min-width: 0; }
-  .pe-count { font-size: 11px; color: #9ca3af; white-space: nowrap; width: 1%; text-align: right; }
+  .pe-name  { font-size: 13px; white-space: nowrap; }
+  .pe-mid   { width: 100%; }
+  .pe-count { font-size: 11px; color: #9ca3af; white-space: nowrap; text-align: right; }
   .play-count { font-size: 11px; color: #9ca3af; margin-left: 4px; }
   .play-fielder { font-size: 12px; color: #6b7280; }
   .play-outcome { font-weight: 600; }
