@@ -34,7 +34,7 @@ function captureSnapshot(g) {
 }
 
 async function undoPlay() {
-  if (!assertScoringLock(LiveGameId)) return;
+  if (!await assertScoringLock(LiveGameId)) return;
   const g = State.getGame(LiveGameId); if (!g) return;
   const undoStack = g.undoStack || [];
   if (!undoStack.length) { toast('Nothing to undo', 'error'); return; }
@@ -51,7 +51,7 @@ async function undoPlay() {
 }
 
 async function redoPlay() {
-  if (!assertScoringLock(LiveGameId)) return;
+  if (!await assertScoringLock(LiveGameId)) return;
   const g = State.getGame(LiveGameId); if (!g) return;
   const redoStack = g.redoStack || [];
   if (!redoStack.length) { toast('Nothing to redo', 'error'); return; }
@@ -173,33 +173,59 @@ function stopScoringHeartbeat() {
 }
 
 // Returns true if the current user still owns a valid (non-stale) scoring lock.
-// If the lock was taken over, or if our own lock has gone stale (we were
-// backgrounded ≥90 s and someone may have taken over), switches to watch-only
-// and returns false.  Never refreshes a stale lock — doing so would overwrite
-// another user's lock that was taken while local state was out of date.
-function assertScoringLock(gameId) {
+// If someone else has taken over → switches to watch-only and returns false.
+// If our own lock is stale → does a fresh Firestore read:
+//   • No one else has an active lock → re-acquire and return true (seamless resume)
+//   • Someone else has an active lock → switch to watch-only and return false
+async function assertScoringLock(gameId) {
   if (!gameId || !currentUser) return false;
   const g = State.getGame(gameId);
   if (!g || g.status === 'completed') return false;
   if (g.scoringLockedBy && g.scoringLockedBy !== currentUser.uid) {
-    // Lock was taken over by someone else — switch to watch-only gracefully
+    // Lock is held by someone else per local state — switch to watch-only
     stopScoringHeartbeat();
     LiveGameWatchOnly = true;
-    const locker = g.scoringLockedBy ? State.getUser(g.scoringLockedBy) : null;
-    const name = locker?.name || 'Another user';
-    toast(`${name} took over scoring. You are now watching.`, 'error');
+    const locker = State.getUser(g.scoringLockedBy);
+    toast(`${locker?.name || 'Another user'} took over scoring. You are now watching.`, 'error');
     renderLiveGame(gameId, true);
     return false;
   }
-  // Our lock is stale — the heartbeat lapsed (tab was backgrounded ≥90 s).
-  // Local state may not reflect reality; someone else may have taken over.
-  // Drop to watch-only so we never overwrite their state.
   if (isScoringLockStale(g)) {
-    stopScoringHeartbeat();
-    LiveGameWatchOnly = true;
-    toast('Your scoring session timed out. Open the game again to resume scoring.', 'error');
-    renderLiveGame(gameId, true);
-    return false;
+    // Our lock is stale — do a fresh read to see if anyone else took over while
+    // the tab was backgrounded (local state may not reflect Firestore reality).
+    try {
+      const fs = window._fs;
+      const snap = await fs.getDoc(fs.doc(fs.db, 'games', gameId));
+      if (snap.exists()) {
+        const d = snap.data();
+        const freshBy = d.scoringLockedBy;
+        const freshAt = d.scoringLockedAt;
+        const freshActive = freshBy && freshAt &&
+                            (Date.now() - freshAt) < SCORING_LOCK_STALE_MS;
+        if (freshActive && freshBy !== currentUser.uid) {
+          // Someone else has an active lock — drop to watch
+          stopScoringHeartbeat();
+          LiveGameWatchOnly = true;
+          const locker = State.getUser(freshBy);
+          toast(`${locker?.name || 'Another user'} took over scoring. You are now watching.`, 'error');
+          renderLiveGame(gameId, true);
+          return false;
+        }
+      }
+    } catch (e) {
+      // Can't verify — safe default is to deny the stale action
+      console.warn('assertScoringLock: fresh read failed', e);
+      stopScoringHeartbeat();
+      LiveGameWatchOnly = true;
+      toast('Could not verify your scoring session. Please try again.', 'error');
+      renderLiveGame(gameId, true);
+      return false;
+    }
+    // Nobody else has an active lock — re-acquire and resume
+    await State.updateGame(gameId, { scoringLockedAt: Date.now() });
+    startScoringHeartbeat(gameId);
+    const banner = document.getElementById('stale-scoring-banner');
+    if (banner) banner.remove();
   }
   return true;
 }
@@ -224,19 +250,16 @@ window.addEventListener('beforeunload', () => {
 });
 
 // When the user returns to the tab after the phone/browser was backgrounded,
-// check immediately whether our scoring lock has gone stale.  If it has, drop
-// to watch-only before any user interaction — prevents overwriting a lock that
-// another scorer acquired while local state was frozen.
+// re-render immediately so the stale-lock banner shows if applicable.
+// assertScoringLock will do a fresh Firestore read on the next action to decide
+// whether to resume scoring or drop to watch-only.
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
   if (!LiveGameId || LiveGameWatchOnly || !currentUser) return;
   const g = State.getGame(LiveGameId);
   if (!g || g.status === 'completed') return;
   if (g.scoringLockedBy === currentUser.uid && isScoringLockStale(g)) {
-    stopScoringHeartbeat();
-    LiveGameWatchOnly = true;
-    toast('Your scoring session timed out. Open the game again to resume scoring.', 'error');
-    renderLiveGame(LiveGameId, true);
+    renderLiveGame(LiveGameId, false);  // show stale banner; next action verifies
   }
 });
 
@@ -517,7 +540,7 @@ function liveGameHTML(g, home, away) {
 
       <div class="lg-tab-body">
         <div class="lg-pane" data-tab="score" ${scorePaneHidden ? 'hidden' : ''}>
-          ${canScore && isScoringLockStale(g) ? `<div id="stale-scoring-banner" style="background:#fee2e2;border-bottom:1px solid #fca5a5;padding:8px 14px;font-size:12px;color:#991b1b">⚠️ Your scoring session has timed out — another scorer may have taken over. Close and reopen the game to resume scoring.</div>` : ''}
+          ${canScore && isScoringLockStale(g) ? `<div id="stale-scoring-banner" style="background:#fef9c3;border-bottom:1px solid #fde68a;padding:8px 14px;font-size:12px;color:#92400e">⚠️ Scoring session timed out. Press any pitch button — if no one else took over, you'll resume automatically.</div>` : ''}
           ${!isCompleted ? renderMatchupStrip(g, _betweenInnings) : ''}
           <div class="field-wrap">
             <div class="field-and-bases">
@@ -1928,7 +1951,7 @@ async function handlePitch(kind) {
   const g = State.getGame(LiveGameId); if (!g) return;
   if (g.status === 'completed') return;
   if (!canUserScore()) { toast('You need scoring privilege to record plays', 'error'); return; }
-  if (!assertScoringLock(LiveGameId)) return;  // kicks to watch-only if lock was taken over
+  if (!await assertScoringLock(LiveGameId)) return;  // kicks to watch-only if lock was taken over
   _cancelAnim();  // abort any in-progress animation before the new action
   g.undoStack = [...(g.undoStack || []).slice(-14), captureSnapshot(g)];
   g.redoStack = [];
@@ -2276,7 +2299,7 @@ async function finishError(errBase, errorById, location) {
 }
 
 async function applyPaEnd(g, ev) {
-  if (!assertScoringLock(g.id)) return;
+  if (!await assertScoringLock(g.id)) return;
   const batterId  = currentBatterId(g);
   const pitcherId = currentPitcherId(g);
   const inning = g.currentInning;
@@ -2614,7 +2637,7 @@ function showSkipBatterModal() {
 async function skipBatter() {
   Modal.hide();
   const g = State.getGame(LiveGameId); if (!g) return;
-  if (!assertScoringLock(g.id)) return;
+  if (!await assertScoringLock(g.id)) return;
   _cancelAnim();
   g.undoStack = [...(g.undoStack || []).slice(-14), captureSnapshot(g)];
   g.redoStack = [];
@@ -2624,7 +2647,7 @@ async function skipBatter() {
 }
 
 async function endHalfInning(gameId) {
-  if (!assertScoringLock(gameId)) return;
+  if (!await assertScoringLock(gameId)) return;
   if (!confirm('End this half-inning early? The current at-bat will be discarded.')) return;
   const g = State.getGame(gameId); if (!g) return;
   await endHalfInningInternal(g);
@@ -2632,7 +2655,7 @@ async function endHalfInning(gameId) {
 }
 
 async function endGameEarly(gameId) {
-  if (!assertScoringLock(gameId)) return;
+  if (!await assertScoringLock(gameId)) return;
   if (!confirm('End the game now? Final scores will be locked.')) return;
   const g = State.getGame(gameId); if (!g) return;
   await State.updateGame(gameId, { status: 'completed', isOver: true });
