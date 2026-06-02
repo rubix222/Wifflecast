@@ -77,6 +77,8 @@ function renderLiveGame(gameId, watchOnly = false) {
     _frozenScore    = null;
     _frozenOuts     = null;
     _frozenBases    = null;
+    _frozenHalf     = null;
+    _frozenInning   = null;
     _betweenInnings = false;
   }
   _lastLiveGameId = gameId;
@@ -282,6 +284,8 @@ let _betweenInnings = false;  // true while blank-field transition plays between
 let _frozenCount     = null;   // { balls, strikes, fouls } — shown during outcome toast
 let _frozenBatterId  = null;   // batter to display during outcome toast (pre-play)
 let _frozenPitcherId = null;   // pitcher to display during outcome toast (pre-play)
+let _frozenHalf      = null;   // currentHalf frozen during outcome/EOI toasts (prevents inning flip)
+let _frozenInning    = null;   // currentInning frozen during outcome/EOI toasts
 let _animInputLocked = false;  // true while any scoring toast is showing (buttons disabled)
 let _pitcherSwapWarningDismissed = false; // true after user confirms early swap; reset each half-inning
 
@@ -478,9 +482,13 @@ function renderFieldingStats(g, away, home) {
 }
 
 function liveGameHTML(g, home, away) {
-  const battingSide = g.currentHalf === 'top' ? 'away' : 'home';
+  // Use frozen half/inning during outcome and EOI toasts so the scoreboard doesn't
+  // flip to the new inning the moment endHalfInningInternal saves to Firestore.
+  const displayHalf   = _frozenHalf   ?? g.currentHalf;
+  const displayInning = _frozenInning ?? g.currentInning;
+  const battingSide = displayHalf === 'top' ? 'away' : 'home';
   const fieldingTeam = battingSide === 'away' ? home : away;
-  const inningStr = (g.currentHalf === 'top' ? '▲' : '▼') + g.currentInning;
+  const inningStr = (displayHalf === 'top' ? '▲' : '▼') + displayInning;
   const isCompleted = g.status === 'completed';
   const canScore = !LiveGameWatchOnly && canUserScore();
   const batterId = currentBatterId(g);
@@ -1075,6 +1083,8 @@ function _cancelAnim() {
   _frozenCount     = null;
   _frozenBatterId  = null;
   _frozenPitcherId = null;
+  _frozenHalf      = null;
+  _frozenInning    = null;
   _animInputLocked = false;
   const overlay   = document.getElementById('play-anim-overlay');
   const ballEl    = document.getElementById('anim-ball');
@@ -1128,6 +1138,8 @@ function _unfreezeDisplay() {
   _frozenCount     = null;
   _frozenBatterId  = null;
   _frozenPitcherId = null;
+  _frozenHalf      = null;
+  _frozenInning    = null;
   _animInputLocked = false;
   if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly);
 }
@@ -1344,6 +1356,10 @@ function _detectAndQueueAnims(newG, prev) {
           _frozenCount     = { balls: prev.balls, strikes: prev.strikes, fouls: prev.fouls };
           _frozenBatterId  = prev.batterId  || null;
           _frozenPitcherId = prev.pitcherId || null;
+          // Freeze half/inning so the scoreboard and fielder circles stay on the old
+          // inning until the blank-field fn releases them (same as scorer path).
+          _frozenHalf      = prev.currentHalf;
+          _frozenInning    = prev.currentInning;
           frozeDisplay = true;
         }
         // At the moment the banner appears: snap count to FINAL value (stored in event)
@@ -1395,18 +1411,19 @@ function _detectAndQueueAnims(newG, prev) {
     const lastNewEv = newEventsSlice[newEventsSlice.length - 1];
     const endOuts = (lastNewEv && lastNewEv.outsAfter !== undefined) ? lastNewEv.outsAfter : prev.outs;
 
-    // Before EOI banner: show 3rd out, clear count/batter; fielders remain visible
+    // Before EOI banner: show 3rd out, clear count/batter; keep old inning and fielders
     _queueAnim({ fn: () => {
       _frozenCount     = null;
       _frozenBatterId  = null;
       _frozenPitcherId = null;
       _frozenOuts      = endOuts;  // show 3rd out during EOI banner
+      // _frozenHalf/_frozenInning stay set — keep old inning display and fielders
       // _betweenInnings stays false — fielders from this inning remain visible
       if (LiveGameId) renderLiveGame(LiveGameId, true);
     }});
-    // EOI banner: outs=3 shown, fielders still visible
+    // EOI banner: outs=3 shown, old inning fielders still visible
     _queueAnim({ text: `End of ${prevHalf} ${ordinal(prev.currentInning)}`, color: '#60a5fa', holdMs: 1400 });
-    // After EOI banner: blank field — player circles and names hidden
+    // After EOI banner: blank field, release half/inning freeze so scoreboard updates
     _queueAnim({ fn: () => {
       _frozenCount     = null;
       _frozenBatterId  = null;
@@ -1414,6 +1431,8 @@ function _detectAndQueueAnims(newG, prev) {
       _frozenScore     = null;
       _frozenOuts      = null;
       _frozenBases     = null;
+      _frozenHalf      = null;
+      _frozenInning    = null;
       _betweenInnings  = true;
       if (LiveGameId) renderLiveGame(LiveGameId, true);
     }});
@@ -1594,7 +1613,11 @@ function drawField(overrideBases = null) {
               : isCompleted            ? { 1: null, 2: null, 3: null }
               : g.bases;
 
-  const fieldingPos = _betweenInnings ? {} : fieldingPositions(g);
+  // Use frozen half during outcome/EOI animations so fielder positions don't flip to the
+  // new inning the moment endHalfInningInternal saves to Firestore.
+  const displayHalf  = _frozenHalf ?? g.currentHalf;
+  const displayG     = displayHalf !== g.currentHalf ? { ...g, currentHalf: displayHalf } : g;
+  const fieldingPos  = _betweenInnings ? {} : fieldingPositions(displayG);
   const pitcherId = Object.keys(fieldingPos).find(pid => fieldingPos[pid] === 'P');
   const cfId = Object.keys(fieldingPos).find(pid => fieldingPos[pid] === 'CF');
   const pitcher = pitcherId ? State.getPlayer(pitcherId) : null;
@@ -1602,9 +1625,9 @@ function drawField(overrideBases = null) {
   const batterId = (isCompleted || _betweenInnings) ? null : (_frozenBatterId || currentBatterId(g));
   const batter = batterId ? State.getPlayer(batterId) : null;
 
-  // Team colors for fielder/batter circles
-  const fielderFill = _teamColor(State.getTeam(fieldingTeamId(g)));
-  const batterFill  = _teamColor(State.getTeam(battingTeamId(g)));
+  // Team colors for fielder/batter circles (use display half)
+  const fielderFill = _teamColor(State.getTeam(fieldingTeamId(displayG)));
+  const batterFill  = _teamColor(State.getTeam(battingTeamId(displayG)));
 
   const fielderMarker = (pid, player, pos, cx, cy, fillColor, hidden = false) => {
     if (hidden) return '';
@@ -2474,6 +2497,10 @@ async function applyPaEnd(g, ev, prePitchCount = null) {
       _frozenScore      = { ...g.score };
       _frozenOuts       = g.outs;
       _frozenBases      = JSON.parse(JSON.stringify(g.bases || {}));
+      // Freeze half/inning so the scoreboard and fielder circles don't flip to the new
+      // inning when endHalfInningInternal saves to Firestore mid-animation-queue.
+      _frozenHalf       = g.currentHalf;
+      _frozenInning     = g.currentInning;
       // At the moment the banner appears (after ball flight), snap count to FINAL value
       anim.onBannerShow = () => {
         _frozenCount = finalCount;
@@ -2540,7 +2567,8 @@ async function postPlayCheck(g) {
       const halfLabel = g.currentHalf === 'top' ? 'Top' : 'Bottom';
 
       // After outcome toast: unfreeze score/outs/bases so real outs (3) shows.
-      // Fielders remain visible (_betweenInnings stays false).
+      // Keep _frozenHalf/_frozenInning so the inning indicator and fielders stay on the
+      // OLD inning. Fielders remain visible (_betweenInnings stays false).
       // _animInputLocked stays true — buttons remain disabled.
       _queueAnim({ fn: () => {
         _frozenCount     = null;
@@ -2549,6 +2577,7 @@ async function postPlayCheck(g) {
         _frozenScore     = null;
         _frozenOuts      = null;
         _frozenBases     = null;
+        // _frozenHalf / _frozenInning stay set — keep old inning display and fielders
         // _betweenInnings stays false — fielders from this inning remain visible
         if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly);
       }});
@@ -2556,10 +2585,13 @@ async function postPlayCheck(g) {
       // End-of-inning banner: outs=3 shown, fielders from this inning still visible
       _queueAnim({ text: `End of ${halfLabel} ${ordinal(g.currentInning)}`, color: '#60a5fa', holdMs: 1400 });
 
-      // After EOI toast: blank field — player circles and names hidden
+      // After EOI toast: blank field — player circles and names hidden.
+      // Release the half/inning freeze so the scoreboard updates to the new inning.
       _queueAnim({ fn: () => {
         const g2 = State.getGame(LiveGameId);
         if (!g2 || g2.status === 'completed') return; // game ended — finishGame handles it
+        _frozenHalf      = null;
+        _frozenInning    = null;
         _betweenInnings  = true;
         if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly);
       }});
