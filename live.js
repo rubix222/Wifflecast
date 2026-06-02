@@ -718,7 +718,7 @@ function renderPlayLog(g) {
       }
       const startScore = halfStartScores[key];
       const scoreTag = startScore ? ` <span class="play-inning-score">${startScore.away}–${startScore.home}</span>` : '';
-      parts.push(_span3('play-inning-break', `${e.half === 'top' ? 'Top' : 'Bottom'} ${ordinal(e.inning)}${scoreTag}`));
+      parts.push(_span3('play-inning-break', `${e.half === 'top' ? '▲' : '▼'} ${ordinal(e.inning)}${scoreTag}`));
       lastKey = key;
       lastPitcherId = null;
       if (e.pitcherId) {
@@ -818,7 +818,7 @@ function renderPlayLog(g) {
           parts.push(_span3('play-inning-break play-inning-end', `— End of ${ordinal(parseInt(prevInn))} inning —`));
         }
       }
-      const curHalf  = g.currentHalf === 'top' ? 'Top' : 'Bottom';
+      const curHalf  = g.currentHalf === 'top' ? '▲' : '▼';
       const scoreTag = ` <span class="play-inning-score">${g.score.away}–${g.score.home}</span>`;
       parts.push(_span3('play-inning-break', `${curHalf} ${ordinal(g.currentInning)}${scoreTag}`));
     }
