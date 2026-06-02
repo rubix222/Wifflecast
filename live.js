@@ -498,7 +498,7 @@ function liveGameHTML(g, home, away) {
       <div class="lg-tab-body">
         <div class="lg-pane" data-tab="score" ${scorePaneHidden ? 'hidden' : ''}>
           ${canScore && isScoringLockStale(g) ? `<div id="stale-scoring-banner" style="background:#fef9c3;border-bottom:1px solid #fde68a;padding:8px 14px;font-size:12px;color:#92400e">⚠️ Your scoring session was inactive. Resume scoring to stay active — another scorer can take over until you do.</div>` : ''}
-          ${!isCompleted && !_betweenInnings ? renderMatchupStrip(g) : ''}
+          ${!isCompleted ? renderMatchupStrip(g, _betweenInnings) : ''}
           <div class="field-wrap">
             <div class="field-and-bases">
               <div class="field-panel">
@@ -617,7 +617,7 @@ function pitcherMatchupStats(g, pitcherId) {
   return parts.join(' · ');
 }
 
-function renderMatchupStrip(g) {
+function renderMatchupStrip(g, hidden = false) {
   const batterId  = _frozenBatterId  || currentBatterId(g);
   const pitcherId = _frozenPitcherId || currentPitcherId(g);
   const batter  = State.getPlayer(batterId);
@@ -628,7 +628,7 @@ function renderMatchupStrip(g) {
     : '?';
   const pn = pitcher ? `<span class="matchup-num">#${escapeHtml(pitcher.jerseyNumber || '-')}</span> ${escapeHtml(pitcher.name)}` : '?';
   return `
-    <div class="lg-matchup-strip">
+    <div class="lg-matchup-strip"${hidden ? ' style="visibility:hidden"' : ''}>
       <div class="lg-matchup-side">
         <div class="lg-matchup-label">At bat</div>
         <div class="lg-matchup-name">${batterName}</div>
