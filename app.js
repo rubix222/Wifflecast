@@ -3197,7 +3197,6 @@ async function autoSendRecapEmails(gameId) {
   if (!cfg) { console.warn('autoSendRecapEmails: no email config found'); return; }
   if (!cfg.recapTemplateId) {
     console.warn('autoSendRecapEmails: no recap template ID configured');
-    toast('Recap email skipped — no recap template configured in Email Settings', 'error');
     return;
   }
   const g = State.getGame(gameId); if (!g) return;
@@ -3241,7 +3240,6 @@ async function autoSendRecapEmails(gameId) {
 
   if (!recipients.length) {
     console.warn('autoSendRecapEmails: no recipients — players need a linked account or inviteEmail');
-    toast('Recap email skipped — no email addresses found for players in this game', 'error');
     return;
   }
 
@@ -3271,7 +3269,7 @@ async function autoSendRecapEmails(gameId) {
       failed++;
     }
   }
-  if (sent) toast(sent + ' recap email' + (sent !== 1 ? 's' : '') + ' sent', 'success');
+  if (sent) console.log('autoSendRecapEmails: ' + sent + ' sent successfully');
   if (failed) { console.error('autoSendRecapEmails: ' + failed + ' failed'); toast(failed + ' recap email' + (failed !== 1 ? 's' : '') + ' failed to send', 'error'); }
 }
 
