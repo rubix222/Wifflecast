@@ -2730,6 +2730,9 @@ async function finishGame(g, _reason) {
       text: winner ? `${winner.name} win! 🏆` : "It's a tie! 🏁",
       color: '#fde68a', big: true, holdMs: 2400,
     });
+    // Always unfreeze after the game-over toast — covers walk-offs and any other
+    // game-ending path where postPlayCheck's normal EOI cleanup doesn't run.
+    _queueAnim({ fn: _unfreezeDisplay });
   }
   await State.updateGame(g.id, { status: 'completed', isOver: true });
   autoSendRecapEmails(g.id);
