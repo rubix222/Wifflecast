@@ -461,7 +461,7 @@ function liveGameHTML(g, home, away) {
         <div class="lg-menu-wrap">
           <button class="btn-icon lg-menu-btn" onclick="toggleLiveMenu()">⋮</button>
           <div class="lg-menu" id="lg-menu" hidden>
-            <button onclick="endHalfInning('${g.id}');closeLiveMenu()">End half early</button>
+            <button onclick="endHalfInning('${g.id}');closeLiveMenu()">End half inning</button>
             <button onclick="endGameEarly('${g.id}');closeLiveMenu()" style="color:#dc2626">End game</button>
           </div>
         </div>` : ''}
@@ -711,8 +711,10 @@ function renderPlayLog(g) {
     if (key !== lastKey) {
       if (lastKey !== null) {
         const [prevInn, prevHalf] = lastKey.split('-');
-        const prevLabel = prevHalf === 'top' ? 'Top' : 'Bottom';
-        parts.push(_span3('play-inning-break play-inning-end', `— End of ${prevLabel} ${ordinal(parseInt(prevInn))} —`));
+        // Only show end-of-inning separator after the bottom half (full inning complete)
+        if (prevHalf === 'bottom') {
+          parts.push(_span3('play-inning-break play-inning-end', `— End of ${ordinal(parseInt(prevInn))} inning —`));
+        }
       }
       const startScore = halfStartScores[key];
       const scoreTag = startScore ? ` <span class="play-inning-score">${startScore.away}–${startScore.home}</span>` : '';
@@ -726,7 +728,7 @@ function renderPlayLog(g) {
       }
     } else if (e.pitcherId && e.pitcherId !== lastPitcherId) {
       const pitcher = State.getPlayer(e.pitcherId);
-      parts.push(_span3('play-pitcher-change', `🔄 ${escapeHtml(pitcher?.name || '?')} now pitching`));
+      parts.push(_span3('play-pitcher-change', `⚾ ${escapeHtml(pitcher?.name || '?')} now pitching`));
       lastPitcherId = e.pitcherId;
     }
 
@@ -792,13 +794,15 @@ function renderPlayLog(g) {
   // Close out the last half-inning
   if (lastKey !== null) {
     const [lastInn, lastHalf] = lastKey.split('-');
-    const lastLabel = lastHalf === 'top' ? 'Top' : 'Bottom';
     if (isCompleted) {
       const away   = State.getTeam(g.awayTeamId);
       const home   = State.getTeam(g.homeTeamId);
       const winner = g.score.away > g.score.home ? away : g.score.home > g.score.away ? home : null;
       const gameEndText = winner ? `🏆 ${escapeHtml(winner.name)} win! ${g.score.away}–${g.score.home}` : `🏁 Final — Tie ${g.score.away}–${g.score.home}`;
-      parts.push(_span3('play-inning-break play-inning-end', `— End of ${lastLabel} ${ordinal(parseInt(lastInn))} —`));
+      // Only show "End of Nth inning" when the bottom half finished (full inning done)
+      if (lastHalf === 'bottom') {
+        parts.push(_span3('play-inning-break play-inning-end', `— End of ${ordinal(parseInt(lastInn))} inning —`));
+      }
       parts.push(_span3('play-game-end', gameEndText));
     }
   }
@@ -809,8 +813,10 @@ function renderPlayLog(g) {
     if (lastKey !== curKey) {
       if (lastKey !== null) {
         const [prevInn, prevHalf] = lastKey.split('-');
-        const prevLabel = prevHalf === 'top' ? 'Top' : 'Bottom';
-        parts.push(_span3('play-inning-break play-inning-end', `— End of ${prevLabel} ${ordinal(parseInt(prevInn))} —`));
+        // Only show end-of-inning separator after the bottom half (full inning complete)
+        if (prevHalf === 'bottom') {
+          parts.push(_span3('play-inning-break play-inning-end', `— End of ${ordinal(parseInt(prevInn))} inning —`));
+        }
       }
       const curHalf  = g.currentHalf === 'top' ? 'Top' : 'Bottom';
       const scoreTag = ` <span class="play-inning-score">${g.score.away}–${g.score.home}</span>`;
