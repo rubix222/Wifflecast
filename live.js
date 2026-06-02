@@ -1372,6 +1372,8 @@ function _detectAndQueueAnims(newG, prev) {
 
   // ── 5. Pitch-count changes (ball / strike / foul) ────────────
   // Only fires when there are no new pa_end events (counts reset to 0 on each PA end).
+  // Each pitch freezes the BEFORE count during its toast, then unfreezes after so
+  // the count ticks up exactly when the word "Ball"/"Strike"/"Foul!" appears.
   if (!hasNewEvents) {
     // A foul with < 2 strikes increments BOTH fouls and strikes — subtract the
     // foul-caused bump so we don't fire a duplicate Strike animation.
@@ -1380,12 +1382,24 @@ function _detectAndQueueAnims(newG, prev) {
     const dStrikes = Math.max(0, rawDS - dFouls);  // pure strike presses only
     const dBalls   = (newG.balls   || 0) - prev.balls;
 
-    for (let i = 0; i < dBalls;   i++)
+    const _clearCount = () => { _frozenCount = null; if (LiveGameId) renderLiveGame(LiveGameId, true); };
+
+    for (let i = 0; i < dBalls; i++) {
+      const frozen = { balls: prev.balls + i, strikes: prev.strikes, fouls: prev.fouls };
+      _queueAnim({ fn: () => { _frozenCount = frozen; } });
       _queueAnim({ text: 'Ball', color: '#fbbf24', fromSvg: FIELD.MOUND, toSvg: { x: 200, y: 368 } });
-    for (let i = 0; i < dStrikes; i++)
+      _queueAnim({ fn: _clearCount });
+    }
+    for (let i = 0; i < dStrikes; i++) {
+      const frozen = { balls: prev.balls, strikes: prev.strikes + i, fouls: prev.fouls };
+      _queueAnim({ fn: () => { _frozenCount = frozen; } });
       _queueAnim({ text: 'Strike ⚡', color: '#f87171', fromSvg: FIELD.MOUND, toSvg: FIELD.HOME });
-    for (let i = 0; i < dFouls;   i++) {
+      _queueAnim({ fn: _clearCount });
+    }
+    for (let i = 0; i < dFouls; i++) {
       const goRight = Math.random() < 0.5;
+      const frozen = { balls: prev.balls, strikes: prev.strikes, fouls: prev.fouls + i };
+      _queueAnim({ fn: () => { _frozenCount = frozen; } });
       _queueAnim({
         text: 'Foul!', color: '#fb923c',
         fromSvg:  FIELD.MOUND,
@@ -1393,6 +1407,7 @@ function _detectAndQueueAnims(newG, prev) {
         toSvg:    goRight ? { x: 338, y: 352 } : { x: 62, y: 352 },
         phase1Dur: 380, phase2Dur: 340,
       });
+      _queueAnim({ fn: _clearCount });
     }
   }
 }
@@ -1806,11 +1821,10 @@ function showSwapFielderModal(currentPid, currentPos) {
     </button>`;
   }).join('');
 
-  // Show warning whenever the pitcher hasn't faced 4 batters yet.
-  // Text differs depending on whether we're directly swapping the pitcher
-  // or swapping another fielder who could displace the pitcher.
+  // Show warning whenever the pitcher hasn't faced 4 batters yet AND the user
+  // hasn't already dismissed the warning once this half-inning.
   let warningBanner = '';
-  if (faced < 4) {
+  if (faced < 4 && !_pitcherSwapWarningDismissed) {
     const msg = isPitcher
       ? `Pitcher has only faced <strong>${faced}</strong> of 4 required batters this inning.`
       : `The current pitcher has only faced <strong>${faced}</strong> of 4 required batters. Swapping them in would violate the pitching rule.`;
@@ -1900,13 +1914,22 @@ async function handlePitch(kind) {
   g.undoStack = [...(g.undoStack || []).slice(-14), captureSnapshot(g)];
   g.redoStack = [];
 
+  // Capture count BEFORE any increment so we can hold the old value during the toast
+  const prevCount = { balls: g.balls, strikes: g.strikes, fouls: g.fouls || 0 };
+  const _unfreezeCount = () => {
+    _frozenCount = null;
+    if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly);
+  };
+
   if (kind === 'ball') {
     g.balls++;
     if (g.balls >= 4) {
       // Walk — outcome anim queued inside applyPaEnd
       await applyPaEnd(g, { outcome: 'BB' });
     } else {
+      _frozenCount = prevCount;
       _queueAnim({ text: 'Ball', color: '#fbbf24', fromSvg: FIELD.MOUND, toSvg: { x: 200, y: 368 } });
+      _queueAnim({ fn: _unfreezeCount });
       await State.updateGame(g.id, { balls: g.balls });
       renderLiveGame(g.id);
     }
@@ -1918,7 +1941,9 @@ async function handlePitch(kind) {
       // Strikeout — outcome anim queued inside applyPaEnd
       await applyPaEnd(g, { outcome: 'K', kType: kind === 'strike_swinging' ? 'swinging' : 'looking' });
     } else {
+      _frozenCount = prevCount;
       _queueAnim({ text: 'Strike ⚡', color: '#f87171', fromSvg: FIELD.MOUND, toSvg: FIELD.HOME });
+      _queueAnim({ fn: _unfreezeCount });
       await State.updateGame(g.id, { strikes: g.strikes });
       renderLiveGame(g.id);
     }
@@ -1931,6 +1956,7 @@ async function handlePitch(kind) {
       await applyPaEnd(g, { outcome: 'K', kType: 'foul_out' });
     } else {
       if (g.strikes < 2) g.strikes++;
+      _frozenCount = prevCount;
       const goRight = Math.random() < 0.5;
       _queueAnim({
         text: 'Foul!', color: '#fb923c',
@@ -1939,6 +1965,7 @@ async function handlePitch(kind) {
         toSvg:    goRight ? { x: 338, y: 352 } : { x: 62, y: 352 },
         phase1Dur: 380, phase2Dur: 340,
       });
+      _queueAnim({ fn: _unfreezeCount });
       await State.updateGame(g.id, { strikes: g.strikes, fouls: g.fouls });
       renderLiveGame(g.id);
     }
