@@ -1411,19 +1411,20 @@ function _detectAndQueueAnims(newG, prev) {
     const lastNewEv = newEventsSlice[newEventsSlice.length - 1];
     const endOuts = (lastNewEv && lastNewEv.outsAfter !== undefined) ? lastNewEv.outsAfter : prev.outs;
 
-    // Before EOI banner: show 3rd out, clear count/batter; keep old inning and fielders
+    // Before EOI banner: clear count only; keep batter/pitcher/half/inning/outs frozen
+    // so the display still shows old inning's players and 3rd out pip.
     _queueAnim({ fn: () => {
       _frozenCount     = null;
-      _frozenBatterId  = null;
-      _frozenPitcherId = null;
+      // _frozenBatterId  stays set — old batter stays visible during EOI
+      // _frozenPitcherId stays set — old pitcher stays visible during EOI
       _frozenOuts      = endOuts;  // show 3rd out during EOI banner
       // _frozenHalf/_frozenInning stay set — keep old inning display and fielders
       // _betweenInnings stays false — fielders from this inning remain visible
       if (LiveGameId) renderLiveGame(LiveGameId, true);
     }});
-    // EOI banner: outs=3 shown, old inning fielders still visible
+    // EOI banner: outs=3 shown, old inning fielders/batter/pitcher still visible
     _queueAnim({ text: `End of ${prevHalf} ${ordinal(prev.currentInning)}`, color: '#60a5fa', holdMs: 1400 });
-    // After EOI banner: blank field, release half/inning freeze so scoreboard updates
+    // After EOI banner: blank field, clear all frozen state, release half/inning freeze
     _queueAnim({ fn: () => {
       _frozenCount     = null;
       _frozenBatterId  = null;
@@ -2565,33 +2566,38 @@ async function postPlayCheck(g) {
   if (g.outs >= 3) {
     if (!LiveGameWatchOnly) {
       const halfLabel = g.currentHalf === 'top' ? 'Top' : 'Bottom';
+      // Capture the 3rd-out value NOW before endHalfInningInternal resets g.outs to 0.
+      const endOuts = g.outs;
 
-      // After outcome toast: unfreeze score/outs/bases so real outs (3) shows.
-      // Keep _frozenHalf/_frozenInning so the inning indicator and fielders stay on the
-      // OLD inning. Fielders remain visible (_betweenInnings stays false).
+      // After outcome toast: clear count, show 3rd out (frozen), keep everything else.
+      // batter/pitcher/half/inning all stay frozen so the display still shows the OLD
+      // inning's players and indicator through the EOI toast.
       // _animInputLocked stays true — buttons remain disabled.
       _queueAnim({ fn: () => {
         _frozenCount     = null;
-        _frozenBatterId  = null;
-        _frozenPitcherId = null;
+        // _frozenBatterId  stays set — old batter stays visible during EOI
+        // _frozenPitcherId stays set — old pitcher stays visible during EOI
         _frozenScore     = null;
-        _frozenOuts      = null;
+        _frozenOuts      = endOuts;  // show 3rd out (real value, e.g. 3) during EOI
         _frozenBases     = null;
         // _frozenHalf / _frozenInning stay set — keep old inning display and fielders
         // _betweenInnings stays false — fielders from this inning remain visible
         if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly);
       }});
 
-      // End-of-inning banner: outs=3 shown, fielders from this inning still visible
+      // End-of-inning banner: outs=3, old fielders/batter/pitcher still visible
       _queueAnim({ text: `End of ${halfLabel} ${ordinal(g.currentInning)}`, color: '#60a5fa', holdMs: 1400 });
 
-      // After EOI toast: blank field — player circles and names hidden.
+      // After EOI toast: blank field — clear all frozen state, hide all circles/names.
       // Release the half/inning freeze so the scoreboard updates to the new inning.
       _queueAnim({ fn: () => {
         const g2 = State.getGame(LiveGameId);
         if (!g2 || g2.status === 'completed') return; // game ended — finishGame handles it
         _frozenHalf      = null;
         _frozenInning    = null;
+        _frozenOuts      = null;
+        _frozenBatterId  = null;
+        _frozenPitcherId = null;
         _betweenInnings  = true;
         if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly);
       }});
