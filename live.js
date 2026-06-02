@@ -2765,7 +2765,7 @@ async function _esSave(gameId) {
   await State.updateGame(gameId, { lineScore: _editScoreLS, score: { away: awayScore, home: homeScore } });
   _editScoreLS = null;
   Modal.hide();
-  renderLiveGame(gameId);
+  renderLiveGame(gameId, LiveGameWatchOnly);
   toast('Score updated');
 }
 
@@ -2773,8 +2773,8 @@ async function reopenGame(gameId) {
   if (!confirm('Reopen this game? It will go back to in-progress status.')) return;
   const g = State.getGame(gameId); if (!g) return;
   await State.updateGame(gameId, { status: 'in_progress', isOver: false });
-  renderLiveGame(gameId);
   Render.games();
+  await openGameForScoring(gameId);
   toast('Game reopened');
 }
 

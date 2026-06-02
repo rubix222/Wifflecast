@@ -3080,7 +3080,7 @@ async function startGame(gameId) {
   });
   Modal.hide();
   Render.games();
-  renderLiveGame(gameId);
+  await openGameForScoring(gameId);
 }
 
 /* ============================================================
