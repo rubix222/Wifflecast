@@ -1282,6 +1282,9 @@ function _runAnim(item) {
     // ── Banner appears when ball arrives ──────────────────────
     setTimeout(() => {
       if (!alive()) return;
+      // Fire onBannerShow callback at the exact moment the banner becomes visible.
+      // Used to update count/score/state displays in sync with the toast appearance.
+      if (item.onBannerShow) item.onBannerShow();
       bannerEl.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out';
       bannerEl.style.opacity    = '1';
       bannerEl.style.transform  = 'translate(-50%, -50%) scale(1)';
@@ -1337,11 +1340,18 @@ function _detectAndQueueAnims(newG, prev) {
           _frozenScore     = { ...prev.score };
           _frozenOuts      = prev.outs;
           _frozenBases     = JSON.parse(JSON.stringify(prev.bases || {}));
-          _frozenCount     = { balls: ev.countBalls ?? 0, strikes: ev.countStrikes ?? 0, fouls: ev.countFouls ?? 0 };
+          // During ball flight: show PRE-pitch count (snapshot before this PA)
+          _frozenCount     = { balls: prev.balls, strikes: prev.strikes, fouls: prev.fouls };
           _frozenBatterId  = prev.batterId  || null;
           _frozenPitcherId = prev.pitcherId || null;
           frozeDisplay = true;
         }
+        // At the moment the banner appears: snap count to FINAL value (stored in event)
+        const finalCount = { balls: ev.countBalls ?? 0, strikes: ev.countStrikes ?? 0, fouls: ev.countFouls ?? 0 };
+        anim.onBannerShow = () => {
+          _frozenCount = finalCount;
+          if (LiveGameId) renderLiveGame(LiveGameId, true);
+        };
         _queueAnim(anim);
       }
     });
@@ -1379,19 +1389,24 @@ function _detectAndQueueAnims(newG, prev) {
   // ── 3. Inning / half change ──────────────────────────────────
   if (inningChanged) {
     const prevHalf = prev.currentHalf === 'top' ? 'Top' : 'Bottom';
-    // Show the 3rd out in the scoreboard before the "End of" banner fires.
-    // prev.outs reflects the post-play state (should be 3) from the snapshot
-    // taken right after the inning-ending play landed.
-    const endOuts = prev.outs;
-    // Clear count/batter before EOI banner, then show 3rd out (matches scorer-path timing)
+    // Determine the 3rd out value: prefer outsAfter from the last new event (robust
+    // whether the K-save and inning-advance arrive as one snapshot or two).
+    const newEventsSlice = events.slice(prev.eventsLen);
+    const lastNewEv = newEventsSlice[newEventsSlice.length - 1];
+    const endOuts = (lastNewEv && lastNewEv.outsAfter !== undefined) ? lastNewEv.outsAfter : prev.outs;
+
+    // Before EOI banner: show 3rd out, clear count/batter; fielders remain visible
     _queueAnim({ fn: () => {
       _frozenCount     = null;
       _frozenBatterId  = null;
       _frozenPitcherId = null;
-      _frozenOuts      = endOuts;
+      _frozenOuts      = endOuts;  // show 3rd out during EOI banner
+      // _betweenInnings stays false — fielders from this inning remain visible
+      if (LiveGameId) renderLiveGame(LiveGameId, true);
     }});
+    // EOI banner: outs=3 shown, fielders still visible
     _queueAnim({ text: `End of ${prevHalf} ${ordinal(prev.currentInning)}`, color: '#60a5fa', holdMs: 1400 });
-    // Blank field between halves — clear all frozen display state so real state shows
+    // After EOI banner: blank field — player circles and names hidden
     _queueAnim({ fn: () => {
       _frozenCount     = null;
       _frozenBatterId  = null;
@@ -1404,7 +1419,15 @@ function _detectAndQueueAnims(newG, prev) {
     }});
     _queueAnim({ blank: true, holdMs: 3000 });
     const halfLabel = newG.currentHalf === 'top' ? '▲ Top' : '▼ Bottom';
-    _queueAnim({ text: `${halfLabel} of the ${ordinal(newG.currentInning)}`, color: '#60a5fa', holdMs: 1800 });
+    // At the moment the start-of-inning banner appears, reveal new inning fielders
+    _queueAnim({
+      text: `${halfLabel} of the ${ordinal(newG.currentInning)}`,
+      color: '#60a5fa', holdMs: 1800,
+      onBannerShow: () => {
+        _betweenInnings = false;
+        if (LiveGameId) renderLiveGame(LiveGameId, true);
+      }
+    });
     _queueAnim({ fn: _unfreezeDisplay });
     return; // pitcher swap after an inning flip is expected — don't fire that too
   }
@@ -1421,9 +1444,8 @@ function _detectAndQueueAnims(newG, prev) {
 
   // ── 5. Pitch-count changes (ball / strike / foul) ────────────
   // Only fires when there are no new pa_end events (counts reset to 0 on each PA end).
-  // For each pitch: a synchronous fn sets _frozenCount to the NEW (post-pitch) value and
-  // re-renders, so the count ticks up at the exact moment the toast banner appears —
-  // matching scorer-path behaviour in handlePitch.
+  // For each pitch: freeze to PRE-pitch count during ball flight, then update to POST-pitch
+  // count at the exact moment the banner appears — matching scorer-path behaviour.
   if (!hasNewEvents) {
     // A foul with < 2 strikes increments BOTH fouls and strikes — subtract the
     // foul-caused bump so we don't fire a duplicate Strike animation.
@@ -1433,31 +1455,42 @@ function _detectAndQueueAnims(newG, prev) {
     const dBalls   = (newG.balls   || 0) - prev.balls;
 
     for (let i = 0; i < dBalls; i++) {
-      const afterCount = { balls: prev.balls + i + 1, strikes: prev.strikes, fouls: prev.fouls };
-      _queueAnim({ fn: () => { _frozenCount = afterCount; if (LiveGameId) renderLiveGame(LiveGameId, true); } });
-      _queueAnim({ text: 'Ball', color: '#fbbf24', fromSvg: FIELD.MOUND, toSvg: { x: 200, y: 368 } });
+      const beforeCount = { balls: prev.balls + i,     strikes: prev.strikes, fouls: prev.fouls };
+      const afterCount  = { balls: prev.balls + i + 1, strikes: prev.strikes, fouls: prev.fouls };
+      _queueAnim({ fn: () => { _frozenCount = beforeCount; if (LiveGameId) renderLiveGame(LiveGameId, true); } });
+      _queueAnim({ text: 'Ball', color: '#fbbf24', fromSvg: FIELD.MOUND, toSvg: { x: 200, y: 368 },
+        onBannerShow: () => { _frozenCount = afterCount; if (LiveGameId) renderLiveGame(LiveGameId, true); }
+      });
     }
     if (dBalls > 0) _queueAnim({ fn: () => { _frozenCount = null; } });
 
     for (let i = 0; i < dStrikes; i++) {
-      const afterCount = { balls: prev.balls, strikes: prev.strikes + i + 1, fouls: prev.fouls };
-      _queueAnim({ fn: () => { _frozenCount = afterCount; if (LiveGameId) renderLiveGame(LiveGameId, true); } });
-      _queueAnim({ text: 'Strike ⚡', color: '#f87171', fromSvg: FIELD.MOUND, toSvg: FIELD.HOME });
+      const beforeCount = { balls: prev.balls, strikes: prev.strikes + i,     fouls: prev.fouls };
+      const afterCount  = { balls: prev.balls, strikes: prev.strikes + i + 1, fouls: prev.fouls };
+      _queueAnim({ fn: () => { _frozenCount = beforeCount; if (LiveGameId) renderLiveGame(LiveGameId, true); } });
+      _queueAnim({ text: 'Strike ⚡', color: '#f87171', fromSvg: FIELD.MOUND, toSvg: FIELD.HOME,
+        onBannerShow: () => { _frozenCount = afterCount; if (LiveGameId) renderLiveGame(LiveGameId, true); }
+      });
     }
     if (dStrikes > 0) _queueAnim({ fn: () => { _frozenCount = null; } });
 
     for (let i = 0; i < dFouls; i++) {
       const goRight = Math.random() < 0.5;
-      // For fouls: unfreeze to show actual game state (includes any strike bump if < 2 strikes)
-      _queueAnim({ fn: () => { _frozenCount = null; if (LiveGameId) renderLiveGame(LiveGameId, true); } });
+      const beforeCount = { balls: prev.balls, strikes: prev.strikes,  fouls: prev.fouls + i };
+      // After the foul, strikes may bump if prev.strikes < 2; use newG.strikes for accuracy.
+      // (dFouls>1 is extremely rare, so newG.strikes as final value is fine for the sequence.)
+      const afterCount  = { balls: prev.balls, strikes: newG.strikes,  fouls: prev.fouls + i + 1 };
+      _queueAnim({ fn: () => { _frozenCount = beforeCount; if (LiveGameId) renderLiveGame(LiveGameId, true); } });
       _queueAnim({
         text: 'Foul!', color: '#fb923c',
         fromSvg:  FIELD.MOUND,
         viaSvg:   FIELD.HOME,
         toSvg:    goRight ? { x: 338, y: 352 } : { x: 62, y: 352 },
         phase1Dur: 380, phase2Dur: 340,
+        onBannerShow: () => { _frozenCount = afterCount; if (LiveGameId) renderLiveGame(LiveGameId, true); }
       });
     }
+    if (dFouls > 0) _queueAnim({ fn: () => { _frozenCount = null; } });
   }
 }
 
@@ -1972,11 +2005,13 @@ async function handlePitch(kind) {
     g.balls++;
     if (g.balls >= 4) {
       // Walk — outcome anim queued inside applyPaEnd
-      await applyPaEnd(g, { outcome: 'BB' });
+      await applyPaEnd(g, { outcome: 'BB' }, prevCount);
     } else {
+      // Freeze to PRE-pitch count during ball flight; count increments at banner appearance
       _frozenCount = prevCount;
-      _queueAnim({ fn: () => { _frozenCount = null; if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly); } });
-      _queueAnim({ text: 'Ball', color: '#fbbf24', fromSvg: FIELD.MOUND, toSvg: { x: 200, y: 368 } });
+      _queueAnim({ text: 'Ball', color: '#fbbf24', fromSvg: FIELD.MOUND, toSvg: { x: 200, y: 368 },
+        onBannerShow: () => { _frozenCount = null; if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly); }
+      });
       await State.updateGame(g.id, { balls: g.balls });
       renderLiveGame(g.id);
     }
@@ -1986,11 +2021,13 @@ async function handlePitch(kind) {
     g.strikes++;
     if (g.strikes >= 3) {
       // Strikeout — outcome anim queued inside applyPaEnd
-      await applyPaEnd(g, { outcome: 'K', kType: kind === 'strike_swinging' ? 'swinging' : 'looking' });
+      await applyPaEnd(g, { outcome: 'K', kType: kind === 'strike_swinging' ? 'swinging' : 'looking' }, prevCount);
     } else {
+      // Freeze to PRE-pitch count during ball flight; count increments at banner appearance
       _frozenCount = prevCount;
-      _queueAnim({ fn: () => { _frozenCount = null; if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly); } });
-      _queueAnim({ text: 'Strike ⚡', color: '#f87171', fromSvg: FIELD.MOUND, toSvg: FIELD.HOME });
+      _queueAnim({ text: 'Strike ⚡', color: '#f87171', fromSvg: FIELD.MOUND, toSvg: FIELD.HOME,
+        onBannerShow: () => { _frozenCount = null; if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly); }
+      });
       await State.updateGame(g.id, { strikes: g.strikes });
       renderLiveGame(g.id);
     }
@@ -2000,18 +2037,19 @@ async function handlePitch(kind) {
     g.fouls = (g.fouls || 0) + 1;
     if (g.fouls >= 4) {
       // Foul-out strikeout — outcome anim queued inside applyPaEnd
-      await applyPaEnd(g, { outcome: 'K', kType: 'foul_out' });
+      await applyPaEnd(g, { outcome: 'K', kType: 'foul_out' }, prevCount);
     } else {
       if (g.strikes < 2) g.strikes++;
+      // Freeze to PRE-pitch count during ball flight; count increments at banner appearance
       _frozenCount = prevCount;
       const goRight = Math.random() < 0.5;
-      _queueAnim({ fn: () => { _frozenCount = null; if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly); } });
       _queueAnim({
         text: 'Foul!', color: '#fb923c',
         fromSvg:  FIELD.MOUND,
         viaSvg:   FIELD.HOME,
         toSvg:    goRight ? { x: 338, y: 352 } : { x: 62, y: 352 },
         phase1Dur: 380, phase2Dur: 340,
+        onBannerShow: () => { _frozenCount = null; if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly); }
       });
       await State.updateGame(g.id, { strikes: g.strikes, fouls: g.fouls });
       renderLiveGame(g.id);
@@ -2305,7 +2343,7 @@ async function finishError(errBase, errorById, location) {
   await applyPaEnd(g, { outcome: 'ERR_REACH', errBase, errorById, location });
 }
 
-async function applyPaEnd(g, ev) {
+async function applyPaEnd(g, ev, prePitchCount = null) {
   if (!await assertScoringLock(g.id)) return;
   const batterId  = currentBatterId(g);
   const pitcherId = currentPitcherId(g);
@@ -2419,7 +2457,7 @@ async function applyPaEnd(g, ev) {
 
   // ── Queue outcome animation for the scorer ────────────────────────────────
   // Freeze PRE-play display state while the toast shows:
-  //   • count: stays at the FINAL count (3 strikes / 4 balls etc.) until toast dismisses
+  //   • count: starts at PRE-PITCH values during ball flight; increments to FINAL at banner
   //   • score / outs / bases: frozen at PRE-play values — reveals POST-play after toast
   //   • batter / pitcher: frozen at pre-play values so they stay visible during toast
   //   • input: locked so no buttons can be pressed during the toast
@@ -2427,12 +2465,20 @@ async function applyPaEnd(g, ev) {
     const anim = _buildOutcomeAnim(event, g);
     if (anim) {
       _animInputLocked  = true;
-      _frozenCount      = { balls: g.balls, strikes: g.strikes, fouls: g.fouls || 0 };
+      const finalCount  = { balls: g.balls, strikes: g.strikes, fouls: g.fouls || 0 };
+      // During ball flight: show PRE-pitch count (passed from handlePitch).
+      // For BIP outcomes (no count change), prePitchCount is null so finalCount is used.
+      _frozenCount      = prePitchCount || finalCount;
       _frozenBatterId   = batterId;
       _frozenPitcherId  = pitcherId;
       _frozenScore      = { ...g.score };
       _frozenOuts       = g.outs;
       _frozenBases      = JSON.parse(JSON.stringify(g.bases || {}));
+      // At the moment the banner appears (after ball flight), snap count to FINAL value
+      anim.onBannerShow = () => {
+        _frozenCount = finalCount;
+        if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly);
+      };
       _queueAnim(anim);
       // Snapshot spray chart BEFORE the save so the new dot is excluded during animation
       if (_sprayChartVisible && batterId) {
@@ -2493,8 +2539,9 @@ async function postPlayCheck(g) {
     if (!LiveGameWatchOnly) {
       const halfLabel = g.currentHalf === 'top' ? 'Top' : 'Bottom';
 
-      // After outcome toast dismisses: clear count/batter freeze, switch to
-      // between-innings mode (hides field + matchup strip, keeps buttons locked)
+      // After outcome toast: unfreeze score/outs/bases so real outs (3) shows.
+      // Fielders remain visible (_betweenInnings stays false).
+      // _animInputLocked stays true — buttons remain disabled.
       _queueAnim({ fn: () => {
         _frozenCount     = null;
         _frozenBatterId  = null;
@@ -2502,20 +2549,18 @@ async function postPlayCheck(g) {
         _frozenScore     = null;
         _frozenOuts      = null;
         _frozenBases     = null;
-        _betweenInnings  = true;
-        // _animInputLocked stays true — buttons remain disabled
+        // _betweenInnings stays false — fielders from this inning remain visible
         if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly);
       }});
 
-      // End-of-inning banner (appears after outcome toast, before new inning)
+      // End-of-inning banner: outs=3 shown, fielders from this inning still visible
       _queueAnim({ text: `End of ${halfLabel} ${ordinal(g.currentInning)}`, color: '#60a5fa', holdMs: 1400 });
 
-      // After EOI toast: reveal new inning fielders/batter and re-enable input
+      // After EOI toast: blank field — player circles and names hidden
       _queueAnim({ fn: () => {
         const g2 = State.getGame(LiveGameId);
         if (!g2 || g2.status === 'completed') return; // game ended — finishGame handles it
-        _betweenInnings  = false;
-        _animInputLocked = false;
+        _betweenInnings  = true;
         if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly);
       }});
     }
@@ -2526,7 +2571,16 @@ async function postPlayCheck(g) {
       const fresh = State.getGame(g.id);
       if (fresh && fresh.status === 'in_progress') {
         const halfLabel2 = fresh.currentHalf === 'top' ? '▲ Top' : '▼ Bottom';
-        _queueAnim({ text: `${halfLabel2} of the ${ordinal(fresh.currentInning)}`, color: '#60a5fa', holdMs: 1800 });
+        // At the moment the start-of-inning banner appears, reveal new inning fielders
+        _queueAnim({
+          text: `${halfLabel2} of the ${ordinal(fresh.currentInning)}`,
+          color: '#60a5fa', holdMs: 1800,
+          onBannerShow: () => {
+            _betweenInnings  = false;
+            _animInputLocked = false;
+            if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly);
+          }
+        });
       }
       _queueAnim({ fn: _unfreezeDisplay });
     }
