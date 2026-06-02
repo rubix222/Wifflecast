@@ -514,7 +514,7 @@ function liveGameHTML(g, home, away) {
             <button onclick="endGameEarly('${g.id}');closeLiveMenu()" style="color:#dc2626">End game</button>
             <div class="lg-menu-divider"></div>
             <button onclick="swapHomeAway('${g.id}');closeLiveMenu()"
-              ${(g.events||[]).length > 0 ? 'disabled' : ''}>⇄ Swap Home/Away</button>
+              ${((g.events||[]).length > 0 || g.balls > 0 || g.strikes > 0 || (g.fouls||0) > 0) ? 'disabled' : ''}>⇄ Swap Home/Away</button>
           </div>
         </div>` : ''}
       </div>
@@ -752,7 +752,11 @@ function renderBatterRow(g) {
 
 function renderPlayLog(g) {
   const events = (g.events || []).filter(e => e.type === 'pa_end');
-  if (!events.length) return '<tr><td colspan="3" class="muted small" style="padding:8px;text-align:center">No plays yet.</td></tr>';
+  if (!events.length) {
+    // Show the current half-inning header so the tab is never completely blank
+    const halfLabel = g.currentHalf === 'top' ? '▲' : '▼';
+    return `<tr class="play-inning-break"><td colspan="3">${halfLabel} ${ordinal(g.currentInning)}</td></tr>`;
+  }
   const isCompleted = g.status === 'completed';
   const parts = [];
   let lastKey = null;
@@ -2673,7 +2677,9 @@ async function endGameEarly(gameId) {
 
 async function swapHomeAway(gameId) {
   const g = State.getGame(gameId); if (!g) return;
-  if ((g.events || []).length > 0) { toast('Cannot swap after scoring has begun', 'error'); return; }
+  if ((g.events || []).length > 0 || g.balls > 0 || g.strikes > 0 || (g.fouls || 0) > 0) {
+    toast('Cannot swap after scoring has begun', 'error'); return;
+  }
   if (!await assertScoringLock(gameId)) return;
   // Swap every home/away field so the teams simply change sides
   await State.updateGame(gameId, {
