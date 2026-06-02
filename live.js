@@ -898,6 +898,28 @@ function renderPlayLog(g) {
       const scoreTag = ` <span class="play-inning-score">${g.score.away}–${g.score.home}</span>`;
       parts.push(_span3('play-inning-break', `${curHalf} ${ordinal(g.currentInning)}${scoreTag}`));
     }
+
+    // Live at-bat row: show when pitches have been thrown but the at-bat isn't over.
+    // Gate on the REAL count (g.balls/strikes/fouls) so this row disappears the moment
+    // the pa_end is saved (which resets them to 0) and the regular outcome row takes over.
+    // Display the FROZEN count when set so it animates in sync with the scoreboard.
+    const realBalls   = g.balls   || 0;
+    const realStrikes = g.strikes || 0;
+    const realFouls   = g.fouls   || 0;
+    if (realBalls > 0 || realStrikes > 0 || realFouls > 0) {
+      const dispBalls   = _frozenCount?.balls   ?? realBalls;
+      const dispStrikes = _frozenCount?.strikes ?? realStrikes;
+      const dispFouls   = _frozenCount?.fouls   ?? realFouls;
+      const liveBatterId = _frozenBatterId || currentBatterId(g);
+      const liveBatter   = State.getPlayer(liveBatterId);
+      parts.push(
+        `<tr class="play-entry play-entry--live">` +
+          `<td class="pe-name">${escapeHtml(liveBatter?.name || '?')}</td>` +
+          `<td class="pe-mid"></td>` +
+          `<td class="pe-count">${dispBalls}-${dispStrikes}-${dispFouls}</td>` +
+        `</tr>`
+      );
+    }
   }
 
   return parts.join('');
