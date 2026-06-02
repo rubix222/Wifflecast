@@ -2541,9 +2541,12 @@ async function endHalfInningInternal(g) {
     // If tied, continue into extras
   }
 
-  // The team about to FIELD is the team that needs a new pitcher:
-  // top half → home team fields; bottom half → away team fields
-  const fieldingSide = currentHalf === 'top' ? 'home' : 'away';
+  // Cycle the pitcher for the team that JUST FINISHED fielding so they're ready
+  // for their next appearance — NOT the team about to field (they use their current
+  // pitcher, already set). After transitioning:
+  //   new 'bottom' half → home just fielded → cycle home pitcher
+  //   new 'top' half    → away just fielded → cycle away pitcher
+  const fieldingSide = currentHalf === 'top' ? 'away' : 'home';
   const cyclePatch = buildPitcherCyclePatch(g, fieldingSide) || {};
 
   await State.updateGame(g.id, {
