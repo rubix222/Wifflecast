@@ -733,7 +733,7 @@ function rerenderLive() {
 }
 
 function renderBatterRow(g) {
-  const batterId = currentBatterId(g);
+  const batterId = _frozenBatterId || currentBatterId(g);
   const batter = State.getPlayer(batterId);
   const canScore = !LiveGameWatchOnly && canUserScore();
   const nameEl = canScore
@@ -1599,7 +1599,7 @@ function drawField(overrideBases = null) {
   const cfId = Object.keys(fieldingPos).find(pid => fieldingPos[pid] === 'CF');
   const pitcher = pitcherId ? State.getPlayer(pitcherId) : null;
   const cf = cfId ? State.getPlayer(cfId) : null;
-  const batterId = (isCompleted || _betweenInnings) ? null : currentBatterId(g);
+  const batterId = (isCompleted || _betweenInnings) ? null : (_frozenBatterId || currentBatterId(g));
   const batter = batterId ? State.getPlayer(batterId) : null;
 
   // Team colors for fielder/batter circles
