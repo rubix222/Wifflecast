@@ -92,8 +92,35 @@ function renderLiveGame(gameId, watchOnly = false) {
   const overlay = $('#live-game-overlay');
   if (!_returnTab) _returnTab = _currentTab || 'home';
   if (overlay) {
+    // Capture scroll state before blowing away the DOM.
+    // For the plays tab: if the user was within 50px of the bottom (or this is a
+    // fresh open), we'll auto-scroll to the bottom after render so new entries stay
+    // visible.  If they'd scrolled up to review old plays, we restore their position.
+    const prevPlEl       = !isNewGame ? document.querySelector('.play-log') : null;
+    const prevPlScrollTop = prevPlEl ? prevPlEl.scrollTop : null;
+    const prevPlAtBottom  = prevPlEl
+      ? (prevPlEl.scrollHeight - prevPlEl.scrollTop - prevPlEl.clientHeight) <= 50
+      : true;  // no prior element → treat as "at bottom" so first render scrolls down
+    const prevStEl  = !isNewGame ? document.querySelector('.lg-stats-scroll') : null;
+    const prevStScr = prevStEl ? prevStEl.scrollTop : 0;
+
     overlay.innerHTML = liveGameHTML(g, home, away);
     overlay.classList.add('open');
+
+    // Restore / advance plays-tab scroll
+    if (_liveTab === 'plays') {
+      const newPlEl = document.querySelector('.play-log');
+      if (newPlEl) {
+        if (prevPlScrollTop === null || prevPlAtBottom) {
+          newPlEl.scrollTop = newPlEl.scrollHeight;   // at bottom → keep at bottom
+        } else {
+          newPlEl.scrollTop = prevPlScrollTop;         // scrolled up → maintain position
+        }
+      }
+    }
+    // Preserve stats-tab scroll position
+    const newStEl = document.querySelector('.lg-stats-scroll');
+    if (newStEl && prevStScr) newStEl.scrollTop = prevStScr;
   }
   drawField();
   attachPitchHandlers();
@@ -728,16 +755,7 @@ function rerenderLive() {
     _detectAndQueueAnims(g, _prevGameSnap);
   }
   _prevGameSnap = g ? _snapGame(g) : null;
-  // Preserve scroll positions inside the live game view (Plays tab log, stats scroll)
-  const _plEl  = document.querySelector('.play-log');
-  const _plScr = _plEl  ? _plEl.scrollTop  : 0;
-  const _stEl  = document.querySelector('.lg-stats-scroll');
-  const _stScr = _stEl  ? _stEl.scrollTop  : 0;
-  renderLiveGame(LiveGameId, LiveGameWatchOnly); // preserve watch-only flag
-  const newPlEl = document.querySelector('.play-log');
-  if (newPlEl) newPlEl.scrollTop = _plScr;
-  const newStEl = document.querySelector('.lg-stats-scroll');
-  if (newStEl) newStEl.scrollTop = _stScr;
+  renderLiveGame(LiveGameId, LiveGameWatchOnly); // scroll preservation handled inside renderLiveGame
 }
 
 function renderBatterRow(g) {
