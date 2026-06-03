@@ -1498,7 +1498,7 @@ function _detectAndQueueAnims(newG, prev) {
     const newPid = Object.keys(newPositions).find(pid => newPositions[pid] === 'P') || null;
     if (newPid && newPid !== prev.pitcherId) {
       const pitcher = State.getPlayer(newPid);
-      _queueAnim({ text: `${pitcher?.name || '?'} is now pitching`, color: '#a78bfa', big: true, holdMs: 2500 });
+      _queueAnim({ text: `${pitcher?.name || '?'} is now pitching`, color: '#a78bfa', holdMs: 2500 });
     }
   }
 
@@ -2036,7 +2036,7 @@ async function swapFielder(currentPid, newPid) {
   renderLiveGame(g.id);
   if (oldPos === 'P') {
     const pitcher = State.getPlayer(newPid);
-    _queueAnim({ text: `${pitcher?.name || '?'} is now pitching`, color: '#a78bfa', big: true, holdMs: 2500 });
+    _queueAnim({ text: `${pitcher?.name || '?'} is now pitching`, color: '#a78bfa', holdMs: 2500 });
   } else {
     toast(`${oldPos}: ${State.getPlayer(newPid)?.name || '?'}`, 'success');
   }
