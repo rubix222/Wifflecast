@@ -2092,8 +2092,11 @@ async function deletePlayer(id) {
 async function repairPlayerLink(id) {
   const p = State.getPlayer(id);
   if (!p || !p.userId) return;
-  if (State.getUser(p.userId)) { toast('Link is valid — no repair needed', 'info'); return; }
-  if (!confirm(`Clear the broken link on "${p.name}"? Their userId (${p.userId}) no longer has a matching user account.`)) return;
+  const linkedUser = State.getUser(p.userId);
+  const isBroken = !linkedUser || linkedUser.playerId !== p.id;
+  if (!isBroken) { toast('Link is valid — no repair needed', 'info'); return; }
+  const reason = !linkedUser ? 'the linked user account no longer exists' : 'the user account does not point back to this player';
+  if (!confirm(`Clear the broken link on "${p.name}"? (${reason})`)) return;
   try {
     p.userId = null;
     p.invitePending = false;
