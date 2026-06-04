@@ -1504,22 +1504,29 @@ const Render = {
     }
     const sorted = [...State.players].sort((a, b) => a.name.localeCompare(b.name));
     const rows = sorted.map(p => {
-      const status = p.userId
-        ? '<span class="badge badge-linked">Linked</span>'
-        : p.invitePending
-          ? `<span class="badge badge-invited">Invited</span> <span class="muted small">${escapeHtml(p.inviteEmail || '')}</span>`
-          : '<span class="badge badge-guest">Guest</span>';
+      const linkedUserExists = p.userId && State.getUser(p.userId);
+      const brokenLink = p.userId && !linkedUserExists;
+      const status = brokenLink
+        ? '<span class="badge badge-error" title="Linked user no longer exists">Broken link</span>'
+        : p.userId
+          ? '<span class="badge badge-linked">Linked</span>'
+          : p.invitePending
+            ? `<span class="badge badge-invited">Invited</span> <span class="muted small">${escapeHtml(p.inviteEmail || '')}</span>`
+            : '<span class="badge badge-guest">Guest</span>';
       const inviteBtn = !p.userId
         ? p.invitePending
           ? `<button class="btn-icon" title="Cancel invite" onclick="cancelInvite('${p.id}')">✕</button>`
           : `<button class="btn-icon" title="Invite" onclick="invitePlayer('${p.id}')">✉</button>`
+        : '';
+      const repairBtn = brokenLink
+        ? `<button class="btn-icon" title="Clear broken link" onclick="repairPlayerLink('${p.id}')">🔧</button>`
         : '';
       return `<tr>
         <td>${escapeHtml(p.name)}</td>
         <td>${status}</td>
         <td style="white-space:nowrap">
           <button class="btn-icon" title="Edit" onclick="showPlayerModal('${p.id}')">✎</button>
-          ${inviteBtn}
+          ${inviteBtn}${repairBtn}
           <button class="btn-icon" title="Delete" onclick="deletePlayer('${p.id}')">🗑</button>
         </td>
       </tr>`;
@@ -2079,6 +2086,21 @@ async function deletePlayer(id) {
   await State.deletePlayer(id);
   Render.all();
   toast('Player deleted');
+}
+async function repairPlayerLink(id) {
+  const p = State.getPlayer(id);
+  if (!p || !p.userId) return;
+  if (State.getUser(p.userId)) { toast('Link is valid — no repair needed', 'info'); return; }
+  if (!confirm(`Clear the broken link on "${p.name}"? Their userId (${p.userId}) no longer has a matching user account.`)) return;
+  try {
+    p.userId = null;
+    p.invitePending = false;
+    await Storage.savePlayer(p);
+    Render.adminPlayers();
+    toast('Broken link cleared', 'success');
+  } catch (e) {
+    toast('Failed to repair: ' + e.message, 'error');
+  }
 }
 
 /* ============================================================
@@ -3479,7 +3501,7 @@ Object.assign(window, {
   showForgotPasswordModal, submitForgotPassword,
   toggleUserMenu, closeUserMenu,
   showChangePasswordModal, submitChangePassword, adminResetPassword,
-  showPlayerModal, showCreateMyPlayerModal, submitCreateMyPlayer, deletePlayer, deleteUser, showTeamModal, deleteTeam, cancelInvite, toggleAdminFeatures,
+  showPlayerModal, showCreateMyPlayerModal, submitCreateMyPlayer, deletePlayer, repairPlayerLink, deleteUser, showTeamModal, deleteTeam, cancelInvite, toggleAdminFeatures,
   bipChooseKind, bipChooseDetail, bipCancel,
   showDoublePlayResult, applyDoublePlay,
   showTagUpResult, applyTagUp,
