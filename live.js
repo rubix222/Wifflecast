@@ -1477,7 +1477,7 @@ function _detectAndQueueAnims(newG, prev) {
       _betweenInnings  = true;
       if (LiveGameId) renderLiveGame(LiveGameId, true);
     }});
-    _queueAnim({ blank: true, holdMs: 3000 });
+    _queueAnim({ blank: true, holdMs: 1200 });
     const halfLabel = newG.currentHalf === 'top' ? '▲ Top' : '▼ Bottom';
     // At the moment the start-of-inning banner appears, reveal new inning fielders
     _queueAnim({
@@ -2642,7 +2642,7 @@ async function postPlayCheck(g) {
         if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly);
       }});
       // Hold on the blank field for the same duration as the watcher path
-      _queueAnim({ blank: true, holdMs: 3000 });
+      _queueAnim({ blank: true, holdMs: 1200 });
     }
 
     await endHalfInningInternal(g);
