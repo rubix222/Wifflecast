@@ -2641,6 +2641,8 @@ async function postPlayCheck(g) {
         _betweenInnings  = true;
         if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly);
       }});
+      // Hold on the blank field for the same duration as the watcher path
+      _queueAnim({ blank: true, holdMs: 3000 });
     }
 
     await endHalfInningInternal(g);
