@@ -1504,10 +1504,12 @@ const Render = {
     }
     const sorted = [...State.players].sort((a, b) => a.name.localeCompare(b.name));
     const rows = sorted.map(p => {
-      const linkedUserExists = p.userId && State.getUser(p.userId);
-      const brokenLink = p.userId && !linkedUserExists;
+      const linkedUser = p.userId ? State.getUser(p.userId) : null;
+      // Broken if: userId set but user missing, OR user exists but doesn't point back to this player
+      const brokenLink = p.userId && (!linkedUser || linkedUser.playerId !== p.id);
+      const brokenTitle = !linkedUser ? 'Linked user no longer exists' : 'User account does not point back to this player';
       const status = brokenLink
-        ? '<span class="badge badge-error" title="Linked user no longer exists">Broken link</span>'
+        ? `<span class="badge badge-error" title="${brokenTitle}">Broken link</span>`
         : p.userId
           ? '<span class="badge badge-linked">Linked</span>'
           : p.invitePending
