@@ -727,15 +727,20 @@ function renderMatchupStrip(g, hidden = false) {
     ? `<span class="matchup-num">#${escapeHtml(batter.jerseyNumber || '-')}</span> ${escapeHtml(batter.name)}`
     : '?';
   const pn = pitcher ? `<span class="matchup-num">#${escapeHtml(pitcher.jerseyNumber || '-')}</span> ${escapeHtml(pitcher.name)}` : '?';
+  // Use display half (frozen during animations) to pick the right teams
+  const displayHalf = _frozenHalf ?? g.currentHalf;
+  const displayG    = displayHalf !== g.currentHalf ? { ...g, currentHalf: displayHalf } : g;
+  const batterColor  = _teamColor(State.getTeam(battingTeamId(displayG)));
+  const pitcherColor = _teamColor(State.getTeam(fieldingTeamId(displayG)));
   return `
     <div class="lg-matchup-strip"${hidden ? ' style="visibility:hidden"' : ''}>
-      <div class="lg-matchup-side">
-        <div class="lg-matchup-label">At bat</div>
+      <div class="lg-matchup-side" style="border-left:3px solid ${batterColor};padding-left:7px">
+        <div class="lg-matchup-label" style="color:${batterColor}">At bat</div>
         <div class="lg-matchup-name">${batterName}</div>
         <div class="lg-matchup-stats">${batterId ? batterMatchupStats(g, batterId) : '—'}</div>
       </div>
-      <div class="lg-matchup-side lg-matchup-right">
-        <div class="lg-matchup-label">Pitching</div>
+      <div class="lg-matchup-side lg-matchup-right" style="border-right:3px solid ${pitcherColor};padding-right:7px">
+        <div class="lg-matchup-label" style="color:${pitcherColor}">Pitching</div>
         <div class="lg-matchup-name">${pn}</div>
         <div class="lg-matchup-stats">${pitcherId ? pitcherMatchupStats(g, pitcherId) : '—'}</div>
       </div>
@@ -2795,10 +2800,23 @@ function buildPitcherCyclePatch(g, side) {
   const order = g[orderKey];
   if (!order || order.length < 2) return null;
 
-  const curIdx  = g[idxKey] ?? 0;
-  const nextIdx = (curIdx + 1) % order.length;
+  const curIdx = g[idxKey] ?? 0;
+  const curPid = order[curIdx];
 
-  const curPid  = order[curIdx];
+  // During the first rotation cycle, free swaps may have pitched players out of their
+  // array order. Scan forward to find the next player who hasn't pitched yet so we
+  // never cycle back to an already-pitched player before everyone has had a turn.
+  let nextIdx = (curIdx + 1) % order.length;
+  if (isInFirstCycle(g, side)) {
+    for (let i = 1; i < order.length; i++) {
+      const candidate = (curIdx + i) % order.length;
+      if (!hasPlayerPitchedThisGame(g, order[candidate])) {
+        nextIdx = candidate;
+        break;
+      }
+    }
+  }
+
   const nextPid = order[nextIdx];
 
   // Swap P with next pitcher's current position
