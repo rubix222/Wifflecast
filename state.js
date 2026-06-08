@@ -461,9 +461,9 @@ const State = {
   // ---- Stat aggregation from event log ----
   // gameIds: optional Set<string> — if provided, only games in the set are counted
   computePlayerStats(playerId, gameIds = null) {
-    let AB=0, H=0, R=0, RBI=0, BB=0, TB=0, K_bat=0;
+    let AB=0, H=0, R=0, RBI=0, BB=0, TB=0, K_bat=0, FO_bat=0;
     let K_looking=0, K_swinging=0, K_foul=0;
-    let pK=0, pBB=0, pIP_outs=0, pER=0, pR=0, pKL=0, pKS=0, pKF=0, pH=0;
+    let pK=0, pFO=0, pBB=0, pIP_outs=0, pER=0, pR=0, pKL=0, pKS=0, pKF=0, pH=0;
     let pBF=0, pPitches=0, pStrikePitches=0;
     let E=0, PO=0, dpAttempts=0, dpSuccesses=0, tagAttempts=0, tagSuccesses=0; // fielding
     let singles=0, doubles=0, triples=0, hrs=0;
@@ -486,10 +486,11 @@ const State = {
           else if (e.outcome === 'HR') { AB++; H++; hrs++; TB += 4; }
           else if (e.outcome === 'K')  {
             AB++; K_bat++;
-            if (e.kType === 'looking')  K_looking++;
+            if (e.kType === 'looking')       K_looking++;
             else if (e.kType === 'swinging') K_swinging++;
-            else if (e.kType === 'foul_out') K_foul++;
+            else if (e.kType === 'foul_out') K_foul++; // legacy: old foul-outs stored as K
           }
+          else if (e.outcome === 'FO') { AB++; FO_bat++; K_foul++; } // new foul-out outcome
           else if (e.outcome === 'OUT') { AB++; }
           else if (e.outcome === 'ERR_REACH') { AB++; } // reached on error: AB but no hit
           RBI += e.rbi || 0;
@@ -499,13 +500,14 @@ const State = {
           if (e.outcome === 'BB') pBB++;
           if (e.outcome === 'K') {
             pK++;
-            if (e.kType === 'looking')  pKL++;
+            if (e.kType === 'looking')       pKL++;
             else if (e.kType === 'swinging') pKS++;
-            else if (e.kType === 'foul_out') pKF++;
+            else if (e.kType === 'foul_out') pKF++; // legacy
           }
+          if (e.outcome === 'FO') { pFO++; pKF++; } // new foul-out; pKF shared for display
           if (['1B','2B','3B','HR'].includes(e.outcome)) pH++;
-          // Innings pitched: count outs recorded by this pitcher (K, OUT)
-          if (e.outcome === 'K' || e.outcome === 'OUT') pIP_outs++;
+          // Innings pitched: count outs recorded by this pitcher (K, FO, OUT)
+          if (e.outcome === 'K' || e.outcome === 'FO' || e.outcome === 'OUT') pIP_outs++;
           pER += e.earnedRuns || 0;
           pR  += e.earnedRuns || 0; // earnedRuns includes batter's run on HR; runsScoredBy misses it
           pBF++;
@@ -543,9 +545,9 @@ const State = {
     const tagPct = tagAttempts > 0 ? tagSuccesses / tagAttempts : null;
 
     return {
-      GP, AB, H, R, RBI, BB, K_bat, K_looking, K_swinging, K_foul, AVG, OBP, SLG, OPS, PA, TB,
+      GP, AB, H, R, RBI, BB, K_bat, FO_bat, K_looking, K_swinging, K_foul, AVG, OBP, SLG, OPS, PA, TB,
       singles, doubles, triples, hrs,
-      pK, pKL, pKS, pKF, pBB, pER, pR, pH, IP, ERA, pWHIP,
+      pK, pFO, pKL, pKS, pKF, pBB, pER, pR, pH, IP, ERA, pWHIP,
       pBF, pPitches, pStrikePitches, pPerIP, pPerBF, pSPct, pKPerBF, pKPerInn, pBBPerInn,
       E, PO, pGP, fGP,
       dpAttempts, dpSuccesses, dpPct, tagAttempts, tagSuccesses, tagPct,

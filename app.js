@@ -28,6 +28,7 @@ const BATTING_COLS = [
   { key: 'RBI', label: 'RBI', desc: 'Runs batted in' },
   { key: 'BB',  label: 'BB',  desc: 'Walks' },
   { key: 'K',   label: 'K',   desc: 'Strikeouts' },
+  { key: 'FO',  label: 'FO',  desc: 'Foul outs' },
 ];
 const PITCH_COLS = [
   { key: 'GP',      label: 'GP',     desc: 'Games pitched' },
@@ -35,6 +36,7 @@ const PITCH_COLS = [
   { key: 'PC',      label: 'PC',     desc: 'Total pitches thrown' },
   { key: 'ERA',     label: 'ERA',    desc: 'Earned run average (ER × 9 / IP)', fmt: v => v !== null ? v.toFixed(2) : '—', nullLow: true },
   { key: 'K',       label: 'K',      desc: 'Strikeouts' },
+  { key: 'FO',      label: 'FO',     desc: 'Foul outs' },
   { key: 'BB',      label: 'BB',     desc: 'Walks allowed' },
   { key: 'H',       label: 'H',      desc: 'Hits allowed' },
   { key: 'R',       label: 'R',      desc: 'Runs allowed' },
@@ -70,10 +72,10 @@ const TEAM_RECORD_COLS = [
 function playerBattingData(s) {
   return { GP: s.GP, PA: s.PA, AB: s.AB, AVG: s.AVG, OBP: s.OBP, SLG: s.SLG, H: s.H,
     '1B': s.singles, '2B': s.doubles, HR: s.hrs,
-    R: s.R, RBI: s.RBI, BB: s.BB, K: s.K_bat };
+    R: s.R, RBI: s.RBI, BB: s.BB, K: s.K_bat, FO: s.FO_bat };
 }
 function playerPitchingData(s) {
-  return { GP: s.pGP, IP: s.IP, ERA: s.ERA, K: s.pK, BB: s.pBB, H: s.pH, R: s.pR, ER: s.pER,
+  return { GP: s.pGP, IP: s.IP, ERA: s.ERA, K: s.pK, FO: s.pFO, BB: s.pBB, H: s.pH, R: s.pR, ER: s.pER,
     PC: s.pPitches, WHIP: s.pWHIP, pPerIP: s.pPerIP, pPerBF: s.pPerBF, sPct: s.pSPct,
     kPerBF: s.pKPerBF, kPerInn: s.pKPerInn, bbPerInn: s.pBBPerInn };
 }
@@ -120,6 +122,7 @@ function renderPlayerBattingRow(s) {
     ${statTile('K', s.K_bat)}
     ${statTile('KL', s.K_looking)}
     ${statTile('KS', s.K_swinging)}
+    ${statTile('FO', s.FO_bat)}
     ${statTile('KF', s.K_foul)}
   </div>`;
 }
@@ -133,6 +136,7 @@ function renderPlayerPitchingRow(s) {
     ${statTile('K', s.pK)}
     ${statTile('KL', s.pKL)}
     ${statTile('KS', s.pKS)}
+    ${statTile('FO', s.pFO)}
     ${statTile('KF', s.pKF)}
     ${statTile('BB', s.pBB)}
     ${statTile('ER', s.pER)}

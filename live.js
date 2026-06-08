@@ -435,7 +435,7 @@ function renderPitchingStats(g, away, home) {
       let outs=0, h=0, hr=0, bb=0, k=0, er=0, pitches=0;
       (g.events || []).forEach(e => {
         if (e.type !== 'pa_end' || e.half !== pitchingHalf || e.pitcherId !== pid) return;
-        if (e.outcome === 'OUT' || e.outcome === 'K') outs++;
+        if (e.outcome === 'OUT' || e.outcome === 'K' || e.outcome === 'FO') outs++;
         if (['1B','2B','3B','HR'].includes(e.outcome)) h++;
         if (e.outcome === 'HR') hr++;
         if (e.outcome === 'BB') bb++;
@@ -649,18 +649,20 @@ function renderPitcherRow(g) {
 }
 
 function batterGameStats(g, batterId) {
-  let ab = 0, h = 0, bb = 0, k = 0, rbi = 0;
+  let ab = 0, h = 0, bb = 0, k = 0, fo = 0, rbi = 0;
   (g.events || []).forEach(e => {
     if (e.type !== 'pa_end' || e.batterId !== batterId) return;
     if (e.outcome === 'BB') { bb++; return; }
     ab++;
     if (['1B','2B','3B','HR'].includes(e.outcome)) h++;
-    if (e.outcome === 'K') k++;
+    if (e.outcome === 'K')  k++;
+    if (e.outcome === 'FO') fo++;
     rbi += e.rbi || 0;
   });
   const parts = [`${h}-${ab}`];
   if (bb)  parts.push(`${bb} BB`);
   if (k)   parts.push(`${k} K`);
+  if (fo)  parts.push(`${fo} FO`);
   if (rbi) parts.push(`${rbi} RBI`);
   return parts.join(', ');
 }
@@ -683,16 +685,18 @@ function batterMatchupStats(g, batterId) {
 }
 
 function pitcherMatchupStats(g, pitcherId) {
-  let pitches = 0, k = 0, bb = 0, er = 0;
+  let pitches = 0, k = 0, fo = 0, bb = 0, er = 0;
   (g.events || []).forEach(e => {
     if (e.type !== 'pa_end' || e.pitcherId !== pitcherId) return;
     pitches += e.pitches || 0;
     if (e.outcome === 'K')  k++;
+    if (e.outcome === 'FO') fo++;
     if (e.outcome === 'BB') bb++;
     er += e.earnedRuns || 0;
   });
   const parts = [`${pitches} pitches`];
   if (k)  parts.push(`${k} K`);
+  if (fo) parts.push(`${fo} FO`);
   if (bb) parts.push(`${bb} BB`);
   if (er) parts.push(`${er} ER`);
   return parts.join(' · ');
@@ -724,15 +728,18 @@ function renderMatchupStrip(g, hidden = false) {
 }
 
 function pitcherGameStats(g, pitcherId) {
-  let k = 0, bb = 0, h = 0, er = 0;
+  let k = 0, fo = 0, bb = 0, h = 0, er = 0;
   (g.events || []).forEach(e => {
     if (e.type !== 'pa_end' || e.pitcherId !== pitcherId) return;
     if (e.outcome === 'K')  k++;
+    if (e.outcome === 'FO') fo++;
     if (e.outcome === 'BB') bb++;
     if (['1B','2B','3B','HR'].includes(e.outcome)) h++;
     er += e.earnedRuns || 0;
   });
-  return `${k} K · ${bb} BB · ${h} H · ${er} ER`;
+  const parts = [`${k} K`];
+  if (fo) parts.push(`${fo} FO`);
+  return [...parts, `${bb} BB`, `${h} H`, `${er} ER`].join(' · ');
 }
 
 function rerenderLive() {
@@ -828,7 +835,7 @@ function renderPlayLog(g) {
 
     const batter = State.getPlayer(e.batterId);
 
-    const outcomeClass = { K: 'play-outcome--out', OUT: 'play-outcome--out',
+    const outcomeClass = { K: 'play-outcome--out', FO: 'play-outcome--out', OUT: 'play-outcome--out',
       ERR_REACH: 'play-outcome--error',
       '1B': 'play-outcome--hit', '2B': 'play-outcome--hit',
       '3B': 'play-outcome--hit', HR: 'play-outcome--hit',
@@ -846,7 +853,7 @@ function renderPlayLog(g) {
 
     // Extras as separate <tr> rows so they align under the outcome column
     const extraRows = [];
-    const isOut = e.outcome === 'K' || e.outcome === 'OUT';
+    const isOut = e.outcome === 'K' || e.outcome === 'FO' || e.outcome === 'OUT';
     const rowCls = `play-entry-extra${isOut ? ' play-entry--out' : ''}`;
     if (e.doublePlay) {
       extraRows.push(`<tr class="${rowCls}"><td></td><td colspan="2"><span class="play-extras play-extras--out">Double play</span></td></tr>`);
@@ -947,6 +954,7 @@ function describeOutcome(e) {
   const map = {
     'BB': 'Walk',
     'K': 'Strikeout',
+    'FO': 'Foul Out',
     '1B': 'Single',
     '2B': 'Double',
     '3B': 'Triple',
@@ -983,7 +991,7 @@ function replayToEvent(g, targetPaIdx) {
     let runsCount = 0;
     if (e.outcome === 'BB') {
       const res = walkAdvance(bases, br); bases = res.newBases; runsCount = res.runnerIdsScored.length;
-    } else if (e.outcome === 'K' || e.outcome === 'OUT') {
+    } else if (e.outcome === 'K' || e.outcome === 'FO' || e.outcome === 'OUT') {
       outs++;
     } else if (['1B','2B','3B','HR'].includes(e.outcome)) {
       const res = hitAdvance(bases, ({ '1B':1,'2B':2,'3B':3,'HR':4 })[e.outcome], br);
@@ -1564,7 +1572,9 @@ function _buildOutcomeAnim(ev, g) {
   switch (ev.outcome) {
     case 'BB':  return { text: 'Walk! 🥊',      color: '#4ade80',
                          fromSvg: FIELD.MOUND,  toSvg: { x: 200, y: 368 } };
-    case 'K':   return { text: ev.kType === 'foul_out' ? 'Foul Out! 🔥' : 'Strikeout! 🔥',
+    case 'K':   return { text: 'Strikeout! 🔥',
+                         color: '#f87171', fromSvg: FIELD.MOUND, toSvg: FIELD.HOME };
+    case 'FO':  return { text: 'Foul Out! 🔥',
                          color: '#f87171', fromSvg: FIELD.MOUND, toSvg: FIELD.HOME };
     case '1B':  return { text: 'Single! 🎯',    color: '#4ade80',
                          fromSvg: FIELD.MOUND,  viaSvg: FIELD.HOME,
@@ -2101,7 +2111,7 @@ async function handlePitch(kind) {
     g.fouls = (g.fouls || 0) + 1;
     if (g.fouls >= 4) {
       // Foul-out strikeout — outcome anim queued inside applyPaEnd
-      await applyPaEnd(g, { outcome: 'K', kType: 'foul_out' }, prevCount);
+      await applyPaEnd(g, { outcome: 'FO' }, prevCount);
     } else {
       if (g.strikes < 2) g.strikes++;
       // Freeze to PRE-pitch count during ball flight; count increments at banner appearance
@@ -2439,8 +2449,8 @@ async function applyPaEnd(g, ev, prePitchCount = null) {
     rbi: 0,
     earnedRuns: 0,
     runsScoredBy: [],
-    pitches: (g.balls || 0) + (g.strikes || 0) + (g.fouls || 0) + (['BB','K'].includes(ev.outcome) ? 0 : 1),
-    strikePitches: (g.strikes || 0) + (g.fouls || 0) + (['BB','K'].includes(ev.outcome) ? 0 : 1),
+    pitches: (g.balls || 0) + (g.strikes || 0) + (g.fouls || 0) + (['BB','K','FO'].includes(ev.outcome) ? 0 : 1),
+    strikePitches: (g.strikes || 0) + (g.fouls || 0) + (['BB','K','FO'].includes(ev.outcome) ? 0 : 1),
   };
 
   // ── Compute new game state (bases, score, outs) ───────────────────────────
@@ -2454,7 +2464,7 @@ async function applyPaEnd(g, ev, prePitchCount = null) {
     const res = walkAdvance(newBases, batterRunner);
     Object.assign(newBases, res.newBases);
     runs = res.runnerIdsScored;
-  } else if (ev.outcome === 'K' || ev.outcome === 'OUT') {
+  } else if (ev.outcome === 'K' || ev.outcome === 'FO' || ev.outcome === 'OUT') {
     outsToAdd = 1;
   } else if (['1B','2B','3B','HR'].includes(ev.outcome)) {
     const target = ({ '1B': 1, '2B': 2, '3B': 3, 'HR': 4 })[ev.outcome];
@@ -2937,7 +2947,7 @@ function computeGameAccolades(g) {
       if (e.outcome==='HR') b.hr++;
       b.rbi += e.rbi||0;
     }
-    if (pit) { if (e.outcome==='K') pit.kp++; }
+    if (pit) { if (e.outcome==='K' || e.outcome==='FO') pit.kp++; }
     if (e.errorById && ps[e.errorById]) ps[e.errorById].err++;
     (e.runsScoredBy||[]).forEach(pid => { if (ps[pid]) ps[pid].r++; });
   });
@@ -3057,11 +3067,12 @@ function buildGamePitcherStats(g) {
   const paEvents = (g.events||[]).filter(e => e.type === 'pa_end' && e.pitcherId);
   const map = {};
   paEvents.forEach(e => {
-    if (!map[e.pitcherId]) map[e.pitcherId] = { outs:0, H:0, K:0, BB:0, BF:0 };
+    if (!map[e.pitcherId]) map[e.pitcherId] = { outs:0, H:0, K:0, FO:0, BB:0, BF:0 };
     const s = map[e.pitcherId];
     s.BF++;
     if (['1B','2B','3B','HR'].includes(e.outcome)) s.H++;
-    if (e.outcome === 'K')   { s.K++; s.outs++; }
+    if (e.outcome === 'K')        { s.K++;  s.outs++; }
+    else if (e.outcome === 'FO')  { s.FO++; s.outs++; }
     else if (e.outcome === 'OUT') s.outs++;
     else if (e.outcome === 'BB')  s.BB++;
     // hits (1B/2B/3B/HR) are not outs
@@ -3070,7 +3081,7 @@ function buildGamePitcherStats(g) {
     const p = State.getPlayer(pid);
     const full = Math.floor(s.outs / 3), rem = s.outs % 3;
     const ipStr = rem === 0 ? String(full) : `${full}.${rem}`;
-    return { name: p?.name || '?', H: s.H, K: s.K, BB: s.BB, BF: s.BF, outs: s.outs, ipStr, ipVal: s.outs / 3 };
+    return { name: p?.name || '?', H: s.H, K: s.K, FO: s.FO, BB: s.BB, BF: s.BF, outs: s.outs, ipStr, ipVal: s.outs / 3 };
   }).sort((a, b) => b.ipVal - a.ipVal);
 }
 
@@ -3127,7 +3138,8 @@ function buildRecapHtml(g, recipientName) {
     const RBI = evs.reduce((s, e) => s + (e.rbi||0), 0);
     const BB = evs.filter(e => e.outcome === 'BB').length;
     const K  = evs.filter(e => e.outcome === 'K').length;
-    return { name: p.name, H, AB, HR, RBI, BB, K };
+    const FO = evs.filter(e => e.outcome === 'FO').length;
+    return { name: p.name, H, AB, HR, RBI, BB, K, FO };
   }).filter(Boolean).filter(p => p.H > 0 || p.HR > 0 || p.RBI > 0);
   batters.sort((a, b) => (b.H + b.HR*2 + b.RBI) - (a.H + a.HR*2 + a.RBI));
 
@@ -3144,6 +3156,7 @@ function buildRecapHtml(g, recipientName) {
         ${SSTATTD(b.RBI||'–', b.RBI>0)}
         ${SSTATTD(b.BB||'–')}
         ${SSTATTD(b.K||'–')}
+        ${SSTATTD(b.FO||'–')}
       </tr>`).join('');
     battingSection = `
       <tr><td style="padding:0 24px 20px">
@@ -3151,7 +3164,7 @@ function buildRecapHtml(g, recipientName) {
         <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden">
           <thead><tr style="background:#f3f4f6">
             <th style="padding:6px 10px;font-size:11px;font-weight:700;color:#9ca3af;text-align:left;background:#f3f4f6">Player</th>
-            ${SSTATTH('H/AB')}${SSTATTH('HR')}${SSTATTH('RBI')}${SSTATTH('BB')}${SSTATTH('K')}
+            ${SSTATTH('H/AB')}${SSTATTH('HR')}${SSTATTH('RBI')}${SSTATTH('BB')}${SSTATTH('K')}${SSTATTH('FO')}
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
@@ -3167,6 +3180,7 @@ function buildRecapHtml(g, recipientName) {
         <td style="padding:6px 10px;font-size:13px;font-weight:700;color:#111827">${esc(p.name)}</td>
         ${SSTATTD(p.ipStr, true)}
         ${SSTATTD(p.K||'–', p.K>0, p.K>0?'#dc2626':'#374151')}
+        ${SSTATTD(p.FO||'–', p.FO>0, p.FO>0?'#dc2626':'#374151')}
         ${SSTATTD(p.BB||'–')}
         ${SSTATTD(p.H||'–')}
       </tr>`).join('');
@@ -3176,7 +3190,7 @@ function buildRecapHtml(g, recipientName) {
         <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden">
           <thead><tr style="background:#f3f4f6">
             <th style="padding:6px 10px;font-size:11px;font-weight:700;color:#9ca3af;text-align:left;background:#f3f4f6">Pitcher</th>
-            ${SSTATTH('IP')}${SSTATTH('K')}${SSTATTH('BB')}${SSTATTH('H')}
+            ${SSTATTH('IP')}${SSTATTH('K')}${SSTATTH('FO')}${SSTATTH('BB')}${SSTATTH('H')}
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
