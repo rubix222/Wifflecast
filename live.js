@@ -2684,6 +2684,11 @@ function ensureLineScore(g) {
 
 async function postPlayCheck(g) {
   if (g.outs >= 3) {
+    // Capture fielding positions NOW, synchronously, before endHalfInningInternal
+    // mutates the game object via Object.assign. Any deferred capture (inside a
+    // _queueAnim fn) will see the already-mutated state and show the wrong pitcher.
+    _frozenFieldingPositions = { ...(fieldingPositions(g) || {}) };
+
     if (!LiveGameWatchOnly) {
       const halfLabel = g.currentHalf === 'top' ? 'Top' : 'Bottom';
       // Capture the 3rd-out value NOW before endHalfInningInternal resets g.outs to 0.
@@ -2702,9 +2707,7 @@ async function postPlayCheck(g) {
         _frozenBases     = null;
         // _frozenHalf / _frozenInning stay set — keep old inning display and fielders
         // _betweenInnings stays false — fielders from this inning remain visible
-        // Snapshot current fielding positions so EOI display keeps the OLD pitcher
-        // even after endHalfInningInternal applies the rotation patch below.
-        _frozenFieldingPositions = { ...(fieldingPositions(g) || {}) };
+        // (_frozenFieldingPositions already set synchronously above)
         if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly);
       }});
 
