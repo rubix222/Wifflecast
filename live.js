@@ -1986,8 +1986,10 @@ function showSwapFielderModal(currentPid, currentPos) {
 
   // Show warning whenever the pitcher hasn't faced 4 batters yet AND the user
   // hasn't already dismissed the warning once this half-inning.
+  // Exception: first-cycle pre-inning swaps are always free (no warning needed).
+  const isFreeSwap = isInFirstCycle(g, fieldingSide) && !halfInningHasStarted(g);
   let warningBanner = '';
-  if (faced < 4 && !_pitcherSwapWarningDismissed) {
+  if (!isFreeSwap && faced < 4 && !_pitcherSwapWarningDismissed) {
     const msg = isPitcher
       ? `Pitcher has only faced <strong>${faced}</strong> of 4 required batters this inning.`
       : `The current pitcher has only faced <strong>${faced}</strong> of 4 required batters. Swapping them in would violate the pitching rule.`;
@@ -2019,8 +2021,12 @@ function swapFielderGuarded(currentPid, newPid, faced) {
   const positions = fieldingPositions(g);
   const pitcherInvolved = positions[currentPid] === 'P' || positions[newPid] === 'P';
   if (pitcherInvolved && faced < 4 && !_pitcherSwapWarningDismissed) {
-    if (!confirm(`The current pitcher has only faced ${faced} batter${faced === 1 ? '' : 's'} (minimum 4 required). Swap anyway?`)) return;
-    _pitcherSwapWarningDismissed = true;
+    const fieldingSide = g.currentHalf === 'top' ? 'home' : 'away';
+    const isFreeSwap = isInFirstCycle(g, fieldingSide) && !halfInningHasStarted(g);
+    if (!isFreeSwap) {
+      if (!confirm(`The current pitcher has only faced ${faced} batter${faced === 1 ? '' : 's'} (minimum 4 required). Swap anyway?`)) return;
+      _pitcherSwapWarningDismissed = true;
+    }
   }
   swapFielder(currentPid, newPid);
 }
@@ -2035,17 +2041,25 @@ async function swapFielder(currentPid, newPid) {
   const posKey = g.currentHalf === 'top' ? 'homePositions' : 'awayPositions';
   const patch = { [posKey]: positions };
 
-  // If this is a pitcher swap, update the pitching index to point at newPid.
-  // Do NOT reset facedKey — it tracks batters faced in the current half-inning
-  // (not per-pitcher) so the 4-batter warning only applies to the first 4 batters
-  // of each inning regardless of how many pitcher changes happen after that.
+  // If this is a pitcher swap, maintain the rotation index correctly:
+  // - Pre-inning free swaps in the first cycle: update pitcherIdx so the new
+  //   starter owns their rotation slot and EOI advances from them correctly.
+  // - Mid-inning relief changes: do NOT touch pitcherIdx. The original starter's
+  //   slot must be preserved so EOI advances to the correct next pitcher.
+  // battersFaced is never reset here — it's a half-inning counter so the
+  // 4-batter threshold applies to the whole inning regardless of relief changes.
   if (oldPos === 'P') {
     const fieldingSide = g.currentHalf === 'top' ? 'home' : 'away';
     const orderKey  = fieldingSide === 'home' ? 'homePitchingOrder' : 'awayPitchingOrder';
     const idxKey    = fieldingSide === 'home' ? 'homePitcherIdx'    : 'awayPitcherIdx';
     const order = g[orderKey] || [];
-    const newIdx = order.indexOf(newPid);
-    if (newIdx >= 0) patch[idxKey] = newIdx;
+    const isFreeSwap = isInFirstCycle(g, fieldingSide) && !halfInningHasStarted(g);
+    if (isFreeSwap) {
+      // Pre-inning first-cycle swap: update rotation slot to the new starter
+      const newIdx = order.indexOf(newPid);
+      if (newIdx >= 0) patch[idxKey] = newIdx;
+    }
+    // Mid-inning relief: pitcherIdx stays unchanged — EOI advances from the starter
   }
 
   await State.updateGame(g.id, patch);
@@ -2687,6 +2701,29 @@ async function postPlayCheck(g) {
   if (g.currentHalf === 'bottom' && g.currentInning >= g.numInnings && g.score.home > g.score.away) {
     await finishGame(g, 'walkoff');
   }
+}
+
+// Returns true if the fielding side is still within their first rotation cycle —
+// i.e. not all pitchers in the rotation have had a starting inning yet.
+function isInFirstCycle(g, side) {
+  const orderKey = side === 'home' ? 'homePitchingOrder' : 'awayPitchingOrder';
+  const order = g[orderKey] || [];
+  if (order.length < 2) return false;
+  // Count unique innings this side has fielded (home fields top, away fields bottom)
+  const fieldingHalf = side === 'home' ? 'top' : 'bottom';
+  const innings = new Set();
+  (g.events || []).forEach(e => {
+    if (e.type === 'pa_end' && e.half === fieldingHalf) innings.add(e.inning);
+  });
+  return innings.size < order.length;
+}
+
+// Returns true if the current half-inning has already begun (at least one
+// batter has been retired/walked, or pitches have been thrown in the current PA).
+function halfInningHasStarted(g) {
+  const fieldingSide = g.currentHalf === 'top' ? 'home' : 'away';
+  const faced = g[fieldingSide === 'home' ? 'homeBattersFaced' : 'awayBattersFaced'] || 0;
+  return faced > 0 || (g.balls || 0) + (g.strikes || 0) + (g.fouls || 0) > 0;
 }
 
 // Returns position-map patch that cycles to next pitcher for the given side,
