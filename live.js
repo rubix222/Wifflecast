@@ -823,7 +823,7 @@ function renderPlayLog(g) {
 
   const _span3 = (cls, content) => `<tr class="${cls}"><td colspan="3">${content}</td></tr>`;
 
-  events.slice(-60).forEach(e => {
+  (isCompleted ? events : events.slice(-60)).forEach(e => {
     const key = e.inning + '-' + e.half;
 
     if (key !== lastKey) {
