@@ -308,6 +308,7 @@ let _frozenScore    = null;   // {away, home} — if set, overrides g.score in s
 let _frozenOuts     = null;   // number — if set, overrides g.outs in scoreboard
 let _frozenBases    = null;   // {1,2,3} — if set, overrides g.bases in field SVG
 let _betweenInnings = false;  // true while blank-field transition plays between halves
+let _frozenFieldingPositions = null; // positions of the just-fielded team, frozen during EOI display
 // Scorer-path toast state — held during outcome/EOI animations so the UI stays locked
 let _frozenCount     = null;   // { balls, strikes, fouls } — shown during outcome toast
 let _frozenBatterId  = null;   // batter to display during outcome toast (pre-play)
@@ -1117,7 +1118,8 @@ function _snapGame(g) {
     currentInning: g.currentInning || 1,
     currentHalf:   g.currentHalf   || 'top',
     pitcherId,
-    batterId:      currentBatterId(g) || null,
+    batterId:          currentBatterId(g) || null,
+    fieldingPositions: { ...positions },
   };
 }
 
@@ -1144,13 +1146,14 @@ function _cancelAnim() {
   _frozenScore     = null;
   _frozenOuts      = null;
   _frozenBases     = null;
-  _betweenInnings  = false;
-  _frozenCount     = null;
-  _frozenBatterId  = null;
-  _frozenPitcherId = null;
-  _frozenHalf      = null;
-  _frozenInning    = null;
-  _animInputLocked = false;
+  _betweenInnings          = false;
+  _frozenFieldingPositions = null;
+  _frozenCount             = null;
+  _frozenBatterId          = null;
+  _frozenPitcherId         = null;
+  _frozenHalf              = null;
+  _frozenInning            = null;
+  _animInputLocked         = false;
   const overlay   = document.getElementById('play-anim-overlay');
   const ballEl    = document.getElementById('anim-ball');
   const fielderEl = document.getElementById('anim-fielder');
@@ -1199,13 +1202,14 @@ function _unfreezeDisplay() {
   _frozenScore     = null;
   _frozenOuts      = null;
   _frozenBases     = null;
-  _betweenInnings  = false;
-  _frozenCount     = null;
-  _frozenBatterId  = null;
-  _frozenPitcherId = null;
-  _frozenHalf      = null;
-  _frozenInning    = null;
-  _animInputLocked = false;
+  _betweenInnings          = false;
+  _frozenFieldingPositions = null;
+  _frozenCount             = null;
+  _frozenBatterId          = null;
+  _frozenPitcherId         = null;
+  _frozenHalf              = null;
+  _frozenInning            = null;
+  _animInputLocked         = false;
   if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly);
 }
 
@@ -1482,6 +1486,9 @@ function _detectAndQueueAnims(newG, prev) {
     const newEventsSlice = events.slice(prev.eventsLen);
     const lastNewEv = newEventsSlice[newEventsSlice.length - 1];
     const endOuts = (lastNewEv && lastNewEv.outsAfter !== undefined) ? lastNewEv.outsAfter : prev.outs;
+    // Freeze the just-fielded team's OLD positions so the pitcher circle doesn't flip
+    // to the next rotation pitcher before the between-innings transition completes.
+    _frozenFieldingPositions = { ...(prev.fieldingPositions || {}) };
 
     // Before EOI banner: clear count only; keep batter/pitcher/half/inning/outs frozen
     // so the display still shows old inning's players and 3rd out pip.
@@ -1516,7 +1523,8 @@ function _detectAndQueueAnims(newG, prev) {
       text: `${halfLabel} ${ordinal(newG.currentInning)}`,
       color: '#60a5fa', holdMs: 1800,
       onBannerShow: () => {
-        _betweenInnings = false;
+        _betweenInnings          = false;
+        _frozenFieldingPositions = null;
         if (LiveGameId) renderLiveGame(LiveGameId, true);
       }
     });
@@ -1692,7 +1700,7 @@ function drawField(overrideBases = null) {
   // new inning the moment endHalfInningInternal saves to Firestore.
   const displayHalf  = _frozenHalf ?? g.currentHalf;
   const displayG     = displayHalf !== g.currentHalf ? { ...g, currentHalf: displayHalf } : g;
-  const fieldingPos  = _betweenInnings ? {} : fieldingPositions(displayG);
+  const fieldingPos  = _betweenInnings ? {} : (_frozenFieldingPositions || fieldingPositions(displayG));
   const pitcherId = Object.keys(fieldingPos).find(pid => fieldingPos[pid] === 'P');
   const cfId = Object.keys(fieldingPos).find(pid => fieldingPos[pid] === 'CF');
   const pitcher = pitcherId ? State.getPlayer(pitcherId) : null;
@@ -2689,6 +2697,9 @@ async function postPlayCheck(g) {
         _frozenBases     = null;
         // _frozenHalf / _frozenInning stay set — keep old inning display and fielders
         // _betweenInnings stays false — fielders from this inning remain visible
+        // Snapshot current fielding positions so EOI display keeps the OLD pitcher
+        // even after endHalfInningInternal applies the rotation patch below.
+        _frozenFieldingPositions = { ...(fieldingPositions(g) || {}) };
         if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly);
       }});
 
@@ -2727,8 +2738,9 @@ async function postPlayCheck(g) {
           text: `${halfLabel2} ${ordinal(fresh.currentInning)}`,
           color: '#60a5fa', holdMs: 1800,
           onBannerShow: () => {
-            _betweenInnings  = false;
-            _animInputLocked = false;
+            _betweenInnings          = false;
+            _frozenFieldingPositions = null;
+            _animInputLocked         = false;
             if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly);
           }
         });
@@ -2914,8 +2926,9 @@ async function continueExtraInnings(gameId) {
       text: `▲ ${ordinal(fresh2.currentInning)}`,
       color: '#60a5fa', holdMs: 1800,
       onBannerShow: () => {
-        _betweenInnings  = false;
-        _animInputLocked = false;
+        _betweenInnings          = false;
+        _frozenFieldingPositions = null;
+        _animInputLocked         = false;
         if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly);
       }
     });
