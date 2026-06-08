@@ -315,6 +315,7 @@ let _frozenHalf      = null;   // currentHalf frozen during outcome/EOI toasts (
 let _frozenInning    = null;   // currentInning frozen during outcome/EOI toasts
 let _animInputLocked = false;  // true while any scoring toast is showing (buttons disabled)
 let _pitcherSwapWarningDismissed = false; // true after user confirms early swap; reset each half-inning
+let _pendingEndGameDecision = false; // true while end-game dialog is open; blocks SOI animations
 
 function switchLiveTab(tab) {
   _liveTab = tab;
@@ -434,14 +435,18 @@ function renderPitchingStats(g, away, home) {
       const p = State.getPlayer(pid);
       let outs=0, h=0, hr=0, bb=0, k=0, er=0, pitches=0;
       (g.events || []).forEach(e => {
-        if (e.type !== 'pa_end' || e.half !== pitchingHalf || e.pitcherId !== pid) return;
-        if (e.outcome === 'OUT' || e.outcome === 'K' || e.outcome === 'FO') outs++;
-        if (['1B','2B','3B','HR'].includes(e.outcome)) h++;
-        if (e.outcome === 'HR') hr++;
-        if (e.outcome === 'BB') bb++;
-        if (e.outcome === 'K') k++;
-        er += e.earnedRuns || 0;
-        pitches += e.pitches || 0;
+        if (e.type !== 'pa_end' || e.half !== pitchingHalf) return;
+        if (e.pitcherId === pid) {
+          if (e.outcome === 'OUT' || e.outcome === 'K' || e.outcome === 'FO') outs++;
+          if (['1B','2B','3B','HR'].includes(e.outcome)) h++;
+          if (e.outcome === 'HR') hr++;
+          if (e.outcome === 'BB') bb++;
+          if (e.outcome === 'K') k++;
+          pitches += e.pitches || 0;
+          if (!e.earnedRunsByPitcher) er += e.earnedRuns || 0; // backward compat
+        }
+        // Inherited runner attribution: pitcher gets ER charged via earnedRunsByPitcher
+        if (e.earnedRunsByPitcher) er += e.earnedRunsByPitcher[pid] || 0;
       });
       // Add the current batter's in-progress pitch count to the active pitcher
       if (pid === activePitcherId) pitches += liveExtraPitches;
@@ -687,12 +692,15 @@ function batterMatchupStats(g, batterId) {
 function pitcherMatchupStats(g, pitcherId) {
   let pitches = 0, k = 0, fo = 0, bb = 0, er = 0;
   (g.events || []).forEach(e => {
-    if (e.type !== 'pa_end' || e.pitcherId !== pitcherId) return;
-    pitches += e.pitches || 0;
-    if (e.outcome === 'K')  k++;
-    if (e.outcome === 'FO') fo++;
-    if (e.outcome === 'BB') bb++;
-    er += e.earnedRuns || 0;
+    if (e.type !== 'pa_end') return;
+    if (e.pitcherId === pitcherId) {
+      pitches += e.pitches || 0;
+      if (e.outcome === 'K')  k++;
+      if (e.outcome === 'FO') fo++;
+      if (e.outcome === 'BB') bb++;
+      if (!e.earnedRunsByPitcher) er += e.earnedRuns || 0; // backward compat
+    }
+    if (e.earnedRunsByPitcher) er += e.earnedRunsByPitcher[pitcherId] || 0;
   });
   const parts = [`${pitches} pitches`];
   if (k)  parts.push(`${k} K`);
@@ -730,12 +738,15 @@ function renderMatchupStrip(g, hidden = false) {
 function pitcherGameStats(g, pitcherId) {
   let k = 0, fo = 0, bb = 0, h = 0, er = 0;
   (g.events || []).forEach(e => {
-    if (e.type !== 'pa_end' || e.pitcherId !== pitcherId) return;
-    if (e.outcome === 'K')  k++;
-    if (e.outcome === 'FO') fo++;
-    if (e.outcome === 'BB') bb++;
-    if (['1B','2B','3B','HR'].includes(e.outcome)) h++;
-    er += e.earnedRuns || 0;
+    if (e.type !== 'pa_end') return;
+    if (e.pitcherId === pitcherId) {
+      if (e.outcome === 'K')  k++;
+      if (e.outcome === 'FO') fo++;
+      if (e.outcome === 'BB') bb++;
+      if (['1B','2B','3B','HR'].includes(e.outcome)) h++;
+      if (!e.earnedRunsByPitcher) er += e.earnedRuns || 0; // backward compat
+    }
+    if (e.earnedRunsByPitcher) er += e.earnedRunsByPitcher[pitcherId] || 0;
   });
   const parts = [`${k} K`];
   if (fo) parts.push(`${fo} FO`);
@@ -1986,8 +1997,10 @@ function showSwapFielderModal(currentPid, currentPos) {
 
   // Show warning whenever the pitcher hasn't faced 4 batters yet AND the user
   // hasn't already dismissed the warning once this half-inning.
-  // Exception: first-cycle pre-inning swaps are always free (no warning needed).
-  const isFreeSwap = isInFirstCycle(g, fieldingSide) && !halfInningHasStarted(g);
+  // Exception: first-cycle pre-inning swaps where the incoming pitcher hasn't pitched yet.
+  // Check if ANY available target qualifies as a free incoming pitcher (suppresses banner).
+  const isFreeSwap = isInFirstCycle(g, fieldingSide) && !halfInningHasStarted(g)
+    && others.some(pid => !hasPlayerPitchedThisGame(g, pid));
   let warningBanner = '';
   if (!isFreeSwap && faced < 4 && !_pitcherSwapWarningDismissed) {
     const msg = isPitcher
@@ -2022,7 +2035,10 @@ function swapFielderGuarded(currentPid, newPid, faced) {
   const pitcherInvolved = positions[currentPid] === 'P' || positions[newPid] === 'P';
   if (pitcherInvolved && faced < 4 && !_pitcherSwapWarningDismissed) {
     const fieldingSide = g.currentHalf === 'top' ? 'home' : 'away';
-    const isFreeSwap = isInFirstCycle(g, fieldingSide) && !halfInningHasStarted(g);
+    // incomingPid = the player who will become the pitcher after the swap
+    const incomingPid = positions[currentPid] === 'P' ? newPid : currentPid;
+    const isFreeSwap = isInFirstCycle(g, fieldingSide) && !halfInningHasStarted(g)
+                       && !hasPlayerPitchedThisGame(g, incomingPid);
     if (!isFreeSwap) {
       if (!confirm(`The current pitcher has only faced ${faced} batter${faced === 1 ? '' : 's'} (minimum 4 required). Swap anyway?`)) return;
       _pitcherSwapWarningDismissed = true;
@@ -2053,7 +2069,8 @@ async function swapFielder(currentPid, newPid) {
     const orderKey  = fieldingSide === 'home' ? 'homePitchingOrder' : 'awayPitchingOrder';
     const idxKey    = fieldingSide === 'home' ? 'homePitcherIdx'    : 'awayPitcherIdx';
     const order = g[orderKey] || [];
-    const isFreeSwap = isInFirstCycle(g, fieldingSide) && !halfInningHasStarted(g);
+    const isFreeSwap = isInFirstCycle(g, fieldingSide) && !halfInningHasStarted(g)
+                       && !hasPlayerPitchedThisGame(g, newPid);
     if (isFreeSwap) {
       // Pre-inning first-cycle swap: update rotation slot to the new starter
       const newIdx = order.indexOf(newPid);
@@ -2526,7 +2543,20 @@ async function applyPaEnd(g, ev, prePitchCount = null) {
   }).filter(Boolean);
 
   const runsCount = runs.length;
-  if (ev.outcome !== 'ERR_REACH') { event.rbi = runsCount; event.earnedRuns = runsCount; }
+  if (ev.outcome !== 'ERR_REACH') {
+    event.rbi = runsCount;
+    event.earnedRuns = runsCount; // total, kept for team stats and backward compat
+    // Attribution: split earned runs to whichever pitcher put each runner on base.
+    // Runners inherit ownedByPitcherId from makeRunner; old runners without it fall
+    // back to the current pitcher so existing game data isn't broken.
+    const erByPitcher = {};
+    for (const rid of runs) {
+      const runner = findRunner(rid);
+      const ownerPid = runner?.ownedByPitcherId || pitcherId;
+      erByPitcher[ownerPid] = (erByPitcher[ownerPid] || 0) + 1;
+    }
+    event.earnedRunsByPitcher = erByPitcher;
+  }
 
   const newScore = { ...g.score };
   if (half === 'top') newScore.away += runsCount;
@@ -2678,6 +2708,10 @@ async function postPlayCheck(g) {
 
     await endHalfInningInternal(g);
 
+    // If endHalfInningInternal opened the end-game decision dialog, pause here.
+    // The dialog's "End Game" / "Continue" buttons will resume the animation sequence.
+    if (_pendingEndGameDecision) return;
+
     if (!LiveGameWatchOnly) {
       const fresh = State.getGame(g.id);
       if (fresh && fresh.status === 'in_progress') {
@@ -2726,6 +2760,12 @@ function halfInningHasStarted(g) {
   return faced > 0 || (g.balls || 0) + (g.strikes || 0) + (g.fouls || 0) > 0;
 }
 
+// Returns true if the given player has appeared as a pitcher in any completed PA this game.
+// Used to restrict first-cycle free swaps to pitchers who haven't thrown a pitch yet.
+function hasPlayerPitchedThisGame(g, pid) {
+  return (g.events || []).some(e => e.type === 'pa_end' && e.pitcherId === pid);
+}
+
 // Returns position-map patch that cycles to next pitcher for the given side,
 // plus resets battersFaced for that side. Returns null if no rotation data.
 function buildPitcherCyclePatch(g, side) {
@@ -2770,7 +2810,7 @@ async function endHalfInningInternal(g) {
     currentInning++;
     currentHalf = 'top';
     if (currentInning > g.numInnings && g.score.home !== g.score.away) {
-      await finishGame(g, 'regulation');
+      _showEndGameDialog(g);
       return;
     }
     // If tied, continue into extras
@@ -2814,6 +2854,66 @@ async function finishGame(g, _reason) {
   if (g.tournamentId) {
     Render.tournaments();
     await autoGenerateTournamentRound(g.tournamentId);
+  }
+}
+
+// Shows a modal dialog asking whether to end the game or continue playing.
+// Called when regulation innings are complete and the score is not tied.
+// Sets _pendingEndGameDecision = true; the modal buttons call the functions below.
+function _showEndGameDialog(g) {
+  _pendingEndGameDecision = true;
+  const away = State.getTeam(g.awayTeamId);
+  const home = State.getTeam(g.homeTeamId);
+  const winner = g.score.away > g.score.home ? away : home;
+  const score = `${g.score.away}–${g.score.home}`;
+  Modal.show(`
+    <div class="modal-header"><h3>End of ${g.numInnings} Innings</h3></div>
+    <div class="modal-body" style="padding:16px">
+      <p style="font-size:15px;margin:0 0 8px">
+        <strong>${escapeHtml(winner?.name || '?')}</strong> leads ${score}.
+      </p>
+      <p style="font-size:13px;color:#6b7280;margin:0">End the game here, or continue playing?</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="Modal.hide(); continueExtraInnings('${g.id}')">Continue Playing</button>
+      <button class="btn btn-primary" onclick="Modal.hide(); endGameFromDialog('${g.id}')">End Game</button>
+    </div>
+  `);
+}
+
+async function endGameFromDialog(gameId) {
+  _pendingEndGameDecision = false;
+  const g = State.getGame(gameId); if (!g) return;
+  await finishGame(g, 'regulation');
+}
+
+async function continueExtraInnings(gameId) {
+  _pendingEndGameDecision = false;
+  const g = State.getGame(gameId); if (!g) return;
+  // Transition: bottom of last inning just ended → top of next inning.
+  // Away was fielding the bottom, so cycle their pitcher.
+  const nextInning = g.currentInning + 1;
+  const cyclePatch = buildPitcherCyclePatch(g, 'away') || {};
+  await State.updateGame(gameId, {
+    currentInning: nextInning, currentHalf: 'top',
+    outs: 0, balls: 0, strikes: 0, fouls: 0,
+    bases: { 1: null, 2: null, 3: null },
+    ...cyclePatch,
+  });
+  const fresh = State.getGame(gameId);
+  await State.updateGame(gameId, { lineScore: ensureLineScore(fresh) });
+  const fresh2 = State.getGame(gameId);
+  if (fresh2 && LiveGameId === gameId && !LiveGameWatchOnly) {
+    _queueAnim({
+      text: `▲ Top of the ${ordinal(fresh2.currentInning)}`,
+      color: '#60a5fa', holdMs: 1800,
+      onBannerShow: () => {
+        _betweenInnings  = false;
+        _animInputLocked = false;
+        if (LiveGameId) renderLiveGame(LiveGameId, LiveGameWatchOnly);
+      }
+    });
+    _queueAnim({ fn: _unfreezeDisplay });
   }
 }
 

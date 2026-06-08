@@ -508,13 +508,15 @@ const State = {
           if (['1B','2B','3B','HR'].includes(e.outcome)) pH++;
           // Innings pitched: count outs recorded by this pitcher (K, FO, OUT)
           if (e.outcome === 'K' || e.outcome === 'FO' || e.outcome === 'OUT') pIP_outs++;
-          pER += e.earnedRuns || 0;
+          if (!e.earnedRunsByPitcher) pER += e.earnedRuns || 0; // backward compat: pre-split events
           pR  += e.earnedRuns || 0; // earnedRuns includes batter's run on HR; runsScoredBy misses it
           pBF++;
           pPitches      += e.pitches       || 0;
           pStrikePitches += e.strikePitches || 0;
           pitchedGames.add(g.id);
         }
+        // Earned runs with inherited runner attribution (new events carry earnedRunsByPitcher map)
+        if (e.earnedRunsByPitcher) pER += e.earnedRunsByPitcher[playerId] || 0;
         if (e.errorById === playerId) { E++; fieldedGames.add(g.id); }
         if (e.fielderId === playerId && e.outcome === 'OUT') { PO++; fieldedGames.add(g.id); }
         if (e.fielderId === playerId && (e.doublePlay || e.dpAttempted)) { dpAttempts++; if (e.doublePlay) dpSuccesses++; fieldedGames.add(g.id); }
@@ -770,5 +772,8 @@ function makeRunner(g, playerId) {
     playerId,
     name: player ? player.name.split(' ')[0] : '?',
     number: g.runnerCounter,
+    // Track the pitcher who put this runner on base so that if they later score
+    // while a different pitcher is on the mound, earned runs are attributed correctly.
+    ownedByPitcherId: currentPitcherId(g),
   };
 }
