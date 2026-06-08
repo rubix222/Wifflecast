@@ -2233,8 +2233,8 @@ function renderBipPanel(g) {
   return `
     <div class="pitch-buttons-compact"${locked ? ' style="opacity:0.3;pointer-events:none"' : ''}>
       <button data-pitch="ball">Ball</button>
-      <button data-pitch="strike_swinging">Strike<small>Swing</small></button>
-      <button data-pitch="strike_looking">Strike<small>Look</small></button>
+      <button data-pitch="strike_swinging">Strike<small>Swinging</small></button>
+      <button data-pitch="strike_looking">Strike<small>Looking</small></button>
       <button data-pitch="foul">Foul</button>
       <button data-pitch="bip" class="btn-bip">In Play</button>
     </div>`;
