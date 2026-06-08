@@ -1078,6 +1078,9 @@ function renderTournPlayerStats(tournId) {
 
   rows.sort((a, b) => {
     if (sort.col === 'name') return b.p.name.localeCompare(a.p.name) * sort.dir;
+    const aGP = a.d.GP || 0, bGP = b.d.GP || 0;
+    if (!aGP && bGP) return 1;
+    if (aGP && !bGP) return -1;
     let av = a.d[sort.col] ?? null, bv = b.d[sort.col] ?? null;
     if (av === null) av = sort.dir > 0 ? -Infinity : Infinity;
     if (bv === null) bv = sort.dir > 0 ? -Infinity : Infinity;
@@ -1675,6 +1678,9 @@ const Render = {
     // Sort
     rows.sort((a, b) => {
       if (sort.col === 'name') return b.p.name.localeCompare(a.p.name) * sort.dir;
+      const aGP = a.d.GP || 0, bGP = b.d.GP || 0;
+      if (!aGP && bGP) return 1;
+      if (aGP && !bGP) return -1;
       let av = a.d[sort.col] ?? null;
       let bv = b.d[sort.col] ?? null;
       if (av === null) av = sort.dir > 0 ? -Infinity : Infinity;

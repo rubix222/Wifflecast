@@ -2153,8 +2153,8 @@ async function handlePitch(kind) {
   }
   if (kind === 'foul') {
     g.fouls = (g.fouls || 0) + 1;
-    if (g.fouls >= 4) {
-      // Foul-out strikeout — outcome anim queued inside applyPaEnd
+    if (g.fouls >= 5) {
+      // Foul-out — outcome anim queued inside applyPaEnd
       await applyPaEnd(g, { outcome: 'FO' }, prevCount);
     } else {
       if (g.strikes < 2) g.strikes++;
