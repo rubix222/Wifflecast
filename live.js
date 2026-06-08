@@ -98,9 +98,10 @@ function renderLiveGame(gameId, watchOnly = false) {
     // visible.  If they'd scrolled up to review old plays, we restore their position.
     const prevPlEl       = !isNewGame ? document.querySelector('.play-log') : null;
     const prevPlScrollTop = prevPlEl ? prevPlEl.scrollTop : null;
+    const isFinished = g.status === 'completed';
     const prevPlAtBottom  = prevPlEl
       ? (prevPlEl.scrollHeight - prevPlEl.scrollTop - prevPlEl.clientHeight) <= 50
-      : true;  // no prior element → treat as "at bottom" so first render scrolls down
+      : !isFinished;  // fresh open of live game → scroll to bottom; finished game → start at top
     const prevStEl  = !isNewGame ? document.querySelector('.lg-stats-scroll') : null;
     const prevStScr = prevStEl ? prevStEl.scrollTop : 0;
 
@@ -324,7 +325,11 @@ function switchLiveTab(tab) {
   if (tab === 'plays') {
     requestAnimationFrame(() => {
       const log = document.querySelector('.play-log');
-      if (log) log.scrollTop = log.scrollHeight;
+      if (!log) return;
+      const g = State.getGame(LiveGameId);
+      // Finished games start at the top so you can read from the beginning.
+      // Live / watch-only games auto-scroll to the latest play.
+      if (!g || g.status !== 'completed') log.scrollTop = log.scrollHeight;
     });
   }
 }
