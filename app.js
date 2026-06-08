@@ -1322,7 +1322,14 @@ async function submitLinkPlayer(uid) {
 
     const updated = { ...user, playerId: newPlayerId || null };
     await Storage.saveUser(updated);
+    // Update local State.users immediately — Firestore snapshot may arrive later and
+    // cause the player to briefly appear as "Broken link" if only the player side
+    // (player.userId) is updated in memory before the user side (user.playerId) is.
+    const uIdx = State.users.findIndex(u => u.uid === uid);
+    if (uIdx !== -1) Object.assign(State.users[uIdx], updated);
     Modal.hide();
+    Render.adminPlayers();
+    Render.users();
     toast('Player link updated', 'success');
   } catch (e) {
     console.error('submitLinkPlayer error:', e);
@@ -3497,6 +3504,14 @@ async function boot() {
     }
 
     Render.all();
+
+    // Deep-link: ?game=<id> opens that game directly (used by recap email links)
+    const dlParams = new URLSearchParams(window.location.search);
+    const dlGameId = dlParams.get('game');
+    if (dlGameId && State.getGame(dlGameId)) {
+      history.replaceState({}, '', window.location.pathname); // clean URL
+      openGame(dlGameId);
+    }
   });
 }
 

@@ -1243,7 +1243,12 @@ function _runAnim(item) {
   // Defer ALL coordinate lookups to the next animation frame.
   // This ensures we query the FRESH #field-svg that renderLiveGame()
   // rebuilds synchronously after _runAnim is called.
-  requestAnimationFrame(() => {
+  // Fallback: requestAnimationFrame is throttled in background tabs, so a
+  // setTimeout(50) ensures the animation proceeds even if rAF never fires.
+  let _rafStarted = false;
+  const _rafBody = () => {
+    if (_rafStarted || !alive()) return;
+    _rafStarted = true;
     if (!alive()) return;   // cancelled before first frame
     const svgEl  = document.getElementById('field-svg');
     const ctm    = svgEl ? svgEl.getScreenCTM() : null;
@@ -1376,7 +1381,9 @@ function _runAnim(item) {
       overlay.style.display = 'none';
       _nextAnim();
     }, totalVisible + fadeMs + 50);
-  });
+  };
+  requestAnimationFrame(_rafBody);
+  setTimeout(_rafBody, 50); // fallback: rAF is throttled in background/inactive tabs
 }
 
 function _detectAndQueueAnims(newG, prev) {
@@ -3275,6 +3282,9 @@ function buildRecapHtml(g, recipientName) {
   <!-- FOOTER -->
   <tr><td style="background:#f9fafb;padding:16px 24px;text-align:center;border-top:1px solid #e5e7eb">
     <div style="font-size:12px;color:#9ca3af">Tracked with <strong style="color:#6b7280">WiffleCast</strong></div>
+    <div style="margin-top:8px">
+      <a href="${window.location.origin}${window.location.pathname}?game=${g.id}" style="font-size:12px;color:#15803d;text-decoration:none;font-weight:600">View this game ↗</a>
+    </div>
   </td></tr>
 
 </table>
