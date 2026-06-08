@@ -1510,10 +1510,10 @@ function _detectAndQueueAnims(newG, prev) {
       if (LiveGameId) renderLiveGame(LiveGameId, true);
     }});
     _queueAnim({ blank: true, holdMs: 2000 });
-    const halfLabel = newG.currentHalf === 'top' ? '▲ Top' : '▼ Bottom';
+    const halfLabel = newG.currentHalf === 'top' ? '▲' : '▼';
     // At the moment the start-of-inning banner appears, reveal new inning fielders
     _queueAnim({
-      text: `${halfLabel} of the ${ordinal(newG.currentInning)}`,
+      text: `${halfLabel} ${ordinal(newG.currentInning)}`,
       color: '#60a5fa', holdMs: 1800,
       onBannerShow: () => {
         _betweenInnings = false;
@@ -2721,10 +2721,10 @@ async function postPlayCheck(g) {
     if (!LiveGameWatchOnly) {
       const fresh = State.getGame(g.id);
       if (fresh && fresh.status === 'in_progress') {
-        const halfLabel2 = fresh.currentHalf === 'top' ? '▲ Top' : '▼ Bottom';
+        const halfLabel2 = fresh.currentHalf === 'top' ? '▲' : '▼';
         // At the moment the start-of-inning banner appears, reveal new inning fielders
         _queueAnim({
-          text: `${halfLabel2} of the ${ordinal(fresh.currentInning)}`,
+          text: `${halfLabel2} ${ordinal(fresh.currentInning)}`,
           color: '#60a5fa', holdMs: 1800,
           onBannerShow: () => {
             _betweenInnings  = false;
@@ -2911,7 +2911,7 @@ async function continueExtraInnings(gameId) {
   const fresh2 = State.getGame(gameId);
   if (fresh2 && LiveGameId === gameId && !LiveGameWatchOnly) {
     _queueAnim({
-      text: `▲ Top of the ${ordinal(fresh2.currentInning)}`,
+      text: `▲ ${ordinal(fresh2.currentInning)}`,
       color: '#60a5fa', holdMs: 1800,
       onBannerShow: () => {
         _betweenInnings  = false;
