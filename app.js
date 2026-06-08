@@ -284,8 +284,8 @@ function renderHomeTeamsSection(teams, view) {
   teamData.sort((a, b) => {
     if (sort.col === 'name') return b.t.name.localeCompare(a.t.name) * sort.dir;
     let av = a[view][sort.col] ?? null, bv = b[view][sort.col] ?? null;
-    if (av === null) av = sort.dir > 0 ? Infinity : -Infinity;
-    if (bv === null) bv = sort.dir > 0 ? Infinity : -Infinity;
+    if (av === null) av = sort.dir > 0 ? -Infinity : Infinity;
+    if (bv === null) bv = sort.dir > 0 ? -Infinity : Infinity;
     return (bv - av) * sort.dir;
   });
 
@@ -1079,8 +1079,8 @@ function renderTournPlayerStats(tournId) {
   rows.sort((a, b) => {
     if (sort.col === 'name') return b.p.name.localeCompare(a.p.name) * sort.dir;
     let av = a.d[sort.col] ?? null, bv = b.d[sort.col] ?? null;
-    if (av === null) av = sort.dir > 0 ? Infinity : -Infinity;
-    if (bv === null) bv = sort.dir > 0 ? Infinity : -Infinity;
+    if (av === null) av = sort.dir > 0 ? -Infinity : Infinity;
+    if (bv === null) bv = sort.dir > 0 ? -Infinity : Infinity;
     return (bv - av) * sort.dir;
   });
 
@@ -1136,8 +1136,8 @@ function renderTournTeamStats(tournId) {
   rows.sort((a, b) => {
     if (sort.col === 'name') return b.team.name.localeCompare(a.team.name) * sort.dir;
     let av = a.d[sort.col] ?? null, bv = b.d[sort.col] ?? null;
-    if (av === null) av = sort.dir > 0 ? Infinity : -Infinity;
-    if (bv === null) bv = sort.dir > 0 ? Infinity : -Infinity;
+    if (av === null) av = sort.dir > 0 ? -Infinity : Infinity;
+    if (bv === null) bv = sort.dir > 0 ? -Infinity : Infinity;
     return (bv - av) * sort.dir;
   });
 
@@ -1677,8 +1677,8 @@ const Render = {
       if (sort.col === 'name') return b.p.name.localeCompare(a.p.name) * sort.dir;
       let av = a.d[sort.col] ?? null;
       let bv = b.d[sort.col] ?? null;
-      if (av === null) av = sort.dir > 0 ? Infinity : -Infinity;
-      if (bv === null) bv = sort.dir > 0 ? Infinity : -Infinity;
+      if (av === null) av = sort.dir > 0 ? -Infinity : Infinity;
+      if (bv === null) bv = sort.dir > 0 ? -Infinity : Infinity;
       return (bv - av) * sort.dir;
     });
 
@@ -1783,8 +1783,8 @@ const Render = {
       rows.sort((a, b) => {
         if (sort.col === 'name') return b.t.name.localeCompare(a.t.name) * sort.dir;
         let av = a.d[sort.col] ?? null, bv = b.d[sort.col] ?? null;
-        if (av === null) av = sort.dir > 0 ? Infinity : -Infinity;
-        if (bv === null) bv = sort.dir > 0 ? Infinity : -Infinity;
+        if (av === null) av = sort.dir > 0 ? -Infinity : Infinity;
+        if (bv === null) bv = sort.dir > 0 ? -Infinity : Infinity;
         return (bv - av) * sort.dir;
       });
       const thArr = col => {
