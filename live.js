@@ -1470,7 +1470,7 @@ function _detectAndQueueAnims(newG, prev) {
 
   // ── 2. Game finished ────────────────────────────────────────
   if (gameJustFinished) {
-    const prevHalf = prev.currentHalf === 'top' ? 'Top' : 'Bottom';
+    const prevHalf = prev.currentHalf === 'top' ? '▲' : '▼';
     _queueAnim({ text: `End of ${prevHalf} ${ordinal(prev.currentInning)}`, color: '#60a5fa', holdMs: 1400 });
     const away   = State.getTeam(newG.awayTeamId);
     const home   = State.getTeam(newG.homeTeamId);
@@ -1485,7 +1485,7 @@ function _detectAndQueueAnims(newG, prev) {
 
   // ── 3. Inning / half change ──────────────────────────────────
   if (inningChanged) {
-    const prevHalf = prev.currentHalf === 'top' ? 'Top' : 'Bottom';
+    const prevHalf = prev.currentHalf === 'top' ? '▲' : '▼';
     // Determine the 3rd out value: prefer outsAfter from the last new event (robust
     // whether the K-save and inning-advance arrive as one snapshot or two).
     const newEventsSlice = events.slice(prev.eventsLen);
@@ -2690,7 +2690,7 @@ async function postPlayCheck(g) {
     _frozenFieldingPositions = { ...(fieldingPositions(g) || {}) };
 
     if (!LiveGameWatchOnly) {
-      const halfLabel = g.currentHalf === 'top' ? 'Top' : 'Bottom';
+      const halfLabel = g.currentHalf === 'top' ? '▲' : '▼';
       // Capture the 3rd-out value NOW before endHalfInningInternal resets g.outs to 0.
       const endOuts = g.outs;
 
