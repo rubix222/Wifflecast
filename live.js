@@ -345,10 +345,29 @@ function closeLiveMenu() {
 }
 
 let _liveStatsTab = 'hitting';
+let _liveSort = {
+  hitting:  { col: 'AVG', dir:  1 },  // descending: best batters first
+  pitching: { col: 'ERA', dir: -1 },  // ascending:  best (lowest) ERA first
+  fielding: { col: 'PO',  dir:  1 },  // descending: most putouts first
+};
 
 function switchLiveStatsTab(tab) {
   _liveStatsTab = tab;
   $$('.lg-stats-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  const g = State.getGame(LiveGameId); if (!g) return;
+  const content = $('#lg-stats-content');
+  if (content) content.innerHTML = renderLiveStatsTable(g, State.getTeam(g.awayTeamId), State.getTeam(g.homeTeamId));
+}
+
+function sortLiveStats(col) {
+  const sort = _liveSort[_liveStatsTab];
+  if (sort.col === col) {
+    sort.dir = -sort.dir;
+  } else {
+    sort.col = col;
+    // Default direction: ERA sorts ascending (lower = better); everything else descending
+    sort.dir = col === 'ERA' ? -1 : 1;
+  }
   const g = State.getGame(LiveGameId); if (!g) return;
   const content = $('#lg-stats-content');
   if (content) content.innerHTML = renderLiveStatsTable(g, State.getTeam(g.awayTeamId), State.getTeam(g.homeTeamId));
@@ -370,9 +389,10 @@ function renderLiveStatsTable(g, away, home) {
 }
 
 function renderHittingStats(g, away, home) {
-  const renderTeam = (team, orderKey) => {
+  const sort = _liveSort.hitting;
+  const COLS = ['AB','H','AVG','1B','2B','HR','R','RBI','BB','K','FO'];
+  const buildRows = (team, orderKey) => {
     const order = g[orderKey] || [];
-    if (!order.length) return `<tr><td colspan="12" class="muted" style="padding:8px;text-align:center">No lineup set</td></tr>`;
     return order.map(pid => {
       const p = State.getPlayer(pid);
       let ab=0, h=0, singles=0, dbl=0, hr=0, bb=0, k=0, fo=0, rbi=0, r=0;
@@ -388,20 +408,46 @@ function renderHittingStats(g, away, home) {
         rbi += e.rbi || 0;
         if ((e.runsScoredBy || []).includes(pid)) r++;
       });
-      const avg = ab ? (h / ab).toFixed(3).replace(/^0/, '') : '.000';
+      const avgVal = ab ? h / ab : null;
+      return { p, AB: ab, H: h, AVG: avgVal, '1B': singles, '2B': dbl, HR: hr, R: r, RBI: rbi, BB: bb, K: k, FO: fo };
+    });
+  };
+  const sortRows = (rows) => [...rows].sort((a, b) => {
+    if (sort.col === 'name') return (a.p?.name || '').localeCompare(b.p?.name || '') * sort.dir;
+    let av = a[sort.col] ?? null, bv = b[sort.col] ?? null;
+    if (av === null && bv === null) return 0;
+    if (av === null) return 1;
+    if (bv === null) return -1;
+    return (bv - av) * sort.dir;
+  });
+  const arr = sort.dir === 1 ? '▲' : '▼';
+  const noArr = '<span style="opacity:0.25">▼</span>';
+  const th = (col, label) => {
+    const active = sort.col === col;
+    return `<th class="num-col${active?' sorted':''}" onclick="sortLiveStats('${col}')" style="cursor:pointer">${label}<span class="sort-arr">${active ? arr : noArr}</span></th>`;
+  };
+  const nameTh = () => {
+    const active = sort.col === 'name';
+    return `<th onclick="sortLiveStats('name')" style="cursor:pointer">Player${active ? `<span class="sort-arr">${arr}</span>` : `<span class="sort-arr" style="opacity:0.25">▼</span>`}</th>`;
+  };
+  const renderTeam = (team, orderKey) => {
+    const order = g[orderKey] || [];
+    if (!order.length) return `<tr><td colspan="12" class="muted" style="padding:8px;text-align:center">No lineup set</td></tr>`;
+    return sortRows(buildRows(team, orderKey)).map(({ p, AB, H, AVG, ...d }) => {
+      const avgStr = AB ? (H / AB).toFixed(3).replace(/^0/, '') : '.000';
       return `<tr>
         <td>${escapeHtml(p?.name||'?')}</td>
-        <td>${ab}</td><td>${h}</td><td>${avg}</td>
-        <td>${singles}</td><td>${dbl}</td><td>${hr}</td>
-        <td>${r}</td><td>${rbi}</td><td>${bb}</td><td>${k}</td><td>${fo}</td>
+        <td>${AB}</td><td>${H}</td><td>${avgStr}</td>
+        <td>${d['1B']}</td><td>${d['2B']}</td><td>${d.HR}</td>
+        <td>${d.R}</td><td>${d.RBI}</td><td>${d.BB}</td><td>${d.K}</td><td>${d.FO}</td>
       </tr>`;
     }).join('');
   };
-  const hdr = (team) => `<tr class="stats-team-hdr"><th colspan="12">${teamSwatch(team)}${escapeHtml(team.name)}</th></tr>
-    <tr class="stats-col-hdr"><th>Player</th><th>AB</th><th>H</th><th>AVG</th><th>1B</th><th>2B</th><th>HR</th><th>R</th><th>RBI</th><th>BB</th><th>K</th><th>FO</th></tr>`;
+  const colHdr = () => `<tr class="stats-col-hdr">${nameTh()}${th('AB','AB')}${th('H','H')}${th('AVG','AVG')}${th('1B','1B')}${th('2B','2B')}${th('HR','HR')}${th('R','R')}${th('RBI','RBI')}${th('BB','BB')}${th('K','K')}${th('FO','FO')}</tr>`;
+  const teamHdr = (team) => `<tr class="stats-team-hdr"><th colspan="12">${teamSwatch(team)}${escapeHtml(team.name)}</th></tr>${colHdr()}`;
   return `<table>
-    <thead>${hdr(away)}</thead><tbody>${renderTeam(away,'awayBattingOrder')}</tbody>
-    <thead>${hdr(home)}</thead><tbody>${renderTeam(home,'homeBattingOrder')}</tbody>
+    <thead>${teamHdr(away)}</thead><tbody>${renderTeam(away,'awayBattingOrder')}</tbody>
+    <thead>${teamHdr(home)}</thead><tbody>${renderTeam(home,'homeBattingOrder')}</tbody>
   </table>
   <div class="stats-key">
     <span><strong>AB</strong> At Bats</span>
@@ -417,27 +463,22 @@ function renderHittingStats(g, away, home) {
 }
 
 function renderPitchingStats(g, away, home) {
-  const renderTeam = (team, positions, pitchingHalf) => {
-    // Find all pitchers who actually threw this half (from event log), plus current assigned P
+  const sort = _liveSort.pitching;
+  const buildRows = (team, positions, pitchingHalf) => {
     const teamPidSet = new Set(team.playerIds || []);
     const eventPids = [...new Set(
       (g.events || [])
         .filter(e => e.type === 'pa_end' && e.half === pitchingHalf && e.pitcherId && teamPidSet.has(e.pitcherId))
         .map(e => e.pitcherId)
     )];
-    // Fall back to current position assignment if no events yet
     if (!eventPids.length) {
       const curPid = Object.keys(positions || {}).find(pid => (positions||{})[pid] === 'P' && teamPidSet.has(pid));
       if (curPid) eventPids.push(curPid);
     }
-    if (!eventPids.length) return `<tr><td colspan="9" class="muted" style="padding:8px;text-align:center">No pitcher assigned</td></tr>`;
-    // Determine if the game is currently mid-AB in this pitching half
+    if (!eventPids.length) return [];
     const gameInProgress = g.status === 'in_progress';
-    const activePitcherId = gameInProgress && pitchingHalf === g.currentHalf
-      ? currentPitcherId(g) : null;
-    const liveExtraPitches = activePitcherId
-      ? (g.balls || 0) + (g.strikes || 0) + (g.fouls || 0) : 0;
-
+    const activePitcherId = gameInProgress && pitchingHalf === g.currentHalf ? currentPitcherId(g) : null;
+    const liveExtraPitches = activePitcherId ? (g.balls || 0) + (g.strikes || 0) + (g.fouls || 0) : 0;
     return eventPids.map(pid => {
       const p = State.getPlayer(pid);
       let outs=0, h=0, hr=0, bb=0, k=0, er=0, pitches=0;
@@ -450,29 +491,52 @@ function renderPitchingStats(g, away, home) {
           if (e.outcome === 'BB') bb++;
           if (e.outcome === 'K') k++;
           pitches += e.pitches || 0;
-          if (!e.earnedRunsByPitcher) er += e.earnedRuns || 0; // backward compat
+          if (!e.earnedRunsByPitcher) er += e.earnedRuns || 0;
         }
-        // Inherited runner attribution: pitcher gets ER charged via earnedRunsByPitcher
         if (e.earnedRunsByPitcher) er += e.earnedRunsByPitcher[pid] || 0;
       });
-      // Add the current batter's in-progress pitch count to the active pitcher
       if (pid === activePitcherId) pitches += liveExtraPitches;
-      const ipOuts = outs;
-      const ipStr = `${Math.floor(ipOuts/3)}${ipOuts%3 ? '.'+ipOuts%3 : ''}`;
-      const era = ipOuts > 0 ? ((er * 27) / ipOuts).toFixed(2) : '—';
+      const eraVal = outs > 0 ? (er * 27) / outs : null;
+      return { p, IP: outs, ERA: eraVal, H: h, HR: hr, BB: bb, K: k, ER: er, PC: pitches, _outs: outs };
+    });
+  };
+  const sortRows = (rows) => [...rows].sort((a, b) => {
+    if (sort.col === 'name') return (a.p?.name || '').localeCompare(b.p?.name || '') * sort.dir;
+    let av = a[sort.col] ?? null, bv = b[sort.col] ?? null;
+    if (av === null && bv === null) return 0;
+    if (av === null) return 1;
+    if (bv === null) return -1;
+    return (bv - av) * sort.dir;
+  });
+  const arr = sort.dir === 1 ? '▲' : '▼';
+  const noArr = '<span style="opacity:0.25">▼</span>';
+  const th = (col, label) => {
+    const active = sort.col === col;
+    return `<th class="num-col${active?' sorted':''}" onclick="sortLiveStats('${col}')" style="cursor:pointer">${label}<span class="sort-arr">${active ? arr : noArr}</span></th>`;
+  };
+  const nameTh = () => {
+    const active = sort.col === 'name';
+    return `<th onclick="sortLiveStats('name')" style="cursor:pointer">Player${active ? `<span class="sort-arr">${arr}</span>` : `<span class="sort-arr" style="opacity:0.25">▼</span>`}</th>`;
+  };
+  const renderTeam = (team, positions, pitchingHalf) => {
+    const rows = buildRows(team, positions, pitchingHalf);
+    if (!rows.length) return `<tr><td colspan="9" class="muted" style="padding:8px;text-align:center">No pitcher assigned</td></tr>`;
+    return sortRows(rows).map(({ p, ERA, _outs, ...d }) => {
+      const ipStr = `${Math.floor(_outs/3)}${_outs%3 ? '.'+_outs%3 : ''}`;
+      const eraStr = ERA !== null ? ERA.toFixed(2) : '—';
       return `<tr>
         <td>${escapeHtml(p?.name||'?')}</td>
-        <td>${ipStr}</td><td>${era}</td>
-        <td>${h}</td><td>${hr}</td><td>${bb}</td><td>${k}</td>
-        <td>${er}</td><td>${pitches}</td>
+        <td>${ipStr}</td><td>${eraStr}</td>
+        <td>${d.H}</td><td>${d.HR}</td><td>${d.BB}</td><td>${d.K}</td>
+        <td>${d.ER}</td><td>${d.PC}</td>
       </tr>`;
     }).join('');
   };
-  const hdr = (team) => `<tr class="stats-team-hdr"><th colspan="9">${teamSwatch(team)}${escapeHtml(team.name)}</th></tr>
-    <tr class="stats-col-hdr"><th>Player</th><th>IP</th><th>ERA</th><th>H</th><th>HR</th><th>BB</th><th>K</th><th>ER</th><th>PC</th></tr>`;
+  const colHdr = () => `<tr class="stats-col-hdr">${nameTh()}${th('IP','IP')}${th('ERA','ERA')}${th('H','H')}${th('HR','HR')}${th('BB','BB')}${th('K','K')}${th('ER','ER')}${th('PC','PC')}</tr>`;
+  const teamHdr = (team) => `<tr class="stats-team-hdr"><th colspan="9">${teamSwatch(team)}${escapeHtml(team.name)}</th></tr>${colHdr()}`;
   return `<table>
-    <thead>${hdr(away)}</thead><tbody>${renderTeam(away, g.awayPositions, 'bottom')}</tbody>
-    <thead>${hdr(home)}</thead><tbody>${renderTeam(home, g.homePositions, 'top')}</tbody>
+    <thead>${teamHdr(away)}</thead><tbody>${renderTeam(away, g.awayPositions, 'bottom')}</tbody>
+    <thead>${teamHdr(home)}</thead><tbody>${renderTeam(home, g.homePositions, 'top')}</tbody>
   </table>
   <div class="stats-key">
     <span><strong>IP</strong> Innings Pitched</span>
@@ -487,10 +551,10 @@ function renderPitchingStats(g, away, home) {
 }
 
 function renderFieldingStats(g, away, home) {
-  const renderTeam = (team, positions, fieldingHalf) => {
+  const sort = _liveSort.fielding;
+  const buildRows = (team, fieldingHalf) => {
     const ids = team.playerIds || [];
-    if (!ids.length) return `<tr><td colspan="5" class="muted" style="padding:8px;text-align:center">No players</td></tr>`;
-    const rows = ids.map(pid => {
+    return ids.map(pid => {
       const p = State.getPlayer(pid);
       let po=0, err=0, dpAtt=0, dpSuc=0, tagAtt=0, tagSuc=0;
       (g.events || []).forEach(e => {
@@ -500,17 +564,38 @@ function renderFieldingStats(g, away, home) {
         if (e.fielderId === pid && (e.doublePlay || e.dpAttempted)) { dpAtt++; if (e.doublePlay) dpSuc++; }
         if (e.fielderId === pid && e.sacFly) { tagAtt++; if (e.sacFlyOut) tagSuc++; }
       });
-      const dpStr  = dpAtt  > 0 ? `${dpSuc}/${dpAtt}`  : '—';
-      const tagStr = tagAtt > 0 ? `${tagSuc}/${tagAtt}` : '—';
-      return `<tr><td>${escapeHtml(p?.name||'?')}</td><td>${po}</td><td>${err}</td><td>${dpStr}</td><td>${tagStr}</td></tr>`;
-    }).join('');
-    return rows;
+      return { p, PO: po, E: err, DP: dpSuc, TAG: tagSuc, _dpAtt: dpAtt, _tagAtt: tagAtt };
+    });
   };
-  const hdr = (team) => `<tr class="stats-team-hdr"><th colspan="5">${teamSwatch(team)}${escapeHtml(team.name)}</th></tr>
-    <tr class="stats-col-hdr"><th>Player</th><th>PO</th><th>E</th><th>DP</th><th>TAG</th></tr>`;
+  const sortRows = (rows) => [...rows].sort((a, b) => {
+    if (sort.col === 'name') return (a.p?.name || '').localeCompare(b.p?.name || '') * sort.dir;
+    let av = a[sort.col] ?? 0, bv = b[sort.col] ?? 0;
+    return (bv - av) * sort.dir;
+  });
+  const arr = sort.dir === 1 ? '▲' : '▼';
+  const noArr = '<span style="opacity:0.25">▼</span>';
+  const th = (col, label) => {
+    const active = sort.col === col;
+    return `<th class="num-col${active?' sorted':''}" onclick="sortLiveStats('${col}')" style="cursor:pointer">${label}<span class="sort-arr">${active ? arr : noArr}</span></th>`;
+  };
+  const nameTh = () => {
+    const active = sort.col === 'name';
+    return `<th onclick="sortLiveStats('name')" style="cursor:pointer">Player${active ? `<span class="sort-arr">${arr}</span>` : `<span class="sort-arr" style="opacity:0.25">▼</span>`}</th>`;
+  };
+  const renderTeam = (team, fieldingHalf) => {
+    const ids = team.playerIds || [];
+    if (!ids.length) return `<tr><td colspan="5" class="muted" style="padding:8px;text-align:center">No players</td></tr>`;
+    return sortRows(buildRows(team, fieldingHalf)).map(({ p, PO, E, DP, TAG, _dpAtt, _tagAtt }) => {
+      const dpStr  = _dpAtt  > 0 ? `${DP}/${_dpAtt}`  : '—';
+      const tagStr = _tagAtt > 0 ? `${TAG}/${_tagAtt}` : '—';
+      return `<tr><td>${escapeHtml(p?.name||'?')}</td><td>${PO}</td><td>${E}</td><td>${dpStr}</td><td>${tagStr}</td></tr>`;
+    }).join('');
+  };
+  const colHdr = () => `<tr class="stats-col-hdr">${nameTh()}${th('PO','PO')}${th('E','E')}${th('DP','DP')}${th('TAG','TAG')}</tr>`;
+  const teamHdr = (team) => `<tr class="stats-team-hdr"><th colspan="5">${teamSwatch(team)}${escapeHtml(team.name)}</th></tr>${colHdr()}`;
   return `<table>
-    <thead>${hdr(away)}</thead><tbody>${renderTeam(away, g.awayPositions, 'bottom')}</tbody>
-    <thead>${hdr(home)}</thead><tbody>${renderTeam(home, g.homePositions, 'top')}</tbody>
+    <thead>${teamHdr(away)}</thead><tbody>${renderTeam(away, 'bottom')}</tbody>
+    <thead>${teamHdr(home)}</thead><tbody>${renderTeam(home, 'top')}</tbody>
   </table>
   <div class="stats-key">
     <span><strong>PO</strong> Putouts</span>
