@@ -369,16 +369,16 @@ function renderHittingStats(g, away, home) {
     if (!order.length) return `<tr><td colspan="12" class="muted" style="padding:8px;text-align:center">No lineup set</td></tr>`;
     return order.map(pid => {
       const p = State.getPlayer(pid);
-      let ab=0, h=0, singles=0, dbl=0, triples=0, hr=0, bb=0, k=0, rbi=0, r=0;
+      let ab=0, h=0, singles=0, dbl=0, hr=0, bb=0, k=0, fo=0, rbi=0, r=0;
       (g.events || []).forEach(e => {
         if (e.type !== 'pa_end' || e.batterId !== pid) return;
         if (e.outcome === 'BB') { bb++; return; }
         ab++;
         if (e.outcome === '1B') { h++; singles++; }
         else if (e.outcome === '2B') { h++; dbl++; }
-        else if (e.outcome === '3B') { h++; triples++; }
         else if (e.outcome === 'HR') { h++; hr++; }
         else if (e.outcome === 'K') k++;
+        else if (e.outcome === 'FO') fo++;
         rbi += e.rbi || 0;
         if ((e.runsScoredBy || []).includes(pid)) r++;
       });
@@ -386,13 +386,13 @@ function renderHittingStats(g, away, home) {
       return `<tr>
         <td>${escapeHtml(p?.name||'?')}</td>
         <td>${ab}</td><td>${h}</td><td>${avg}</td>
-        <td>${singles}</td><td>${dbl}</td><td>${triples}</td><td>${hr}</td>
-        <td>${r}</td><td>${rbi}</td><td>${bb}</td><td>${k}</td>
+        <td>${singles}</td><td>${dbl}</td><td>${hr}</td>
+        <td>${r}</td><td>${rbi}</td><td>${bb}</td><td>${k}</td><td>${fo}</td>
       </tr>`;
     }).join('');
   };
   const hdr = (team) => `<tr class="stats-team-hdr"><th colspan="12">${teamSwatch(team)}${escapeHtml(team.name)}</th></tr>
-    <tr class="stats-col-hdr"><th>Player</th><th>AB</th><th>H</th><th>AVG</th><th>1B</th><th>2B</th><th>3B</th><th>HR</th><th>R</th><th>RBI</th><th>BB</th><th>K</th></tr>`;
+    <tr class="stats-col-hdr"><th>Player</th><th>AB</th><th>H</th><th>AVG</th><th>1B</th><th>2B</th><th>HR</th><th>R</th><th>RBI</th><th>BB</th><th>K</th><th>FO</th></tr>`;
   return `<table>
     <thead>${hdr(away)}</thead><tbody>${renderTeam(away,'awayBattingOrder')}</tbody>
     <thead>${hdr(home)}</thead><tbody>${renderTeam(home,'homeBattingOrder')}</tbody>
@@ -401,11 +401,12 @@ function renderHittingStats(g, away, home) {
     <span><strong>AB</strong> At Bats</span>
     <span><strong>H</strong> Hits</span>
     <span><strong>AVG</strong> Batting Average</span>
-    <span><strong>1B/2B/3B/HR</strong> Hit Types</span>
+    <span><strong>1B/2B/HR</strong> Hit Types</span>
     <span><strong>R</strong> Runs Scored</span>
     <span><strong>RBI</strong> Runs Batted In</span>
     <span><strong>BB</strong> Walks</span>
     <span><strong>K</strong> Strikeouts</span>
+    <span><strong>FO</strong> Foul Outs</span>
   </div>`;
 }
 
@@ -567,7 +568,7 @@ function liveGameHTML(g, home, away) {
         </div>
         <div class="middle">
           <div class="inning" id="sb-inning">${isCompleted ? 'FINAL' : inningStr}</div>
-          <div class="outs" id="sb-outs">${(function(){const o=_frozenOuts??g.outs;return`<span class="outs-label">Outs</span><span class="out-dots"><span class="out-dot${o>=1?' on':''}"></span><span class="out-dot${o>=2?' on':''}"></span><span class="out-dot${o>=3?' on':''}"></span></span>`;})()}</div>
+          <div class="outs" id="sb-outs">${isCompleted ? '' : (function(){const o=_frozenOuts??g.outs;return`<span class="outs-label">Outs</span><span class="out-dots"><span class="out-dot${o>=1?' on':''}"></span><span class="out-dot${o>=2?' on':''}"></span><span class="out-dot${o>=3?' on':''}"></span></span>`;})()}</div>
         </div>
         <div class="team-side ${battingSide === 'home' && !isCompleted ? 'batting' : ''}">
           <div class="name">${teamSwatch(home)}${escapeHtml(home.name)}</div>
@@ -1065,7 +1066,7 @@ function clearPlaySelection(g) {
   const sbInning = $('#sb-inning');
   if (sbInning) sbInning.textContent = 'FINAL';
   const sbOuts = $('#sb-outs');
-  if (sbOuts) sbOuts.innerHTML = `<span class="outs-label">Outs</span><span class="out-dots"><span class="out-dot"></span><span class="out-dot"></span><span class="out-dot"></span></span>`;
+  if (sbOuts) sbOuts.innerHTML = ''; // game over — outs not shown in FINAL state
   const banner = $('#replay-banner');
   if (banner) banner.style.display = 'none';
 }

@@ -402,9 +402,9 @@ let homeTeamsView     = 'record';  // 'record' | 'batting' | 'pitching' | 'field
 let homeShowFinished  = false;
 const homeTeamSort = {
   record:   { col: 'W',   dir: -1 },
-  batting:  { col: 'AVG', dir: -1 },
-  pitching: { col: 'ERA', dir:  1 },
-  fielding: { col: 'PO',  dir: -1 },
+  batting:  { col: 'AVG', dir:  1 }, // descending: best teams first
+  pitching: { col: 'ERA', dir: -1 }, // ascending: lowest ERA first
+  fielding: { col: 'PO',  dir:  1 }, // descending: most putouts first
 };
 
 // Player view state
@@ -418,12 +418,12 @@ let selectedTeamId = null;
 let selectedGameId = null;
 let showFinishedGames = false;
 let showMyGamesOnly = true;
-let statsSort    = { col: 'AVG', dir: -1 };
-let pitchSort    = { col: 'ERA', dir:  1 };
-let fieldSort    = { col: 'PO',  dir: -1 };
-let teamBatSort    = { col: 'AVG', dir: -1 };
-let teamPitSort    = { col: 'ERA', dir:  1 };
-let teamFieldSort  = { col: 'PO', dir: -1 };
+let statsSort    = { col: 'AVG', dir:  1 }; // descending: best batters first
+let pitchSort    = { col: 'ERA', dir: -1 }; // ascending: best (lowest) ERA first
+let fieldSort    = { col: 'PO',  dir:  1 }; // descending: most putouts first
+let teamBatSort    = { col: 'AVG', dir:  1 };
+let teamPitSort    = { col: 'ERA', dir: -1 };
+let teamFieldSort  = { col: 'PO',  dir:  1 };
 let teamRecordSort = { col: 'W',  dir: -1 };
 let teamsView      = 'record'; // 'record' | 'batting' | 'pitching' | 'fielding'
 
@@ -436,11 +436,11 @@ let _statsFilterDraft = null; // pending state while filter modal is open
 let _tournStatsView = 'batting'; // 'batting' | 'pitching' | 'fielding'
 let _tournTeamView  = 'batting'; // 'batting' | 'pitching'
 // Sort state — separate from main stats so the two views are independent
-let _tpSort  = { col: 'AVG', dir: -1 }; // tournament player batting
-let _tppSort = { col: 'ERA', dir:  1 }; // tournament player pitching
-let _tpfSort = { col: 'PO',  dir: -1 }; // tournament player fielding
-let _ttbSort = { col: 'AVG', dir: -1 }; // tournament team batting
-let _ttpSort = { col: 'ERA', dir:  1 }; // tournament team pitching
+let _tpSort  = { col: 'AVG', dir:  1 }; // tournament player batting: best first
+let _tppSort = { col: 'ERA', dir: -1 }; // tournament player pitching: lowest ERA first
+let _tpfSort = { col: 'PO',  dir:  1 }; // tournament player fielding: most PO first
+let _ttbSort = { col: 'AVG', dir:  1 }; // tournament team batting: best first
+let _ttpSort = { col: 'ERA', dir: -1 }; // tournament team pitching: lowest ERA first
 
 function setPlayersView(view) {
   playersView = view;
