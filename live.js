@@ -370,7 +370,14 @@ function sortLiveStats(col) {
   }
   const g = State.getGame(LiveGameId); if (!g) return;
   const content = $('#lg-stats-content');
-  if (content) content.innerHTML = renderLiveStatsTable(g, State.getTeam(g.awayTeamId), State.getTeam(g.homeTeamId));
+  if (!content) return;
+  const wrap = content.querySelector('.stats-table-wrap');
+  const savedScroll = wrap ? wrap.scrollLeft : 0;
+  content.innerHTML = renderLiveStatsTable(g, State.getTeam(g.awayTeamId), State.getTeam(g.homeTeamId));
+  if (savedScroll) {
+    const newWrap = content.querySelector('.stats-table-wrap');
+    if (newWrap) newWrap.scrollLeft = savedScroll;
+  }
 }
 
 function renderLiveStats(g, away, home) {

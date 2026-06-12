@@ -465,11 +465,21 @@ function setTeamsView(view) {
 }
 function setHomePlayerView(view) { homePlayerView = view; Render.home(); }
 function setHomeTeamsView(view)  { homeTeamsView  = view; Render.home(); }
+function _withScrollPreserved(containerSel, fn) {
+  const wrap = document.querySelector(containerSel + ' .stats-table-wrap');
+  const savedScroll = wrap ? wrap.scrollLeft : 0;
+  fn();
+  if (savedScroll) {
+    const newWrap = document.querySelector(containerSel + ' .stats-table-wrap');
+    if (newWrap) newWrap.scrollLeft = savedScroll;
+  }
+}
+
 function sortHomeTeams(col, view) {
   const s = homeTeamSort[view];
   s.dir = s.col === col ? -s.dir : -1;
   s.col = col;
-  Render.home();
+  _withScrollPreserved('#home-container', () => Render.home());
 }
 
 function sortTeamStats(col, which) {
@@ -479,13 +489,13 @@ function sortTeamStats(col, which) {
           : teamBatSort;
   s.dir = s.col === col ? -s.dir : -1;
   s.col = col;
-  Render.teams();
+  _withScrollPreserved('#teams-container', () => Render.teams());
 }
 function sortStats(col, which) {
   const s = which === 'pitching' ? pitchSort : which === 'fielding' ? fieldSort : statsSort;
   s.dir = s.col === col ? -s.dir : -1;
   s.col = col;
-  Render.players();
+  _withScrollPreserved('#players-container', () => Render.players());
 }
 function showCreateMyPlayerModal() {
   Modal.show(`
@@ -1185,14 +1195,14 @@ function sortTournPlayerStats(tournId, col, view) {
   const sort = view === 'pitching' ? _tppSort : view === 'fielding' ? _tpfSort : _tpSort;
   if (sort.col === col) sort.dir *= -1;
   else { sort.col = col; sort.dir = (col === 'ERA' || col === 'WHIP' || col === 'BB') ? 1 : -1; }
-  renderTournPlayerStats(tournId);
+  _withScrollPreserved('#tourn-player-stats', () => renderTournPlayerStats(tournId));
 }
 
 function sortTournTeamStats(tournId, col, view) {
   const sort = view === 'pitching' ? _ttpSort : _ttbSort;
   if (sort.col === col) sort.dir *= -1;
   else { sort.col = col; sort.dir = (col === 'ERA' || col === 'WHIP') ? 1 : -1; }
-  renderTournTeamStats(tournId);
+  _withScrollPreserved('#tourn-team-stats', () => renderTournTeamStats(tournId));
 }
 
 async function invitePlayer(playerId) {
