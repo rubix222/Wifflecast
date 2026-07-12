@@ -1604,10 +1604,11 @@ const Render = {
         : 'Not Started';
       const eventName = g.tournamentId ? (State.getTournament(g.tournamentId)?.name || g.tournamentName || null) : null;
       return `<tr>
-        <td>${matchupHtml(away, home)}<div class="muted small" style="margin-top:2px">${date}${eventName ? ` · 📋 ${escapeHtml(eventName)}` : ''}</div></td>
+        <td>${matchupHtml(away, home)}<div class="muted small" style="margin-top:2px">${date}${eventName ? ` · 📋 ${escapeHtml(eventName)}` : ''}${g.isExhibition ? ` · <span style="color:#b45309">🎯 Exhibition</span>` : ''}</div></td>
         <td style="white-space:nowrap"><span class="game-card-status status-${g.status}" style="font-size:11px">${statusLabel}</span></td>
         <td style="white-space:nowrap">
           <button class="btn-icon" title="Open" onclick="selectGame('${g.id}');switchTab('games')">↗</button>
+          <button class="btn-icon" title="${g.isExhibition ? 'Unmark exhibition' : 'Mark as exhibition'}" onclick="toggleExhibitionGame('${g.id}')" style="${g.isExhibition ? '' : 'opacity:0.35'}">🎯</button>
           <button class="btn-icon" title="Delete" onclick="deleteGame('${g.id}');Render.adminGames()">🗑</button>
         </td>
       </tr>`;
@@ -1939,6 +1940,9 @@ const Render = {
       const eventBadge = eventName
         ? `<span style="font-size:11px;color:#0369a1">📋 ${escapeHtml(eventName)}</span>`
         : '';
+      const exhibitionBadge = g.isExhibition
+        ? `<span style="font-size:11px;color:#b45309">🎯 Exhibition</span>`
+        : '';
 
       // Top-right action buttons
       const topActions = isLive
@@ -1968,7 +1972,7 @@ const Render = {
             ${showScore ? `<div style="font-size:14px;font-weight:700;color:#374151;text-align:right;line-height:1.4">${g.score.away}<br>${g.score.home}</div>` : ''}
           </div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px">
-            <span>${eventBadge}</span>
+            <span style="display:flex;gap:6px">${eventBadge}${exhibitionBadge}</span>
             <span style="font-size:11px;color:#9ca3af">${date}</span>
           </div>
         </div>
@@ -2278,6 +2282,13 @@ function showNewGameModal() {
           <input id="game-innings" type="number" min="1" max="20" value="6" required />
           <div class="help-text">If tied at the end of these innings, extra innings are played.</div>
         </div>
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <input id="game-exhibition" type="checkbox" />
+            Exhibition game
+          </label>
+          <div class="help-text">Scored normally, but excluded from global stats.</div>
+        </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn" onclick="Modal.hide()">Cancel</button>
@@ -2290,11 +2301,12 @@ async function submitNewGame(e) {
   const homeTeamId = $('#game-home').value;
   const awayTeamId = $('#game-away').value;
   const numInnings = parseInt($('#game-innings').value, 10) || 6;
+  const isExhibition = $('#game-exhibition').checked;
   if (!homeTeamId || !awayTeamId) return;
   if (homeTeamId === awayTeamId) { toast('Pick two different teams', 'error'); return; }
   let game;
   try {
-    game = await State.addGame({ homeTeamId, awayTeamId, numInnings });
+    game = await State.addGame({ homeTeamId, awayTeamId, numInnings, isExhibition });
   } catch (err) {
     toast(err.message, 'error');
     return;
@@ -2310,6 +2322,13 @@ async function deleteGame(id) {
   await State.deleteGame(id);
   Render.all();
   toast('Game deleted');
+}
+async function toggleExhibitionGame(id) {
+  const g = State.getGame(id);
+  if (!g) return;
+  await State.updateGame(id, { isExhibition: !g.isExhibition });
+  Render.all();
+  toast(g.isExhibition ? 'Marked as exhibition' : 'Unmarked exhibition');
 }
 
 function selectGame(id) {

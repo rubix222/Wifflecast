@@ -442,6 +442,7 @@ const State = {
                                   tournamentName: this.getTournament(data.tournamentId)?.name || null } : {}),
       ...(data.isChampionship ? { isChampionship: true }               : {}),
       ...(data.deRound        ? { deRound: data.deRound }              : {}),
+      ...(data.isExhibition   ? { isExhibition: true }                 : {}),
     };
     this.games.push(g);
     await Storage.saveGame(g);
@@ -471,7 +472,7 @@ const State = {
     const battedGames  = new Set();
     const fieldedGames = new Set();
 
-    const games = gameIds ? this.games.filter(g => gameIds.has(g.id)) : this.games;
+    const games = (gameIds ? this.games.filter(g => gameIds.has(g.id)) : this.games).filter(g => !g.isExhibition);
     games.forEach(g => {
       (g.events || []).forEach(e => {
         if (e.type !== 'pa_end') return; // only summarize at end of plate appearance
@@ -557,7 +558,7 @@ const State = {
   },
 
   computeTeamStats(teamId, gameIds = null) {
-    const pool  = gameIds ? this.games.filter(g => gameIds.has(g.id)) : this.games;
+    const pool  = (gameIds ? this.games.filter(g => gameIds.has(g.id)) : this.games).filter(g => !g.isExhibition);
     const games = pool.filter(g => g.homeTeamId === teamId || g.awayTeamId === teamId);
     const completed = games.filter(g => g.status === 'completed');
     let wins = 0, losses = 0, ties = 0, runsFor = 0, runsAgainst = 0;
@@ -579,7 +580,7 @@ const State = {
 
   computeTeamBattingStats(teamId, gameIds = null) {
     let AB=0, H=0, R=0, RBI=0, BB=0, TB=0, K=0, singles=0, doubles=0, triples=0, hrs=0;
-    const pool = gameIds ? this.games.filter(g => gameIds.has(g.id)) : this.games;
+    const pool = (gameIds ? this.games.filter(g => gameIds.has(g.id)) : this.games).filter(g => !g.isExhibition);
     pool.forEach(g => {
       if (g.homeTeamId !== teamId && g.awayTeamId !== teamId) return;
       const battingHalf = g.homeTeamId === teamId ? 'bottom' : 'top';
@@ -607,7 +608,7 @@ const State = {
 
   computeTeamPitchingStats(teamId, gameIds = null) {
     let outs=0, ER=0, R=0, K=0, BB=0, H=0, BF=0, pitches=0, strikePitches=0;
-    const pool = gameIds ? this.games.filter(g => gameIds.has(g.id)) : this.games;
+    const pool = (gameIds ? this.games.filter(g => gameIds.has(g.id)) : this.games).filter(g => !g.isExhibition);
     pool.forEach(g => {
       if (g.homeTeamId !== teamId && g.awayTeamId !== teamId) return;
       const pitchingHalf = g.homeTeamId === teamId ? 'top' : 'bottom';
@@ -638,7 +639,7 @@ const State = {
 
   computeTeamFieldingStats(teamId, gameIds = null) {
     let E = 0, PO = 0, dpAttempts = 0, dpSuccesses = 0, tagAttempts = 0, tagSuccesses = 0;
-    const pool  = gameIds ? this.games.filter(g => gameIds.has(g.id)) : this.games;
+    const pool  = (gameIds ? this.games.filter(g => gameIds.has(g.id)) : this.games).filter(g => !g.isExhibition);
     const games = pool.filter(g => g.homeTeamId === teamId || g.awayTeamId === teamId);
     const GP = games.filter(g => g.status === 'completed').length;
     games.forEach(g => {
@@ -660,7 +661,7 @@ const State = {
   // Hit locations across all games for a player
   getPlayerHitLocations(playerId) {
     const locs = [];
-    this.games.forEach(g => {
+    this.games.filter(g => !g.isExhibition).forEach(g => {
       (g.events || []).forEach(e => {
         if (e.type === 'pa_end' && e.batterId === playerId && e.location) {
           locs.push({ ...e.location, outcome: e.outcome });
