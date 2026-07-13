@@ -2283,11 +2283,10 @@ function showNewGameModal() {
           <div class="help-text">If tied at the end of these innings, extra innings are played.</div>
         </div>
         <div class="form-group">
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-            <input id="game-exhibition" type="checkbox" />
-            Exhibition game
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:400;color:#6b7280;font-size:12px">
+            <input id="game-exhibition" type="checkbox" style="width:auto" />
+            Exhibition only (no global stats)
           </label>
-          <div class="help-text">Scored normally, but excluded from global stats.</div>
         </div>
       </div>
       <div class="modal-footer">
