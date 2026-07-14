@@ -2277,10 +2277,9 @@ function showNewGameModal() {
             </select>
           </div>
         </div>
-        <div class="form-group">
-          <label for="game-innings">Number of innings</label>
-          <input id="game-innings" type="number" min="1" max="20" value="6" required />
-          <div class="help-text">If tied at the end of these innings, extra innings are played.</div>
+        <div class="form-group" style="display:flex;align-items:center;gap:8px;margin-bottom:20px">
+          <label for="game-innings" style="margin:0;white-space:nowrap">Number of innings</label>
+          <input id="game-innings" type="number" min="1" max="20" value="6" required style="width:60px" />
         </div>
         <div class="form-group">
           <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:400;color:#6b7280;font-size:12px">
