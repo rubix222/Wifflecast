@@ -2513,11 +2513,12 @@ function renderTournamentDetail(id) {
     if (isAdmin()) {
       const showGenBtn = curRoundDone && !champGame && activeCount > 2;
       const nextRound  = maxRound + 1;
-      if (showGenBtn) {
-        adminBtn = `<div class="tourn-admin-actions">
-          <button class="btn btn-sm btn-primary" onclick="generateTournamentGames('${id}')">⚙ Generate Round ${nextRound}</button>
-        </div>`;
-      }
+      const latestRoundGames     = nonChamp.filter(g => (g.deRound||1) === maxRound);
+      const latestRoundUnstarted = maxRound > 0 && latestRoundGames.length > 0 && latestRoundGames.every(g => g.status === 'setup');
+      const btns = [];
+      if (showGenBtn) btns.push(`<button class="btn btn-sm btn-primary" onclick="generateTournamentGames('${id}')">⚙ Generate Round ${nextRound}</button>`);
+      if (latestRoundUnstarted) btns.push(`<button class="btn btn-sm" onclick="regenerateDERound('${id}')">🎲 Re-randomize Round ${maxRound}</button>`);
+      if (btns.length) adminBtn = `<div class="tourn-admin-actions">${btns.join('')}</div>`;
     }
 
     // Games grouped by round
@@ -2769,6 +2770,20 @@ function generateDEPairings(activeTeams, existingPairSet) {
   return { pairs, byeTeam };
 }
 
+async function regenerateDERound(tournId) {
+  const t = State.getTournament(tournId); if (!t) return;
+  const deGames  = State.games.filter(g => g.tournamentId === tournId && !g.isChampionship);
+  const maxRound = deGames.length ? Math.max(...deGames.map(g => g.deRound || 1)) : 0;
+  if (maxRound === 0) return;
+  const roundGames = deGames.filter(g => (g.deRound || 1) === maxRound);
+  if (!roundGames.every(g => g.status === 'setup')) {
+    toast('Games in this round have already started', 'error');
+    return;
+  }
+  if (!confirm(`Re-randomize Round ${maxRound}? This deletes and regenerates this round's matchups.`)) return;
+  await Promise.all(roundGames.map(g => State.deleteGame(g.id)));
+  await generateTournamentGames(tournId);
+}
 async function generateTournamentGames(tournId) {
   const t = State.getTournament(tournId); if (!t) return;
 
@@ -3563,14 +3578,14 @@ Object.assign(window, {
   showDoublePlayResult, applyDoublePlay,
   showTagUpResult, applyTagUp,
   toggleCanScore, showLinkPlayerModal, submitLinkPlayer,
-  showNewGameModal, openGame, selectGame, deselectGame, deleteGame, openGameForScoring, showSetupModal,
+  showNewGameModal, openGame, selectGame, deselectGame, deleteGame, toggleExhibitionGame, openGameForScoring, showSetupModal,
   submitPlayer, submitTeam, submitNewGame,
   startGame, setPosition, moveBatter,
   endHalfInning, endGameEarly, swapHomeAway, showSkipBatterModal, skipBatter,
   showEditScoreModal, reopenGame, _esAdj, _esSave,
   showRecapModal, _copyRecap, _shareRecap, sendRecapEmails, autoSendRecapEmails, showEmailSetupModal, _saveEmailSetup, _toggleEmailSetup,
   showNewTournamentModal, submitNewTournament, showTournamentModal, submitTournament, selectTournament, tournamentBack,
-  generateTournamentGames, generateChampionshipGame, autoGenerateTournamentRound, deleteTournamentUI,
+  generateTournamentGames, regenerateDERound, generateChampionshipGame, autoGenerateTournamentRound, deleteTournamentUI,
   selectPlay, clearPlaySelection,
   onFielderClick, swapFielder, swapFielderGuarded, showAssignPositionModal, assignPositionFromModal,
   switchLiveStatsTab,
