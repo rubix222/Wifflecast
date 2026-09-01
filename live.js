@@ -3206,6 +3206,12 @@ async function reopenGame(gameId) {
   if (!confirm('Reopen this game? It will go back to in-progress status.')) return;
   const g = State.getGame(gameId); if (!g) return;
   await State.updateGame(gameId, { status: 'in_progress', isOver: false });
+  // The event is no longer fully decided until this game is finished again --
+  // clear its recap flag so finishing it re-triggers the event recap.
+  if (g.tournamentId) {
+    const t = State.getTournament(g.tournamentId);
+    if (t?.recapSent) await State.updateTournament(g.tournamentId, { recapSent: false });
+  }
   Render.games();
   Render.adminGames();
   await openGameForScoring(gameId);
