@@ -2641,6 +2641,12 @@ function renderTournamentDetail(id) {
       <div class="tourn-section-title" style="margin-top:20px">Event Awards</div>
       <div class="accolades-row">${cards}</div>`;
     }
+    if (isAdmin()) {
+      eventAwardsHtml += `
+      <div class="tourn-admin-actions" style="margin-top:10px">
+        <button class="btn btn-sm" id="btn-send-event-recap" onclick="sendEventRecapEmails('${id}')">📧 Email Event Recap</button>
+      </div>`;
+    }
   }
 
   const split = $('#tournaments-split');
@@ -3450,22 +3456,22 @@ function isTournamentComplete(tournId) {
   return totalPairs > 0 && nonChamp.filter(g => g.status === 'completed').length >= totalPairs;
 }
 
-async function maybeSendEventRecap(tournId) {
-  const t = State.getTournament(tournId); if (!t || t.recapSent) return;
-  if (!isTournamentComplete(tournId)) return;
-  // Mark sent first so a slow send / concurrent trigger can't double-fire.
-  await State.updateTournament(tournId, { recapSent: true });
-
-  if (!isAutoRecapEnabled()) { console.log('maybeSendEventRecap: skipped — recap emails disabled in Admin settings'); return; }
+// Does the actual sending — shared by the automatic and manual trigger paths.
+// Returns { sent, failed, recipients } (recipients = count found, before send attempts).
+async function _doSendEventRecap(tournId) {
+  const t = State.getTournament(tournId); if (!t) return { sent: 0, failed: 0, recipients: 0 };
   const cfg = getEmailConfig();
-  if (!cfg || !cfg.recapTemplateId) { console.warn('maybeSendEventRecap: no recap template configured'); return; }
+  if (!cfg || !cfg.recapTemplateId) return { sent: 0, failed: 0, recipients: 0, noTemplate: true };
 
   const allPids = new Set();
   t.teamIds.forEach(tid => (State.getTeam(tid)?.playerIds || []).forEach(pid => allPids.add(pid)));
   const recipients = resolveRecipientsForPlayerIds(allPids);
-  if (!recipients.length) { console.warn('maybeSendEventRecap: no recipients'); return; }
+  if (!recipients.length) return { sent: 0, failed: 0, recipients: 0 };
 
-  try { emailjs.init(cfg.publicKey); } catch (e) { console.error('maybeSendEventRecap: emailjs.init failed:', e); return; }
+  try { emailjs.init(cfg.publicKey); } catch (e) {
+    console.error('_doSendEventRecap: emailjs.init failed:', e);
+    return { sent: 0, failed: 0, recipients: recipients.length, initFailed: true };
+  }
 
   const plainText = buildEventRecapText(tournId);
   const subject = `${t.name} — WiffleCast Event Recap`;
@@ -3485,8 +3491,47 @@ async function maybeSendEventRecap(tournId) {
       failed++;
     }
   }
+  return { sent, failed, recipients: recipients.length };
+}
+
+async function maybeSendEventRecap(tournId) {
+  const t = State.getTournament(tournId); if (!t || t.recapSent) return;
+  if (!isTournamentComplete(tournId)) return;
+  // Skip quietly without marking recapSent -- disabled is a deliberate,
+  // possibly temporary state (e.g. testing), not a permanent skip.
+  if (!isAutoRecapEnabled()) { console.log('maybeSendEventRecap: skipped — recap emails disabled in Admin settings'); return; }
+
+  const { sent, failed, recipients, noTemplate } = await _doSendEventRecap(tournId);
+  // Don't lock in recapSent on a failure that a later retry (e.g. after
+  // configuring the recap template) could still recover from -- otherwise
+  // reopening and re-finishing the deciding game would never re-trigger it.
+  if (noTemplate) { console.warn('maybeSendEventRecap: no recap template configured — will retry next time this event\'s deciding game finishes'); return; }
+  if (!recipients) { console.warn('maybeSendEventRecap: no recipients — will retry next time this event\'s deciding game finishes'); return; }
+
+  await State.updateTournament(tournId, { recapSent: true });
   if (sent) console.log('maybeSendEventRecap: ' + sent + ' sent successfully');
   if (failed) console.error('maybeSendEventRecap: ' + failed + ' failed');
+}
+
+// Manual trigger (admin button on the event page) — sends regardless of
+// whether the automatic pass already ran, e.g. for an event that finished
+// before this feature existed, or to resend after fixing email settings.
+async function sendEventRecapEmails(tournId) {
+  if (!isAutoRecapEnabled()) { toast('Recap emails are disabled in Admin settings', 'error'); return; }
+  const cfg = getEmailConfig();
+  if (!cfg) { showEmailSetupModal(); return; }
+  if (!cfg.recapTemplateId) {
+    toast('No recap template configured — open email settings and add a Recap Template ID.', 'error');
+    showEmailSetupModal();
+    return;
+  }
+  const btn = document.getElementById('btn-send-event-recap');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  const { sent, failed, recipients } = await _doSendEventRecap(tournId);
+  if (btn) { btn.disabled = false; btn.textContent = '📧 Email Event Recap'; }
+  if (!recipients) { toast('No recipients (players need a linked account, invite, or have recaps turned off)', 'error'); return; }
+  await State.updateTournament(tournId, { recapSent: true });
+  toast(sent + ' event recap email' + (sent !== 1 ? 's' : '') + ' sent' + (failed ? ', ' + failed + ' failed' : ''), sent ? 'success' : 'error');
 }
 
 function showRecapModal(gameId) {
@@ -3715,7 +3760,7 @@ Object.assign(window, {
   endHalfInning, endGameEarly, swapHomeAway, showSkipBatterModal, skipBatter,
   showEditScoreModal, reopenGame, _esAdj, _esSave,
   showRecapModal, _copyRecap, _shareRecap, sendRecapEmails, autoSendRecapEmails, showEmailSetupModal, _saveEmailSetup, _toggleEmailSetup,
-  toggleAutoRecapEnabled, showEmailPreferencesModal, saveEmailPreferences,
+  toggleAutoRecapEnabled, showEmailPreferencesModal, saveEmailPreferences, sendEventRecapEmails,
   showNewTournamentModal, submitNewTournament, showTournamentModal, submitTournament, selectTournament, tournamentBack,
   generateTournamentGames, regenerateDERound, generateChampionshipGame, autoGenerateTournamentRound, deleteTournamentUI,
   selectPlay, clearPlaySelection,
