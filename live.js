@@ -2982,6 +2982,7 @@ async function finishGame(g, _reason) {
   await State.updateGame(g.id, { status: 'completed', isOver: true });
   autoSendRecapEmails(g.id);
   Render.games();
+  Render.adminGames();
   if (g.tournamentId) {
     Render.tournaments();
     await autoGenerateTournamentRound(g.tournamentId);
@@ -3092,6 +3093,7 @@ async function endGameEarly(gameId) {
   autoSendRecapEmails(gameId);
   renderLiveGame(gameId);
   Render.games();
+  Render.adminGames();
   if (g.tournamentId) {
     Render.tournaments();
     await autoGenerateTournamentRound(g.tournamentId);
@@ -3203,6 +3205,7 @@ async function reopenGame(gameId) {
   const g = State.getGame(gameId); if (!g) return;
   await State.updateGame(gameId, { status: 'in_progress', isOver: false });
   Render.games();
+  Render.adminGames();
   await openGameForScoring(gameId);
   toast('Game reopened');
 }

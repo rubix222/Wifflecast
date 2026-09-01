@@ -3166,6 +3166,7 @@ async function startGame(gameId) {
   });
   Modal.hide();
   Render.games();
+  Render.adminGames();
   await openGameForScoring(gameId);
 }
 
