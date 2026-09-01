@@ -2625,6 +2625,24 @@ function renderTournamentDetail(id) {
 
   const formatLabel = isDE ? 'Double Elimination' : 'Round Robin';
 
+  // Event-wide awards — shown once the event is fully decided
+  let eventAwardsHtml = '';
+  if (isTournamentComplete(id)) {
+    const accolades = computeEventAccolades(id);
+    if (accolades.length) {
+      const cards = accolades.map(a => `
+        <div class="accolade-card">
+          <div class="accolade-emoji">${a.emoji}</div>
+          <div class="accolade-label">${a.label}</div>
+          <div class="accolade-name">${escapeHtml(a.player.name)}</div>
+          ${a.detail ? `<div class="accolade-detail">${a.detail}</div>` : ''}
+        </div>`).join('');
+      eventAwardsHtml = `
+      <div class="tourn-section-title" style="margin-top:20px">Event Awards</div>
+      <div class="accolades-row">${cards}</div>`;
+    }
+  }
+
   const split = $('#tournaments-split');
   if (split) split.classList.add('tourn-has-detail');
 
@@ -2646,6 +2664,8 @@ function renderTournamentDetail(id) {
 
       <div class="tourn-section-title">Games</div>
       ${gamesHtml}
+
+      ${eventAwardsHtml}
 
       <div class="tourn-section-title" style="margin-top:20px">Player Stats</div>
       <div class="players-subnav" id="tourn-player-subnav">

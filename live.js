@@ -3215,11 +3215,13 @@ async function reopenGame(gameId) {
 /* ============================================================
    END-OF-GAME ACCOLADES
    ============================================================ */
-function computeGameAccolades(g) {
-  const allPids = [...new Set([...(g.homeBattingOrder||[]), ...(g.awayBattingOrder||[])])];
+// Shared by both single-game and event-wide accolades: given a player-id list
+// and the pool of pa_end events to consider, finds each stat category's
+// leader(s) and assigns each qualifying player their best accolade.
+function _computeAccoladesFromEvents(allPids, events) {
   const ps = {};
   allPids.forEach(id => { ps[id] = { hits:0, rbi:0, hr:0, r:0, bb:0, kp:0, xbh:0, err:0 }; });
-  (g.events||[]).forEach(e => {
+  events.forEach(e => {
     if (e.type !== 'pa_end') return;
     const b = ps[e.batterId], pit = ps[e.pitcherId];
     if (b) {
@@ -3254,6 +3256,24 @@ function computeGameAccolades(g) {
     if (!accolade) return null;
     return { player, ...accolade };
   }).filter(Boolean);
+}
+
+function computeGameAccolades(g) {
+  const allPids = [...new Set([...(g.homeBattingOrder||[]), ...(g.awayBattingOrder||[])])];
+  return _computeAccoladesFromEvents(allPids, g.events || []);
+}
+
+// Event-wide accolades: same categories, but aggregated across every game
+// (including the championship) played in the tournament.
+function computeEventAccolades(tournId) {
+  const games = State.games.filter(g => g.tournamentId === tournId);
+  const allPids = new Set();
+  games.forEach(g => {
+    (g.homeBattingOrder||[]).forEach(id => allPids.add(id));
+    (g.awayBattingOrder||[]).forEach(id => allPids.add(id));
+  });
+  const allEvents = games.flatMap(g => g.events || []);
+  return _computeAccoladesFromEvents([...allPids], allEvents);
 }
 
 function renderAccolades(g) {
@@ -3569,13 +3589,16 @@ function buildRecapHtml(g, recipientName) {
 }
 
 /* ── Event (tournament) recap — sent once when an event is fully decided ── */
-function _eventRecapChampionName(t) {
+// Returns { home, away, homeScore, awayScore, championName } for the completed
+// championship game, or null if there isn't one (e.g. pure round robin).
+function _eventRecapFinals(t) {
   const champGame = State.games.find(g => g.tournamentId === t.id && g.isChampionship);
   if (!champGame || champGame.status !== 'completed') return null;
   const home = State.getTeam(champGame.homeTeamId), away = State.getTeam(champGame.awayTeamId);
-  if (champGame.score.home > champGame.score.away) return home?.name || null;
-  if (champGame.score.away > champGame.score.home) return away?.name || null;
-  return null;
+  const homeScore = champGame.score.home, awayScore = champGame.score.away;
+  const championName = homeScore > awayScore ? home?.name || null
+    : awayScore > homeScore ? away?.name || null : null;
+  return { home, away, homeScore, awayScore, championName };
 }
 function _eventRecapStandings(t) {
   const isDE = t.format === 'double_elim';
@@ -3588,19 +3611,33 @@ function _eventRecapStandings(t) {
 
 function buildEventRecapText(tournId) {
   const t = State.getTournament(tournId); if (!t) return '';
-  const championName = _eventRecapChampionName(t);
+  const finals = _eventRecapFinals(t);
   const standings = _eventRecapStandings(t);
+  const accolades = computeEventAccolades(tournId);
   const lines = [];
   lines.push(`🏆 WiffleCast Event Recap — ${t.name}`);
   lines.push('');
-  if (championName) lines.push(`CHAMPION: ${championName} 🎉`);
-  lines.push('');
+
+  if (finals) {
+    lines.push('FINALS');
+    lines.push(`  ${finals.away?.name || '?'} ${finals.awayScore} @ ${finals.home?.name || '?'} ${finals.homeScore}`);
+    if (finals.championName) lines.push(`  🎉 ${finals.championName} wins the championship!`);
+    lines.push('');
+  }
+
   lines.push('FINAL STANDINGS');
   standings.forEach((row, i) => {
     const record = row.T ? `${row.W}-${row.L}-${row.T}` : `${row.W}-${row.L}`;
     lines.push(`  ${i + 1}. ${row.name} (${record})`);
   });
   lines.push('');
+
+  if (accolades.length) {
+    lines.push('EVENT AWARDS');
+    accolades.forEach(a => lines.push(`  ${a.emoji} ${a.label}: ${a.player.name} (${a.detail})`));
+    lines.push('');
+  }
+
   lines.push('— Tracked with WiffleCast');
   return lines.join('\n');
 }
@@ -3608,12 +3645,13 @@ function buildEventRecapText(tournId) {
 function buildEventRecapHtml(tournId, recipientName) {
   const t = State.getTournament(tournId); if (!t) return '<p>Event data unavailable.</p>';
   const esc = escapeHtml;
-  const championName = _eventRecapChampionName(t);
+  const finals = _eventRecapFinals(t);
   const standings = _eventRecapStandings(t);
+  const accolades = computeEventAccolades(tournId);
 
   const rows = standings.map((row, i) => {
     const record = row.T ? `${row.W}-${row.L}-${row.T}` : `${row.W}-${row.L}`;
-    const isChamp = championName && row.name === championName;
+    const isChamp = finals?.championName && row.name === finals.championName;
     return `
       <tr style="background:${i % 2 ? '#ffffff' : '#f9fafb'}">
         <td style="padding:6px 10px;font-size:12px;color:#9ca3af;text-align:center">${i + 1}</td>
@@ -3625,6 +3663,57 @@ function buildEventRecapHtml(tournId, recipientName) {
   const greeting = recipientName
     ? `<tr><td style="padding:20px 24px 4px;font-size:14px;color:#374151">Hi <strong>${esc(recipientName)}</strong>, here's how ${esc(t.name)} wrapped up.</td></tr>`
     : '';
+
+  let finalsSection = '';
+  if (finals) {
+    const awayWon = finals.awayScore > finals.homeScore, homeWon = finals.homeScore > finals.awayScore;
+    finalsSection = `
+  <!-- FINALS -->
+  <tr><td style="padding:20px 24px 0">
+    <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">Finals</div>
+  </td></tr>
+  <tr><td style="background:#f0fdf4;padding:24px 16px;border-radius:8px 8px 0 0">
+    <table width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td width="43%" align="center" valign="top" style="padding:0 8px">
+          <div style="font-size:14px;font-weight:700;color:#15803d;margin-bottom:8px;line-height:1.2">${esc(finals.away?.name || '?')}</div>
+          <div style="font-size:44px;font-weight:800;line-height:1;color:${awayWon?'#15803d':'#9ca3af'}">${finals.awayScore}</div>
+        </td>
+        <td width="14%" align="center" valign="top" style="padding-top:14px">
+          <div style="font-size:18px;color:#d1d5db">@</div>
+        </td>
+        <td width="43%" align="center" valign="top" style="padding:0 8px">
+          <div style="font-size:14px;font-weight:700;color:#15803d;margin-bottom:8px;line-height:1.2">${esc(finals.home?.name || '?')}</div>
+          <div style="font-size:44px;font-weight:800;line-height:1;color:${homeWon?'#15803d':'#9ca3af'}">${finals.homeScore}</div>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+  ${finals.championName ? `
+  <tr><td style="background:#f0fdf4;padding:0 16px 20px;border-bottom:2px solid #dcfce7;text-align:center;border-radius:0 0 8px 8px">
+    <span style="display:inline-block;background:#15803d;color:#fff;font-size:12px;font-weight:700;padding:5px 14px;border-radius:12px;letter-spacing:0.05em">🎉 ${esc(finals.championName)} — CHAMPION</span>
+  </td></tr>` : ''}`;
+  }
+
+  let awardsSection = '';
+  if (accolades.length) {
+    const perRow = Math.min(accolades.length, 4);
+    const pct = Math.floor(100 / perRow);
+    const cards = accolades.slice(0, 8).map(a => `
+      <td width="${pct}%" align="center" valign="top" style="padding:4px">
+        <div style="background:#f0fdf4;border:1px solid #dcfce7;border-radius:8px;padding:12px 6px;text-align:center">
+          <div style="font-size:22px;line-height:1;margin-bottom:4px">${a.emoji}</div>
+          <div style="font-size:10px;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px">${esc(a.label)}</div>
+          <div style="font-size:12px;font-weight:700;color:#111827">${esc(a.player.name)}</div>
+          <div style="font-size:11px;color:#6b7280;margin-top:2px">${a.detail||''}</div>
+        </div>
+      </td>`).join('');
+    awardsSection = `
+      <tr><td style="padding:20px 24px 0">
+        <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">Event Awards</div>
+        <table width="100%" cellpadding="0" cellspacing="0"><tr>${cards}</tr></table>
+      </td></tr>`;
+  }
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -3644,12 +3733,7 @@ function buildEventRecapHtml(tournId, recipientName) {
 
   ${greeting}
 
-  ${championName ? `
-  <!-- CHAMPION BANNER -->
-  <tr><td style="background:#f0fdf4;padding:24px 16px;border-bottom:2px solid #dcfce7;text-align:center">
-    <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">Champion</div>
-    <div style="font-size:28px;font-weight:800;color:#15803d">${esc(championName)} 🎉</div>
-  </td></tr>` : ''}
+  ${finalsSection}
 
   <!-- STANDINGS -->
   <tr><td style="padding:20px 24px">
@@ -3663,6 +3747,8 @@ function buildEventRecapHtml(tournId, recipientName) {
       <tbody>${rows}</tbody>
     </table>
   </td></tr>
+
+  ${awardsSection}
 
   <!-- FOOTER -->
   <tr><td style="background:#f9fafb;padding:16px 24px;text-align:center;border-top:1px solid #e5e7eb">
