@@ -857,6 +857,36 @@ async function submitChangePassword(event) {
   }
 }
 
+function showEmailPreferencesModal() {
+  if (!currentUserProfile) return;
+  const wantsRecap = currentUserProfile.wantsRecap !== false;
+  Modal.show(`
+    <div class="modal-header">
+      <h3>Email Preferences</h3>
+      <button class="btn-icon" onclick="Modal.hide()">✕</button>
+    </div>
+    <div class="modal-body">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input id="pref-recap" type="checkbox" style="width:auto" ${wantsRecap ? 'checked' : ''} />
+        Receive game &amp; event recap emails
+      </label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="Modal.hide()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEmailPreferences()">Save</button>
+    </div>`);
+}
+
+async function saveEmailPreferences() {
+  if (!currentUserProfile) return;
+  const wantsRecap = document.getElementById('pref-recap')?.checked ?? true;
+  const updated = { ...currentUserProfile, wantsRecap };
+  await Storage.saveUser(updated);
+  currentUserProfile = updated;
+  Modal.hide();
+  toast('Email preferences saved', 'success');
+}
+
 async function adminResetPassword(uid) {
   const u = State.users.find(u => u.uid === uid);
   if (!u?.email) { toast('No email on file for this user', 'error'); return; }
@@ -3185,6 +3215,22 @@ async function saveEmailConfig(cfg) {
   try { await Storage.saveEmailConfig(cfg); } catch (e) { console.warn('saveEmailConfig Firestore error:', e); }
 }
 
+// Global kill switch for all recap sending (game + event). Defaults to enabled
+// when unset so existing configs keep working; admins flip it off for testing.
+function isAutoRecapEnabled() {
+  const cfg = getEmailConfig();
+  return !cfg || cfg.autoRecapEnabled !== false;
+}
+async function toggleAutoRecapEnabled(enabled) {
+  const cfg = getEmailConfig() || {};
+  await saveEmailConfig({ ...cfg, autoRecapEnabled: enabled });
+  toast(enabled ? 'Recap emails enabled' : 'Recap emails disabled (testing mode)', 'success');
+}
+function syncAdminEmailToggle() {
+  const chk = document.getElementById('chk-auto-recap');
+  if (chk) chk.checked = isAutoRecapEnabled();
+}
+
 function _toggleEmailSetup() {
   const wrap = document.getElementById('ejs-setup-wrap');
   if (wrap) wrap.style.display = wrap.style.display === 'none' ? 'block' : 'none';
@@ -3231,12 +3277,53 @@ async function _saveEmailSetup() {
   const publicKey        = document.getElementById('ejs-key')?.value.trim();
   const recapTemplateId  = document.getElementById('ejs-recap-template')?.value.trim() || '';
   if (!serviceId || !publicKey) { toast('Service ID and Public Key are required', 'error'); return; }
-  await saveEmailConfig({ serviceId, templateId, publicKey, recapTemplateId });
+  await saveEmailConfig({ ...(getEmailConfig() || {}), serviceId, templateId, publicKey, recapTemplateId });
   toast('Email settings saved — synced to all devices', 'success');
   Modal.hide();
 }
 
+// Resolves email recipients for a set of player IDs, honoring each user's
+// per-user recap opt-out (wantsRecap === false). De-duped by email.
+function resolveRecipientsForPlayerIds(pidSet) {
+  const seen = new Set();
+  const recipients = [];
+
+  // Method 1: user account has u.playerId pointing into this set
+  for (const u of State.users) {
+    if (u.playerId && pidSet.has(u.playerId) && u.email && !seen.has(u.email)) {
+      seen.add(u.email);
+      if (u.wantsRecap !== false) recipients.push({ email: u.email, name: u.name || u.email });
+    }
+  }
+
+  // Method 2: player has p.userId → look up that user's email.
+  // This catches the inverse direction (player was linked to user via admin tools).
+  for (const pid of pidSet) {
+    const p = State.getPlayer(pid);
+    if (p?.userId) {
+      const u = State.getUser(p.userId);
+      if (u?.email && !seen.has(u.email)) {
+        seen.add(u.email);
+        if (u.wantsRecap !== false) recipients.push({ email: u.email, name: u.name || p.name || u.email });
+      }
+    }
+  }
+
+  // Method 3: player has an inviteEmail (invited but may not have signed up yet —
+  // no user profile exists yet, so there's no opt-out to honor).
+  for (const pid of pidSet) {
+    const p = State.getPlayer(pid);
+    if (p?.inviteEmail && !seen.has(p.inviteEmail)) {
+      recipients.push({ email: p.inviteEmail, name: p.name || p.inviteEmail });
+      seen.add(p.inviteEmail);
+    }
+  }
+
+  return recipients;
+}
+
 async function sendRecapEmails(gameId) {
+  if (!isAutoRecapEnabled()) { toast('Recap emails are disabled in Admin settings', 'error'); return; }
   const cfg = getEmailConfig();
   if (!cfg) { showEmailSetupModal(); return; }
   if (!cfg.recapTemplateId) {
@@ -3246,9 +3333,9 @@ async function sendRecapEmails(gameId) {
   }
   const g = State.getGame(gameId); if (!g) return;
   const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
-  const allPids = [...new Set([...(home?.playerIds || []), ...(away?.playerIds || [])])];
-  const players = allPids.map(pid => State.getPlayer(pid)).filter(p => p?.email);
-  if (!players.length) { toast('No players have email addresses on file', 'error'); return; }
+  const allPids = new Set([...(home?.playerIds || []), ...(away?.playerIds || [])]);
+  const recipients = resolveRecipientsForPlayerIds(allPids);
+  if (!recipients.length) { toast('No recipients (players need a linked account, invite, or have recaps turned off)', 'error'); return; }
 
   try { emailjs.init(cfg.publicKey); } catch (e) { toast('EmailJS init failed: ' + e.message, 'error'); return; }
 
@@ -3258,18 +3345,18 @@ async function sendRecapEmails(gameId) {
   const btn = document.getElementById('btn-send-recap');
   if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
 
-  for (const p of players) {
+  for (const r of recipients) {
     try {
       await emailjs.send(cfg.serviceId, cfg.recapTemplateId, {
-        to_email: p.email,
-        to_name:  p.name || p.email,
+        to_email: r.email,
+        to_name:  r.name,
         subject,
         message:      plainText,
-        html_message: buildRecapHtml(g, p.name || ''),
+        html_message: buildRecapHtml(g, r.name),
       });
       sent++;
     } catch (e) {
-      console.warn('EmailJS send failed for', p.email, e);
+      console.warn('EmailJS send failed for', r.email, e);
       failed++;
     }
   }
@@ -3280,6 +3367,7 @@ async function sendRecapEmails(gameId) {
 
 /* Auto-send recap to all users linked to players in the game when a game finishes */
 async function autoSendRecapEmails(gameId) {
+  if (!isAutoRecapEnabled()) { console.log('autoSendRecapEmails: skipped — recap emails disabled in Admin settings'); return; }
   const cfg = getEmailConfig();
   if (!cfg) { console.warn('autoSendRecapEmails: no email config found'); return; }
   if (!cfg.recapTemplateId) {
@@ -3289,44 +3377,12 @@ async function autoSendRecapEmails(gameId) {
   const g = State.getGame(gameId); if (!g) return;
   const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
   const allPids = new Set([...(home?.playerIds || []), ...(away?.playerIds || [])]);
-
-  const seen = new Set();
-  const recipients = [];
-
-  // Method 1: user account has u.playerId pointing into this game
-  for (const u of State.users) {
-    if (u.playerId && allPids.has(u.playerId) && u.email && !seen.has(u.email)) {
-      recipients.push({ email: u.email, name: u.name || u.email });
-      seen.add(u.email);
-    }
-  }
-
-  // Method 2: player in this game has p.userId → look up that user's email.
-  // This catches the inverse direction (player was linked to user via admin tools).
-  for (const pid of allPids) {
-    const p = State.getPlayer(pid);
-    if (p?.userId) {
-      const u = State.getUser(p.userId);
-      if (u?.email && !seen.has(u.email)) {
-        recipients.push({ email: u.email, name: u.name || p.name || u.email });
-        seen.add(u.email);
-      }
-    }
-  }
-
-  // Method 3: player has an inviteEmail (invited but may not have signed up yet)
-  for (const pid of allPids) {
-    const p = State.getPlayer(pid);
-    if (p?.inviteEmail && !seen.has(p.inviteEmail)) {
-      recipients.push({ email: p.inviteEmail, name: p.name || p.inviteEmail });
-      seen.add(p.inviteEmail);
-    }
-  }
+  const recipients = resolveRecipientsForPlayerIds(allPids);
 
   console.log('autoSendRecapEmails: found', recipients.length, 'recipient(s):', recipients.map(r => r.email));
 
   if (!recipients.length) {
-    console.warn('autoSendRecapEmails: no recipients — players need a linked account or inviteEmail');
+    console.warn('autoSendRecapEmails: no recipients — players need a linked account or inviteEmail, or have recaps turned off');
     return;
   }
 
@@ -3358,6 +3414,59 @@ async function autoSendRecapEmails(gameId) {
   }
   if (sent) console.log('autoSendRecapEmails: ' + sent + ' sent successfully');
   if (failed) { console.error('autoSendRecapEmails: ' + failed + ' failed'); toast(failed + ' recap email' + (failed !== 1 ? 's' : '') + ' failed to send', 'error'); }
+}
+
+/* Fires an event-wide recap once a tournament is fully decided (championship
+   played, or round robin's last pair completed). Sent once per tournament. */
+function isTournamentComplete(tournId) {
+  const t = State.getTournament(tournId); if (!t) return false;
+  const allGames  = State.games.filter(g => g.tournamentId === tournId);
+  const champGame = allGames.find(g => g.isChampionship);
+  if (t.format === 'double_elim' || t.format === 'playoff') {
+    return !!champGame && champGame.status === 'completed';
+  }
+  const nonChamp   = allGames.filter(g => !g.isChampionship);
+  const totalPairs = t.teamIds.length * (t.teamIds.length - 1) / 2;
+  return totalPairs > 0 && nonChamp.filter(g => g.status === 'completed').length >= totalPairs;
+}
+
+async function maybeSendEventRecap(tournId) {
+  const t = State.getTournament(tournId); if (!t || t.recapSent) return;
+  if (!isTournamentComplete(tournId)) return;
+  // Mark sent first so a slow send / concurrent trigger can't double-fire.
+  await State.updateTournament(tournId, { recapSent: true });
+
+  if (!isAutoRecapEnabled()) { console.log('maybeSendEventRecap: skipped — recap emails disabled in Admin settings'); return; }
+  const cfg = getEmailConfig();
+  if (!cfg || !cfg.recapTemplateId) { console.warn('maybeSendEventRecap: no recap template configured'); return; }
+
+  const allPids = new Set();
+  t.teamIds.forEach(tid => (State.getTeam(tid)?.playerIds || []).forEach(pid => allPids.add(pid)));
+  const recipients = resolveRecipientsForPlayerIds(allPids);
+  if (!recipients.length) { console.warn('maybeSendEventRecap: no recipients'); return; }
+
+  try { emailjs.init(cfg.publicKey); } catch (e) { console.error('maybeSendEventRecap: emailjs.init failed:', e); return; }
+
+  const plainText = buildEventRecapText(tournId);
+  const subject = `${t.name} — WiffleCast Event Recap`;
+  let sent = 0, failed = 0;
+  for (const r of recipients) {
+    try {
+      await emailjs.send(cfg.serviceId, cfg.recapTemplateId, {
+        to_email:     r.email,
+        to_name:      r.name,
+        subject,
+        message:      plainText,
+        html_message: buildEventRecapHtml(tournId, r.name),
+      });
+      sent++;
+    } catch (e) {
+      console.error('Event recap email failed for', r.email, e?.status, e?.text || e?.message || e);
+      failed++;
+    }
+  }
+  if (sent) console.log('maybeSendEventRecap: ' + sent + ' sent successfully');
+  if (failed) console.error('maybeSendEventRecap: ' + failed + ' failed');
 }
 
 function showRecapModal(gameId) {
@@ -3438,6 +3547,7 @@ function switchTab(view) {
   _currentTab = view;
   $$('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
   $$('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + view));
+  if (view === 'admin') syncAdminEmailToggle();
 }
 $$('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => switchTab(btn.dataset.view));
@@ -3585,6 +3695,7 @@ Object.assign(window, {
   endHalfInning, endGameEarly, swapHomeAway, showSkipBatterModal, skipBatter,
   showEditScoreModal, reopenGame, _esAdj, _esSave,
   showRecapModal, _copyRecap, _shareRecap, sendRecapEmails, autoSendRecapEmails, showEmailSetupModal, _saveEmailSetup, _toggleEmailSetup,
+  toggleAutoRecapEnabled, showEmailPreferencesModal, saveEmailPreferences,
   showNewTournamentModal, submitNewTournament, showTournamentModal, submitTournament, selectTournament, tournamentBack,
   generateTournamentGames, regenerateDERound, generateChampionshipGame, autoGenerateTournamentRound, deleteTournamentUI,
   selectPlay, clearPlaySelection,

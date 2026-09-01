@@ -2986,6 +2986,7 @@ async function finishGame(g, _reason) {
   if (g.tournamentId) {
     Render.tournaments();
     await autoGenerateTournamentRound(g.tournamentId);
+    await maybeSendEventRecap(g.tournamentId);
   }
 }
 
@@ -3097,6 +3098,7 @@ async function endGameEarly(gameId) {
   if (g.tournamentId) {
     Render.tournaments();
     await autoGenerateTournamentRound(g.tournamentId);
+    await maybeSendEventRecap(g.tournamentId);
   }
 }
 
@@ -3557,6 +3559,114 @@ function buildRecapHtml(g, recipientName) {
     <div style="margin-top:8px">
       <a href="${window.location.origin}${window.location.pathname}?game=${g.id}" style="font-size:12px;color:#15803d;text-decoration:none;font-weight:600">View this game ↗</a>
     </div>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
+}
+
+/* ── Event (tournament) recap — sent once when an event is fully decided ── */
+function _eventRecapChampionName(t) {
+  const champGame = State.games.find(g => g.tournamentId === t.id && g.isChampionship);
+  if (!champGame || champGame.status !== 'completed') return null;
+  const home = State.getTeam(champGame.homeTeamId), away = State.getTeam(champGame.awayTeamId);
+  if (champGame.score.home > champGame.score.away) return home?.name || null;
+  if (champGame.score.away > champGame.score.home) return away?.name || null;
+  return null;
+}
+function _eventRecapStandings(t) {
+  const isDE = t.format === 'double_elim';
+  const rows = isDE ? State.computeDoubleElimStandings(t.id) : State.computeTournamentStandings(t.id);
+  return rows.map(row => ({
+    name: row.team.name,
+    W: row.W, L: row.L, T: row.T || 0,
+  }));
+}
+
+function buildEventRecapText(tournId) {
+  const t = State.getTournament(tournId); if (!t) return '';
+  const championName = _eventRecapChampionName(t);
+  const standings = _eventRecapStandings(t);
+  const lines = [];
+  lines.push(`🏆 WiffleCast Event Recap — ${t.name}`);
+  lines.push('');
+  if (championName) lines.push(`CHAMPION: ${championName} 🎉`);
+  lines.push('');
+  lines.push('FINAL STANDINGS');
+  standings.forEach((row, i) => {
+    const record = row.T ? `${row.W}-${row.L}-${row.T}` : `${row.W}-${row.L}`;
+    lines.push(`  ${i + 1}. ${row.name} (${record})`);
+  });
+  lines.push('');
+  lines.push('— Tracked with WiffleCast');
+  return lines.join('\n');
+}
+
+function buildEventRecapHtml(tournId, recipientName) {
+  const t = State.getTournament(tournId); if (!t) return '<p>Event data unavailable.</p>';
+  const esc = escapeHtml;
+  const championName = _eventRecapChampionName(t);
+  const standings = _eventRecapStandings(t);
+
+  const rows = standings.map((row, i) => {
+    const record = row.T ? `${row.W}-${row.L}-${row.T}` : `${row.W}-${row.L}`;
+    const isChamp = championName && row.name === championName;
+    return `
+      <tr style="background:${i % 2 ? '#ffffff' : '#f9fafb'}">
+        <td style="padding:6px 10px;font-size:12px;color:#9ca3af;text-align:center">${i + 1}</td>
+        <td style="padding:6px 10px;font-size:13px;font-weight:700;color:#111827">${esc(row.name)}${isChamp ? ' 🏆' : ''}</td>
+        <td style="padding:6px 10px;font-size:12px;color:#374151;text-align:center">${record}</td>
+      </tr>`;
+  }).join('');
+
+  const greeting = recipientName
+    ? `<tr><td style="padding:20px 24px 4px;font-size:14px;color:#374151">Hi <strong>${esc(recipientName)}</strong>, here's how ${esc(t.name)} wrapped up.</td></tr>`
+    : '';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WiffleCast Event Recap</title></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:24px 0">
+<tr><td align="center" style="padding:0 12px">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;width:100%;max-width:600px;border:1px solid #e5e7eb">
+
+  <!-- HEADER -->
+  <tr><td style="background:#14532d;padding:28px 24px;text-align:center">
+    <div style="font-size:36px;line-height:1;margin-bottom:8px">🏆</div>
+    <div style="color:#ffffff;font-size:20px;font-weight:700">${esc(t.name)}</div>
+    <div style="color:#86efac;font-size:13px;margin-top:6px">Event Recap</div>
+  </td></tr>
+
+  ${greeting}
+
+  ${championName ? `
+  <!-- CHAMPION BANNER -->
+  <tr><td style="background:#f0fdf4;padding:24px 16px;border-bottom:2px solid #dcfce7;text-align:center">
+    <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">Champion</div>
+    <div style="font-size:28px;font-weight:800;color:#15803d">${esc(championName)} 🎉</div>
+  </td></tr>` : ''}
+
+  <!-- STANDINGS -->
+  <tr><td style="padding:20px 24px">
+    <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">Final Standings</div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden">
+      <thead><tr style="background:#f3f4f6">
+        <th style="padding:6px 10px;font-size:11px;font-weight:700;color:#9ca3af;text-align:center">#</th>
+        <th style="padding:6px 10px;font-size:11px;font-weight:700;color:#9ca3af;text-align:left">Team</th>
+        <th style="padding:6px 10px;font-size:11px;font-weight:700;color:#9ca3af;text-align:center">Record</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </td></tr>
+
+  <!-- FOOTER -->
+  <tr><td style="background:#f9fafb;padding:16px 24px;text-align:center;border-top:1px solid #e5e7eb">
+    <div style="font-size:12px;color:#9ca3af">Tracked with <strong style="color:#6b7280">WiffleCast</strong></div>
   </td></tr>
 
 </table>

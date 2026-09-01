@@ -24,6 +24,7 @@
       </button>
       <div id="user-menu-dropdown" class="user-menu-dropdown" style="display:none">
         <button class="user-menu-item" onclick="closeUserMenu();showChangePasswordModal()">Change Password</button>
+        <button class="user-menu-item" onclick="closeUserMenu();showEmailPreferencesModal()">Email Preferences</button>
         <div class="user-menu-divider"></div>
         <button class="user-menu-item user-menu-item-danger" id="btn-sign-out">Sign Out</button>
       </div>
@@ -120,6 +121,10 @@
     <div class="admin-panel-section">
       <h3 class="admin-panel-heading">Email Settings</h3>
       <p class="help-text" style="margin-bottom:10px">Configure EmailJS to automatically send game recaps to linked players when a game finishes.</p>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:10px;font-size:13px">
+        <input type="checkbox" id="chk-auto-recap" onchange="toggleAutoRecapEnabled(this.checked)">
+        Send recap emails <span class="muted small">(uncheck to disable all recap sending, e.g. for testing)</span>
+      </label>
       <button class="btn" onclick="showEmailSetupModal()">⚙️ Configure EmailJS</button>
     </div>
   </section>
