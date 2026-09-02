@@ -36,7 +36,23 @@ function toast(msg, type = '') {
   el.textContent = msg;
   el.className = 'toast show' + (type ? ' ' + type : '');
   clearTimeout(toast._t);
-  toast._t = setTimeout(() => { el.className = 'toast'; }, 2400);
+  toast._t = setTimeout(() => { el.className = 'toast'; }, type === 'error' ? 6000 : 2400);
+}
+
+// Surfaces a visible warning when a Firestore read/write fails (e.g. daily
+// quota exceeded), instead of the silent console.warn these used to be.
+// Throttled so a burst of failures (e.g. every listener erroring at once)
+// only shows one toast rather than spamming the screen.
+let _lastFirestoreErrorToast = 0;
+function _notifyFirestoreError(context, err) {
+  console.error(context + ':', err?.code || '', err?.message || err);
+  const now = Date.now();
+  if (now - _lastFirestoreErrorToast < 8000) return;
+  _lastFirestoreErrorToast = now;
+  const isQuota = err?.code === 'resource-exhausted' || /quota/i.test(err?.message || '');
+  toast(isQuota
+    ? '⚠️ Firebase daily limit reached — data may not be saving or syncing'
+    : '⚠️ Connection issue — some data may not have saved', 'error');
 }
 
 /* ============================================================
@@ -63,10 +79,10 @@ const Storage = {
     if (gs.status === 'fulfilled') State.games       = gs.value.docs.map(d => d.data());
     if (us.status === 'fulfilled') State.users       = us.value.docs.map(d => d.data());
     if (tr.status === 'fulfilled') State.tournaments = tr.value.docs.map(d => d.data());
-    // Surface load errors for debugging but don't throw — partial data is usable
+    // Surface load errors but don't throw — partial data is usable
+    const names = ['players', 'teams', 'games', 'users', 'tournaments'];
     [ps, ts, gs, us, tr].forEach((r, i) => {
-      if (r.status === 'rejected')
-        console.warn('loadAll collection', i, 'failed:', r.reason?.code, r.reason?.message);
+      if (r.status === 'rejected') _notifyFirestoreError('loadAll ' + names[i], r.reason);
     });
     // Load email config separately — it lives in a config document, not a collection
     await Storage.loadEmailConfig();
@@ -88,7 +104,7 @@ const Storage = {
           Render.adminPlayers();
           Render.home();
         });
-      }, err => console.warn('players listener:', err.message)),
+      }, err => _notifyFirestoreError('players listener', err)),
 
       fs.onSnapshot(fs.collection(fs.db, 'teams'), snap => {
         State.teams = snap.docs.map(d => d.data());
@@ -98,7 +114,7 @@ const Storage = {
           Render.home();
         });
         rerenderLive(); // reflect team name changes immediately in any open live game
-      }, err => console.warn('teams listener:', err.message)),
+      }, err => _notifyFirestoreError('teams listener', err)),
 
       fs.onSnapshot(fs.collection(fs.db, 'games'), snap => {
         snap.docChanges().forEach(change => {
@@ -121,7 +137,7 @@ const Storage = {
           Render.adminGames && Render.adminGames();
         });
         if (LiveGameId) rerenderLive();
-      }, err => console.warn('games listener:', err.message)),
+      }, err => _notifyFirestoreError('games listener', err)),
 
       fs.onSnapshot(fs.collection(fs.db, 'tournaments'), snap => {
         State.tournaments = snap.docs.map(d => d.data());
@@ -129,7 +145,7 @@ const Storage = {
           Render.tournaments && Render.tournaments();
           Render.adminEvents && Render.adminEvents();
         });
-      }, err => console.warn('tournaments listener:', err.message)),
+      }, err => _notifyFirestoreError('tournaments listener', err)),
 
       fs.onSnapshot(fs.collection(fs.db, 'users'), snap => {
         State.users = snap.docs.map(d => d.data());
@@ -146,7 +162,7 @@ const Storage = {
           p.invitePending = false;
           Storage.savePlayer(p);
         });
-      }, err => console.warn('users listener:', err.message)),
+      }, err => _notifyFirestoreError('users listener', err)),
 
       // Email config — single document listener so all devices share the same settings
       fs.onSnapshot(fs.doc(fs.db, 'config', 'email'), snap => {
@@ -154,62 +170,75 @@ const Storage = {
           State.emailConfig = snap.data();
           try { localStorage.setItem('wc_ejs', JSON.stringify(State.emailConfig)); } catch (_) {}
         }
-      }, err => console.warn('email config listener:', err.message))
+      }, err => _notifyFirestoreError('email config listener', err))
     );
   },
 
   async saveUser(profile) {
     const fs = window._fs;
-    await fs.setDoc(fs.doc(fs.db, 'users', profile.uid), profile);
+    try { await fs.setDoc(fs.doc(fs.db, 'users', profile.uid), profile); }
+    catch (e) { _notifyFirestoreError('saveUser', e); throw e; }
   },
   async removeUser(uid) {
     const fs = window._fs;
-    await fs.deleteDoc(fs.doc(fs.db, 'users', uid));
+    try { await fs.deleteDoc(fs.doc(fs.db, 'users', uid)); }
+    catch (e) { _notifyFirestoreError('removeUser', e); throw e; }
   },
   async getUser(uid) {
     const fs = window._fs;
-    const snap = await fs.getDocs(fs.collection(fs.db, 'users'));
-    const d = snap.docs.find(x => x.id === uid);
-    return d ? d.data() : null;
+    try {
+      const snap = await fs.getDocs(fs.collection(fs.db, 'users'));
+      const d = snap.docs.find(x => x.id === uid);
+      return d ? d.data() : null;
+    } catch (e) { _notifyFirestoreError('getUser', e); throw e; }
   },
   async saveAll() { /* no-op — individual saves handle this */ },
 
   async savePlayer(p) {
     const fs = window._fs;
-    await fs.setDoc(fs.doc(fs.db, 'players', p.id), p);
+    try { await fs.setDoc(fs.doc(fs.db, 'players', p.id), p); }
+    catch (e) { _notifyFirestoreError('savePlayer', e); throw e; }
   },
   async removePlayer(id) {
     const fs = window._fs;
-    await fs.deleteDoc(fs.doc(fs.db, 'players', id));
+    try { await fs.deleteDoc(fs.doc(fs.db, 'players', id)); }
+    catch (e) { _notifyFirestoreError('removePlayer', e); throw e; }
   },
   async saveTeam(t) {
     const fs = window._fs;
-    await fs.setDoc(fs.doc(fs.db, 'teams', t.id), t);
+    try { await fs.setDoc(fs.doc(fs.db, 'teams', t.id), t); }
+    catch (e) { _notifyFirestoreError('saveTeam', e); throw e; }
   },
   async removeTeam(id) {
     const fs = window._fs;
-    await fs.deleteDoc(fs.doc(fs.db, 'teams', id));
+    try { await fs.deleteDoc(fs.doc(fs.db, 'teams', id)); }
+    catch (e) { _notifyFirestoreError('removeTeam', e); throw e; }
   },
   async saveGame(g) {
     const fs = window._fs;
-    await fs.setDoc(fs.doc(fs.db, 'games', g.id), g);
+    try { await fs.setDoc(fs.doc(fs.db, 'games', g.id), g); }
+    catch (e) { _notifyFirestoreError('saveGame', e); throw e; }
   },
   async removeGame(id) {
     const fs = window._fs;
-    await fs.deleteDoc(fs.doc(fs.db, 'games', id));
+    try { await fs.deleteDoc(fs.doc(fs.db, 'games', id)); }
+    catch (e) { _notifyFirestoreError('removeGame', e); throw e; }
   },
   async saveTournament(t) {
     const fs = window._fs;
-    await fs.setDoc(fs.doc(fs.db, 'tournaments', t.id), t);
+    try { await fs.setDoc(fs.doc(fs.db, 'tournaments', t.id), t); }
+    catch (e) { _notifyFirestoreError('saveTournament', e); throw e; }
   },
   async removeTournament(id) {
     const fs = window._fs;
-    await fs.deleteDoc(fs.doc(fs.db, 'tournaments', id));
+    try { await fs.deleteDoc(fs.doc(fs.db, 'tournaments', id)); }
+    catch (e) { _notifyFirestoreError('removeTournament', e); throw e; }
   },
 
   async saveEmailConfig(cfg) {
     const fs = window._fs;
-    await fs.setDoc(fs.doc(fs.db, 'config', 'email'), cfg);
+    try { await fs.setDoc(fs.doc(fs.db, 'config', 'email'), cfg); }
+    catch (e) { _notifyFirestoreError('saveEmailConfig', e); throw e; }
     // Also cache in localStorage for fast offline reads
     try { localStorage.setItem('wc_ejs', JSON.stringify(cfg)); } catch (_) {}
   },
@@ -223,6 +252,7 @@ const Storage = {
       }
     } catch (e) {
       // Fall back to localStorage if Firestore read fails (offline / permission denied)
+      _notifyFirestoreError('loadEmailConfig', e);
       try { State.emailConfig = JSON.parse(localStorage.getItem('wc_ejs') || 'null'); } catch (_) {}
     }
   },

@@ -167,6 +167,7 @@ async function acquireScoringLock(gameId) {
     g = snap.exists() ? snap.data() : null;
   } catch (e) {
     // Fallback to local cache if offline / read fails
+    _notifyFirestoreError('acquireScoringLock', e);
     g = State.getGame(gameId);
   }
   if (!g) return false;
