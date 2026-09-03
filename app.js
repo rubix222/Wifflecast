@@ -2723,7 +2723,7 @@ function showNewTournamentModal() {
       </div>
       <div class="form-row">
         <label>Teams (select 2 or more)</label>
-        <div>${teamOpts || '<span class="help-text">Add teams first.</span>'}</div>
+        <div class="player-picker">${teamOpts || '<span class="help-text" style="padding:8px 12px;display:block">Add teams first.</span>'}</div>
       </div>
       <div id="tourn-games-estimate" class="help-text" style="margin-top:2px"></div>
     </div>
