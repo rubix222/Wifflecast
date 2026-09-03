@@ -2690,7 +2690,7 @@ function renderTournamentDetail(id) {
 function showNewTournamentModal() {
   const teamOpts = State.teams.map(t =>
     `<label class="tourn-team-opt">
-       <input type="checkbox" name="tourn-team" value="${t.id}"> ${escapeHtml(t.name)}
+       <input type="checkbox" name="tourn-team" value="${t.id}" onchange="updateTournGamesEstimate()"> ${escapeHtml(t.name)}
      </label>`).join('');
   Modal.show(`
     <div class="modal-header">
@@ -2706,14 +2706,14 @@ function showNewTournamentModal() {
         <label>Format</label>
         <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
           <label class="tourn-team-opt">
-            <input type="radio" name="tourn-format" value="double_elim" checked>
+            <input type="radio" name="tourn-format" value="double_elim" checked onchange="updateTournGamesEstimate()">
             <div>
               <strong>Double Elimination</strong>
               <div class="help-text">Teams are eliminated after 2 losses. Games are played in rounds. Last 2 teams meet in a championship.</div>
             </div>
           </label>
           <label class="tourn-team-opt">
-            <input type="radio" name="tourn-format" value="playoff">
+            <input type="radio" name="tourn-format" value="playoff" onchange="updateTournGamesEstimate()">
             <div>
               <strong>Round Robin</strong>
               <div class="help-text">All teams play each other. Top 2 records advance to a championship game. Tiebreaker: fewest runs allowed.</div>
@@ -2725,11 +2725,29 @@ function showNewTournamentModal() {
         <label>Teams (select 2 or more)</label>
         <div>${teamOpts || '<span class="help-text">Add teams first.</span>'}</div>
       </div>
+      <div id="tourn-games-estimate" class="help-text" style="margin-top:2px"></div>
     </div>
     <div class="modal-footer">
       <button type="button" class="btn" onclick="Modal.hide()">Cancel</button>
       <button type="button" class="btn btn-primary" onclick="submitNewTournament()">Create</button>
     </div>`);
+  updateTournGamesEstimate();
+}
+
+// Live estimate of total games needed for the event, updated as teams/format
+// are toggled in the New Event modal.
+function updateTournGamesEstimate() {
+  const el = $('#tourn-games-estimate'); if (!el) return;
+  const format = $('input[name="tourn-format"]:checked')?.value || 'double_elim';
+  const n = $$('input[name="tourn-team"]:checked').length;
+  if (n < 3) { el.textContent = ''; return; }
+  if (format === 'double_elim') {
+    const min = 2 * n - 2, max = 2 * n - 1;
+    el.innerHTML = `📊 Estimated games: <strong>${min}–${max}</strong> (varies with how many teams reach 2 losses before the champion does)`;
+  } else {
+    const rr = n * (n - 1) / 2;
+    el.innerHTML = `📊 Estimated games: <strong>${rr + 1}</strong> (${rr} round robin + 1 championship)`;
+  }
 }
 
 async function submitNewTournament() {
@@ -3719,7 +3737,7 @@ Object.assign(window, {
   showEditScoreModal, reopenGame, _esAdj, _esSave,
   showRecapModal, _copyRecap, _shareRecap, sendRecapEmails, autoSendRecapEmails, showEmailSetupModal, _saveEmailSetup, _toggleEmailSetup,
   toggleAutoRecapEnabled, showEmailPreferencesModal, saveEmailPreferences,
-  showNewTournamentModal, submitNewTournament, showTournamentModal, submitTournament, selectTournament, tournamentBack,
+  showNewTournamentModal, submitNewTournament, updateTournGamesEstimate, showTournamentModal, submitTournament, selectTournament, tournamentBack,
   generateTournamentGames, regenerateDERound, generateChampionshipGame, autoGenerateTournamentRound, deleteTournamentUI,
   selectPlay, clearPlaySelection,
   onFielderClick, swapFielder, swapFielderGuarded, showAssignPositionModal, assignPositionFromModal,
