@@ -2672,10 +2672,10 @@ function renderTournamentDetail(id) {
       <div class="tourn-section-title" style="margin-top:14px">Standings</div>
       ${standingsHtml}
 
-      <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;row-gap:4px">
         <div class="tourn-section-title" style="margin:0">Games</div>
-        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:#6b7280">
-          <input type="checkbox" style="width:auto" ${tournShowFinishedGames ? 'checked' : ''} onchange="toggleTournShowFinished(this.checked)">
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:#6b7280;flex-shrink:0">
+          <input type="checkbox" style="width:auto;flex-shrink:0" ${tournShowFinishedGames ? 'checked' : ''} onchange="toggleTournShowFinished(this.checked)">
           Show finished
         </label>
       </div>
