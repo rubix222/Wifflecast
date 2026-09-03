@@ -1830,6 +1830,9 @@
   #tournaments-split:not(.tourn-has-detail) .player-detail-panel { display: none; }
   #tournaments-split.tourn-has-detail .player-list-panel { display: none; }
   #tournaments-split.tourn-has-detail .player-detail-panel { padding: 0; min-height: 0; }
+  /* Without this, the grid keeps its 230px/1fr tracks and the lone remaining
+     item (detail panel) auto-places into just the narrow first track. */
+  #tournaments-split.tourn-has-detail { grid-template-columns: 1fr; }
   .tourn-detail-body { padding: 16px; max-width: 100%; box-sizing: border-box; overflow-x: hidden; }
 
   /* Event header row: name left, admin actions right */
