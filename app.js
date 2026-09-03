@@ -2404,6 +2404,12 @@ function openGame(id) {
    TOURNAMENTS
    ============================================================ */
 let selectedTournamentId = null;
+let tournShowFinishedGames = false;
+
+function toggleTournShowFinished(checked) {
+  tournShowFinishedGames = checked;
+  if (selectedTournamentId) renderTournamentDetail(selectedTournamentId);
+}
 
 function selectTournament(id) {
   selectedTournamentId = id;
@@ -2551,14 +2557,17 @@ function renderTournamentDetail(id) {
       if (btns.length) adminBtn = `<div class="tourn-admin-actions">${btns.join('')}</div>`;
     }
 
-    // Games grouped by round
+    // Games grouped by round (finished games hidden unless the checkbox is on)
+    const deVisible = tournShowFinishedGames ? nonChamp : nonChamp.filter(g => g.status !== 'completed');
     if (nonChamp.length) {
       const rounds = [...new Set(nonChamp.map(g => g.deRound || 1))].sort((a,b) => a-b);
       gamesHtml = rounds.map(r => {
-        const rGames = nonChamp.filter(g => (g.deRound||1) === r);
+        const rGames = deVisible.filter(g => (g.deRound||1) === r);
+        if (!rGames.length) return '';
         return `<div class="tourn-section-title" style="margin-top:10px">Round ${r}</div>
           <div class="tourn-games-scroll">${rGames.map(buildGameListItem).join('')}</div>`;
       }).join('');
+      if (!deVisible.length) gamesHtml = `<div class="help-text" style="padding:8px">No unfinished games. ${tournShowFinishedGames ? '' : 'Check "Show finished" to see past games.'}</div>`;
     } else {
       gamesHtml = `<div class="help-text" style="padding:8px">No games yet. ${isAdmin() ? 'Generate Round 1 to start.' : ''}</div>`;
     }
@@ -2616,10 +2625,11 @@ function renderTournamentDetail(id) {
       </div>`;
     }
 
-    // Games list
-    gamesHtml = `<div class="tourn-games-scroll">${nonChamp.length
-      ? [...nonChamp].reverse().map(buildGameListItem).join('')
-      : '<div class="help-text" style="padding:8px">No round-robin games yet.</div>'
+    // Games list (finished games hidden unless the checkbox is on)
+    const rrVisible = tournShowFinishedGames ? nonChamp : nonChamp.filter(g => g.status !== 'completed');
+    gamesHtml = `<div class="tourn-games-scroll">${rrVisible.length
+      ? [...rrVisible].reverse().map(buildGameListItem).join('')
+      : `<div class="help-text" style="padding:8px">${nonChamp.length ? `No unfinished games. ${tournShowFinishedGames ? '' : 'Check "Show finished" to see past games.'}` : 'No round-robin games yet.'}</div>`
     }</div>`;
   }
 
@@ -2662,7 +2672,13 @@ function renderTournamentDetail(id) {
       <div class="tourn-section-title" style="margin-top:14px">Standings</div>
       ${standingsHtml}
 
-      <div class="tourn-section-title">Games</div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div class="tourn-section-title" style="margin:0">Games</div>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:#6b7280">
+          <input type="checkbox" style="width:auto" ${tournShowFinishedGames ? 'checked' : ''} onchange="toggleTournShowFinished(this.checked)">
+          Show finished
+        </label>
+      </div>
       ${gamesHtml}
 
       ${eventAwardsHtml}
@@ -3742,7 +3758,7 @@ Object.assign(window, {
   showEditScoreModal, reopenGame, _esAdj, _esSave,
   showRecapModal, _copyRecap, _shareRecap, sendRecapEmails, autoSendRecapEmails, showEmailSetupModal, _saveEmailSetup, _toggleEmailSetup,
   toggleAutoRecapEnabled, showEmailPreferencesModal, saveEmailPreferences,
-  showNewTournamentModal, submitNewTournament, updateTournGamesEstimate, showTournamentModal, submitTournament, selectTournament, tournamentBack,
+  showNewTournamentModal, submitNewTournament, updateTournGamesEstimate, showTournamentModal, submitTournament, selectTournament, tournamentBack, toggleTournShowFinished,
   generateTournamentGames, regenerateDERound, generateChampionshipGame, autoGenerateTournamentRound, deleteTournamentUI,
   selectPlay, clearPlaySelection,
   onFielderClick, swapFielder, swapFielderGuarded, showAssignPositionModal, assignPositionFromModal,
