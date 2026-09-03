@@ -695,7 +695,7 @@
     font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: #9ca3af;
+    color: #111827;
     font-weight: 600;
     margin-bottom: 1px;
   }
@@ -1464,6 +1464,7 @@
   }
 
   .field-svg.location-mode { cursor: crosshair; }
+  .lg-matchup-strip.location-mode { cursor: crosshair; }
   .bip-instruction {
     display: flex;
     align-items: center;

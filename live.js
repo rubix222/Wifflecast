@@ -828,12 +828,12 @@ function renderMatchupStrip(g, hidden = false) {
   return `
     <div class="lg-matchup-strip"${hidden ? ' style="visibility:hidden"' : ''}>
       <div class="lg-matchup-side" style="border-left:3px solid ${batterColor};padding-left:7px">
-        <div class="lg-matchup-label" style="color:${batterColor}">At bat</div>
+        <div class="lg-matchup-label">At bat</div>
         <div class="lg-matchup-name">${batterName}</div>
         <div class="lg-matchup-stats">${batterId ? batterMatchupStats(g, batterId) : '—'}</div>
       </div>
       <div class="lg-matchup-side lg-matchup-right" style="border-right:3px solid ${pitcherColor};padding-right:7px">
-        <div class="lg-matchup-label" style="color:${pitcherColor}">Pitching</div>
+        <div class="lg-matchup-label">Pitching</div>
         <div class="lg-matchup-name">${pn}</div>
         <div class="lg-matchup-stats">${pitcherId ? pitcherMatchupStats(g, pitcherId) : '—'}</div>
       </div>
@@ -1923,11 +1923,13 @@ function drawField(overrideBases = null) {
   container.innerHTML = svg;
 
   const svgEl = $('#field-svg');
-  attachSvgLocationHandlers(svgEl);
+  const matchupEl = document.querySelector('.lg-matchup-strip');
+  attachSvgLocationHandlers(svgEl, matchupEl ? [matchupEl] : []);
 
   if (__bipStep === 'locate' && svgEl) {
     svgEl.classList.add('location-mode');
   }
+  if (matchupEl) matchupEl.classList.toggle('location-mode', __bipStep === 'locate' && !__fieldClickMode?.needFielder);
 }
 
 function drawBases(overrideBases = null) {
@@ -1942,18 +1944,20 @@ function svgPoint(svg, evt) {
   return pt.matrixTransform(svg.getScreenCTM().inverse());
 }
 
-function attachSvgLocationHandlers(svgEl) {
+function attachSvgLocationHandlers(svgEl, extraEls = []) {
   const DRAG_THRESHOLD = 8;
   let pointerStart = null; // { x, y, fielderId, fielderEl }
 
-  const getPoint = (e) => {
-    const pt = svgPoint(svgEl, e);
-    return { x: Math.round(pt.x), y: Math.round(pt.y) };
-  };
+  // Always resolve the live #field-svg at event time rather than closing over
+  // the svgEl passed in at attach time -- needed because extraEls (e.g. the
+  // matchup strip) are bound once and outlive many drawField() re-renders,
+  // each of which replaces #field-svg with a new element.
+  const currentSvg = () => document.getElementById('field-svg');
 
   const onStart = (e) => {
+    const svg = currentSvg(); if (!svg) return;
     const fielderEl = e.target.closest('.fielder');
-    const pt = svgPoint(svgEl, e);
+    const pt = svgPoint(svg, e);
     let origX = 0, origY = 0;
     if (fielderEl) {
       const m = (fielderEl.getAttribute('transform') || '').match(/translate\(([^,]+),([^)]+)\)/);
@@ -1965,8 +1969,9 @@ function attachSvgLocationHandlers(svgEl) {
 
   const onMove = (e) => {
     if (!pointerStart || !__fieldClickMode) return;
+    const svg = currentSvg(); if (!svg) return;
     e.preventDefault();
-    const pt = svgPoint(svgEl, e);
+    const pt = svgPoint(svg, e);
     const dist = Math.hypot(pt.x - pointerStart.x, pt.y - pointerStart.y);
     if (dist > DRAG_THRESHOLD) {
       if (pointerStart.fielderEl && __fieldClickMode.needFielder) {
@@ -1981,6 +1986,7 @@ function attachSvgLocationHandlers(svgEl) {
 
   const onEnd = (e) => {
     if (!pointerStart) return;
+    const svg = currentSvg();
     const start = pointerStart;
     pointerStart = null;
 
@@ -1988,8 +1994,9 @@ function attachSvgLocationHandlers(svgEl) {
     if (start.fielderEl) {
       start.fielderEl.setAttribute('transform', `translate(${start.origX},${start.origY})`);
     }
+    if (!svg) return;
 
-    const pt = svgPoint(svgEl, e);
+    const pt = svgPoint(svg, e);
     const loc = { x: Math.round(pt.x), y: Math.round(pt.y) };
     const isDrag = Math.hypot(pt.x - start.x, pt.y - start.y) > DRAG_THRESHOLD;
 
@@ -2001,7 +2008,8 @@ function attachSvgLocationHandlers(svgEl) {
           __fieldClickMode.onDragEnd(start.fielderId, loc);
         }
       } else {
-        // Hit / HR: any tap or drag on the field works
+        // Hit / HR: any tap or drag works, including above the field graphic
+        // itself (e.g. the matchup strip) for very deep home runs.
         drawBallMarker(loc);
         __fieldClickMode.onDragEnd(null, loc);
       }
@@ -2015,12 +2023,25 @@ function attachSvgLocationHandlers(svgEl) {
     }
   };
 
-  svgEl.addEventListener('mousedown', onStart);
-  svgEl.addEventListener('mousemove', onMove);
-  svgEl.addEventListener('mouseup', onEnd);
-  svgEl.addEventListener('touchstart', onStart, { passive: false });
-  svgEl.addEventListener('touchmove', onMove, { passive: false });
-  svgEl.addEventListener('touchend', onEnd, { passive: false });
+  const bind = el => {
+    el.addEventListener('mousedown', onStart);
+    el.addEventListener('mousemove', onMove);
+    el.addEventListener('mouseup', onEnd);
+    el.addEventListener('touchstart', onStart, { passive: false });
+    el.addEventListener('touchmove', onMove, { passive: false });
+    el.addEventListener('touchend', onEnd, { passive: false });
+  };
+
+  // svgEl is a fresh element every drawField() call, so binding fresh each
+  // time is safe. extraEls (the matchup strip) persist across many
+  // drawField() calls, so they're bound once ever per element instance —
+  // otherwise listeners would stack up and each tap would fire N times.
+  bind(svgEl);
+  extraEls.forEach(el => {
+    if (el.dataset.locHandlerBound) return;
+    el.dataset.locHandlerBound = '1';
+    bind(el);
+  });
 }
 
 function onFielderClick(pid, pos) {
