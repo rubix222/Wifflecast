@@ -2740,13 +2740,18 @@ function updateTournGamesEstimate() {
   const el = $('#tourn-games-estimate'); if (!el) return;
   const format = $('input[name="tourn-format"]:checked')?.value || 'double_elim';
   const n = $$('input[name="tourn-team"]:checked').length;
-  if (n < 3) { el.textContent = ''; return; }
+  if (n === 0) { el.textContent = ''; return; }
+  if (n < 3) { el.innerHTML = 'Select at least 3 teams to see the games estimate.'; return; }
   if (format === 'double_elim') {
-    const min = 2 * n - 2, max = 2 * n - 1;
-    el.innerHTML = `📊 Estimated games: <strong>${min}–${max}</strong> (varies with how many teams reach 2 losses before the champion does)`;
+    // Bracket play eliminates n-2 teams (2 losses each) before the final 2 face
+    // off; those 2 finalists can each arrive with 0 or 1 loss of their own.
+    // The championship itself is always exactly one game -- no rematch/reset.
+    const bracketMin = 2 * (n - 2);
+    const bracketMax = 2 * (n - 2) + 2;
+    el.innerHTML = `📊 Estimated games: <strong>${bracketMin + 1}–${bracketMax + 1}</strong> (${bracketMin}–${bracketMax} bracket games, plus 1 championship game — always exactly one)`;
   } else {
     const rr = n * (n - 1) / 2;
-    el.innerHTML = `📊 Estimated games: <strong>${rr + 1}</strong> (${rr} round robin + 1 championship)`;
+    el.innerHTML = `📊 Estimated games: <strong>${rr + 1}</strong> (${rr} round robin, plus 1 championship game)`;
   }
 }
 
