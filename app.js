@@ -3020,14 +3020,37 @@ async function submitTournament(e, id) {
   toast('Event updated', 'success');
 }
 
-async function deleteTournamentUI(id) {
+function deleteTournamentUI(id) {
   const t = State.getTournament(id); if (!t) return;
-  const unstartedGames = State.games.filter(g => g.tournamentId === id && g.status === 'setup');
-  const msg = unstartedGames.length
-    ? `Delete "${t.name}"? ${unstartedGames.length} unstarted game${unstartedGames.length > 1 ? 's' : ''} will be removed. Finished games are kept.`
-    : `Delete "${t.name}"? All finished games will be kept.`;
-  if (!confirm(msg)) return;
-  await Promise.all(unstartedGames.map(g => State.deleteGame(g.id)));
+  const allGames      = State.games.filter(g => g.tournamentId === id);
+  const finishedCount = allGames.filter(g => g.status === 'completed').length;
+  const unstartedOrLiveCount = allGames.length - finishedCount;
+  Modal.show(`
+    <div class="modal-header">
+      <h3>Delete Event</h3>
+      <button class="btn-icon" onclick="Modal.hide()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p>Delete "${escapeHtml(t.name)}"?</p>
+      <p class="help-text">${unstartedOrLiveCount} unstarted/live game${unstartedOrLiveCount !== 1 ? 's' : ''} will always be removed.</p>
+      ${finishedCount ? `
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:10px">
+        <input id="del-tourn-all-games" type="checkbox" style="width:auto" />
+        Also delete ${finishedCount} finished game${finishedCount !== 1 ? 's' : ''} (removes their stats too)
+      </label>` : `<p class="help-text">No finished games in this event.</p>`}
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="Modal.hide()">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmDeleteTournament('${id}')">Delete Event</button>
+    </div>`);
+}
+
+async function confirmDeleteTournament(id) {
+  const t = State.getTournament(id); if (!t) return;
+  const deleteFinishedToo = $('#del-tourn-all-games')?.checked || false;
+  const gamesToDelete = State.games.filter(g => g.tournamentId === id && (deleteFinishedToo || g.status !== 'completed'));
+  Modal.hide();
+  await Promise.all(gamesToDelete.map(g => State.deleteGame(g.id)));
   selectedTournamentId = null;
   await State.deleteTournament(id);
   Render.all();
@@ -3759,7 +3782,7 @@ Object.assign(window, {
   showRecapModal, _copyRecap, _shareRecap, sendRecapEmails, autoSendRecapEmails, showEmailSetupModal, _saveEmailSetup, _toggleEmailSetup,
   toggleAutoRecapEnabled, showEmailPreferencesModal, saveEmailPreferences,
   showNewTournamentModal, submitNewTournament, updateTournGamesEstimate, showTournamentModal, submitTournament, selectTournament, tournamentBack, toggleTournShowFinished,
-  generateTournamentGames, regenerateDERound, generateChampionshipGame, autoGenerateTournamentRound, deleteTournamentUI,
+  generateTournamentGames, regenerateDERound, generateChampionshipGame, autoGenerateTournamentRound, deleteTournamentUI, confirmDeleteTournament,
   selectPlay, clearPlaySelection,
   onFielderClick, swapFielder, swapFielderGuarded, showAssignPositionModal, assignPositionFromModal,
   switchLiveStatsTab,
