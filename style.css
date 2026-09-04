@@ -608,6 +608,10 @@
   .games-split { grid-template-columns: 210px 1fr; }
   .games-detail-panel { padding: 0; overflow-y: auto; max-height: 82vh; min-height: 0; }
   .games-detail-panel:empty { display: none; }
+  /* Without this, the grid keeps its 210px/1fr tracks when the detail panel
+     is hidden (empty), and the lone remaining item (the games list) auto-
+     places into just the narrow first track instead of the full row. */
+  .games-split:has(.games-detail-panel:empty) { grid-template-columns: 1fr; }
 
   /* ============================================================
      LIVE GAME SCREEN
