@@ -1471,7 +1471,9 @@ const Render = {
         ${renderHomeTeamsSection(myTeams, tv)}
       </div>`;
 
-    // Recent games — filtered to current player's games when linked
+    // Recent games — filtered to current player's games when linked.
+    // Active (in-progress) games always sort ahead of finished ones; within
+    // each group, most recent first.
     const recent = [...State.games]
       .filter(g => {
         if (!homeShowFinished && g.status === 'completed') return false;
@@ -1480,7 +1482,11 @@ const Render = {
         return (g.homeBattingOrder || []).includes(myPid) ||
                (g.awayBattingOrder || []).includes(myPid);
       })
-      .sort((a, b) => b.createdAt - a.createdAt)
+      .sort((a, b) => {
+        const aLive = a.status === 'in_progress', bLive = b.status === 'in_progress';
+        if (aLive !== bLive) return aLive ? -1 : 1;
+        return b.createdAt - a.createdAt;
+      })
       .slice(0, 6);
     const recentToggle = `<label style="display:flex;align-items:center;gap:5px;font-size:13px;color:#6b7280;cursor:pointer;user-select:none">
       <input type="checkbox" ${homeShowFinished ? 'checked' : ''} onchange="homeShowFinished=this.checked;Render.home()">
@@ -1488,6 +1494,26 @@ const Render = {
     </label>`;
     const recentHtml = recent.map(g => buildGameListItem(g)).join('')
       || '<p style="color:#6b7280;font-size:14px;margin:0">No active games.</p>';
+
+    // My events — any event where one of my current teams is entered.
+    // Active/undecided events sort ahead of finished ones; within each
+    // group, most recently created first.
+    const myTeamIds = new Set(myTeams.map(t => t.id));
+    const myEvents = State.tournaments
+      .filter(t => (t.teamIds || []).some(tid => myTeamIds.has(tid)))
+      .sort((a, b) => {
+        const aDone = isTournamentComplete(a.id), bDone = isTournamentComplete(b.id);
+        if (aDone !== bDone) return aDone ? 1 : -1;
+        return b.createdAt - a.createdAt;
+      });
+    const eventsHtml = myEvents.map(t => {
+      const games = State.games.filter(g => g.tournamentId === t.id);
+      const done  = games.filter(g => g.status === 'completed').length;
+      return `<div class="player-list-item" onclick="switchTab('tournaments');selectTournament('${t.id}')">
+        <div class="pli-name">${escapeHtml(t.name)}</div>
+        <div class="pli-sub">${isTournamentComplete(t.id) ? 'Finished' : 'In progress'} · ${done}/${games.length} games played</div>
+      </div>`;
+    }).join('') || '<p style="color:#6b7280;font-size:14px;margin:0">No events yet.</p>';
 
     c.innerHTML = `
       <div style="padding-top:8px">
@@ -1501,6 +1527,11 @@ const Render = {
             </div>
             ${recentHtml}
           </div>
+          ${myPid ? `
+          <div class="home-card home-card-full">
+            <div class="home-section-title">My Events</div>
+            ${eventsHtml}
+          </div>` : ''}
         </div>
       </div>`;
   },
