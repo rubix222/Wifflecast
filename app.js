@@ -2445,6 +2445,7 @@ function toggleTournShowFinished(checked) {
 function selectTournament(id) {
   selectedTournamentId = id;
   Render.tournaments();
+  window.scrollTo(0, 0);
 }
 
 function tournamentBack() {
