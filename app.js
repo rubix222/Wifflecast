@@ -2466,7 +2466,9 @@ function toggleTournShowFinished(checked) {
 function selectTournament(id) {
   selectedTournamentId = id;
   Render.tournaments();
-  window.scrollTo(0, 0);
+  // <main> is the actual scrollable container (overflow-y:auto), not window.
+  const mainEl = document.querySelector('main');
+  if (mainEl) mainEl.scrollTop = 0;
 }
 
 function tournamentBack() {
