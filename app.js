@@ -2640,16 +2640,17 @@ function renderTournamentDetail(id) {
     const totalRRPairs = t.teamIds.length * (t.teamIds.length - 1) / 2;
     const rrComplete   = nonChamp.filter(g => g.status === 'completed').length === totalRRPairs;
 
-    // Standings
+    // Standings — who's advancing isn't known until the round robin is
+    // fully played, so medals/cutoff only appear once rrComplete is true.
     const rrRows = standings.map((row, i) => {
-      const isFinalist = isPlayoff && i < 2;
+      const isFinalist = isPlayoff && rrComplete && i < 2;
       return `<tr class="${i === 0 ? 'tourn-leader' : ''}${isFinalist ? ' tourn-finalist' : ''}">
         <td>${isFinalist ? (i === 0 ? '🥇' : '🥈') : i+1}</td>
         <td><span style="display:inline-flex;align-items:center;gap:5px"><strong>${teamSwatch(row.team)}${escapeHtml(row.team.name)}</strong></span></td>
         <td>${row.W}</td><td>${row.L}</td><td>${row.T}</td>
         <td>${row.pts}</td><td>${row.RF}</td><td>${row.RA}</td>
         <td>${row.rd >= 0 ? '+' : ''}${row.rd}</td>
-      </tr>${isPlayoff && i === 1 && standings.length > 2 ? '<tr class="tourn-cutoff-row"><td colspan="9"><span class="tourn-cutoff-label">── advance to finals ──</span></td></tr>' : ''}`;
+      </tr>${isPlayoff && rrComplete && i === 1 && standings.length > 2 ? '<tr class="tourn-cutoff-row"><td colspan="9"><span class="tourn-cutoff-label">── advance to finals ──</span></td></tr>' : ''}`;
     }).join('');
     standingsHtml = standings.length
       ? `<div class="tourn-standings-scroll">
