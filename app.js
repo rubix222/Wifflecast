@@ -1472,21 +1472,21 @@ const Render = {
       </div>`;
 
     // Recent games — filtered to current player's games when linked.
-    // Active (in-progress) games always sort ahead of finished ones; within
-    // each group, most recent first.
+    // Non-event games in 'setup' stay hidden until started (as before), but
+    // an event's freshly-generated bracket matchups are worth surfacing even
+    // before they've started, so those are let through.
+    // Sort priority: live > upcoming (setup) > finished; most recent first
+    // within each group.
+    const gameRank = g => g.status === 'in_progress' ? 0 : g.status === 'setup' ? 1 : 2;
     const recent = [...State.games]
       .filter(g => {
         if (!homeShowFinished && g.status === 'completed') return false;
-        if (g.status === 'setup') return false;
+        if (g.status === 'setup' && !g.tournamentId) return false;
         if (!myPid) return true;
         return (g.homeBattingOrder || []).includes(myPid) ||
                (g.awayBattingOrder || []).includes(myPid);
       })
-      .sort((a, b) => {
-        const aLive = a.status === 'in_progress', bLive = b.status === 'in_progress';
-        if (aLive !== bLive) return aLive ? -1 : 1;
-        return b.createdAt - a.createdAt;
-      })
+      .sort((a, b) => gameRank(a) - gameRank(b) || b.createdAt - a.createdAt)
       .slice(0, 6);
     const recentToggle = `<label style="display:flex;align-items:center;gap:5px;font-size:13px;color:#6b7280;cursor:pointer;user-select:none">
       <input type="checkbox" ${homeShowFinished ? 'checked' : ''} onchange="homeShowFinished=this.checked;Render.home()">
