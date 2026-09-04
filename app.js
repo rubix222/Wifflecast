@@ -418,6 +418,7 @@ let selectedTeamId = null;
 let selectedGameId = null;
 let showFinishedGames = false;
 let showMyGamesOnly = true;
+let showFinishedEvents = false;
 let statsSort    = { col: 'AVG', dir:  1 }; // descending: best batters first
 let pitchSort    = { col: 'ERA', dir: -1 }; // ascending: best (lowest) ERA first
 let fieldSort    = { col: 'PO',  dir:  1 }; // descending: most putouts first
@@ -559,11 +560,13 @@ function updateAuthUI() {
     menuWrap.style.display = 'none';
   }
 
-  // Add-team / add-game buttons — admin only
-  const addTeam = $('#btn-add-team');
-  const addGame = $('#btn-add-game');
-  if (addTeam) addTeam.style.display = isAdmin() ? '' : 'none';
-  if (addGame) addGame.style.display = isAdmin() ? '' : 'none';
+  // Add-team / add-game / add-event buttons — admin only
+  const addTeam  = $('#btn-add-team');
+  const addGame  = $('#btn-add-game');
+  const addTourn = $('#btn-add-tournament');
+  if (addTeam)  addTeam.style.display  = isAdmin() ? '' : 'none';
+  if (addGame)  addGame.style.display  = isAdmin() ? '' : 'none';
+  if (addTourn) addTourn.style.display = isAdmin() ? '' : 'none';
 
   // Admin tab — admin only
   $$('.admin-only-tab').forEach(t => { t.style.display = isAdminUser() ? '' : 'none'; });
@@ -1394,19 +1397,37 @@ const Render = {
 
   tournaments() {
     const listEl = $('#tournaments-list'); if (!listEl) return;
-    const sorted = [...State.tournaments].sort((a, b) => b.createdAt - a.createdAt);
-    if (!sorted.length) {
-      listEl.innerHTML = '<div class="empty-state" style="padding:24px"><p>No events found.</p></div>';
-      return;
+
+    // Sync "Show finished" checkbox — only shown when there's at least one
+    // finished event to actually filter out.
+    const anyFinished = State.tournaments.some(t => isTournamentComplete(t.id));
+    const lbl = $('#lbl-show-finished-events');
+    if (lbl) lbl.style.display = anyFinished ? 'flex' : 'none';
+    const chk = $('#chk-show-finished-events');
+    if (chk) chk.checked = showFinishedEvents;
+
+    const allSorted = [...State.tournaments].sort((a, b) => b.createdAt - a.createdAt);
+    const sorted = showFinishedEvents ? allSorted : allSorted.filter(t => !isTournamentComplete(t.id));
+
+    // If the selected event is now hidden by the filter, deselect it
+    if (selectedTournamentId && !sorted.find(t => t.id === selectedTournamentId)) {
+      selectedTournamentId = null;
+      const detail = $('#tournaments-detail');
+      if (detail) detail.innerHTML = '';
     }
-    listEl.innerHTML = sorted.map(t => {
-      const games = State.games.filter(g => g.tournamentId === t.id);
-      const done  = games.filter(g => g.status === 'completed').length;
-      return `<div class="player-list-item${selectedTournamentId === t.id ? ' selected' : ''}" onclick="selectTournament('${t.id}')">
-        <div class="pli-name">${escapeHtml(t.name)}</div>
-        <div class="pli-sub">${t.teamIds.length} teams · ${done}/${games.length} games played</div>
-      </div>`;
-    }).join('');
+
+    if (!sorted.length) {
+      listEl.innerHTML = `<div class="empty-state" style="padding:24px"><p>${allSorted.length ? 'No active events. <label style="cursor:pointer;color:#0369a1" onclick="showFinishedEvents=true;Render.tournaments()">Show finished?</label>' : 'No events found.'}</p></div>`;
+    } else {
+      listEl.innerHTML = sorted.map(t => {
+        const games = State.games.filter(g => g.tournamentId === t.id);
+        const done  = games.filter(g => g.status === 'completed').length;
+        return `<div class="player-list-item${selectedTournamentId === t.id ? ' selected' : ''}" onclick="selectTournament('${t.id}')">
+          <div class="pli-name">${escapeHtml(t.name)}</div>
+          <div class="pli-sub">${t.teamIds.length} teams · ${done}/${games.length} games played</div>
+        </div>`;
+      }).join('');
+    }
     const split = $('#tournaments-split');
     if (selectedTournamentId) {
       renderTournamentDetail(selectedTournamentId);
@@ -3672,7 +3693,7 @@ $$('.tab-btn').forEach(btn => {
 
 // btn-add-player and btn-add-team are dynamically rendered — no static listeners needed
 $('#btn-add-game').addEventListener('click', () => showNewGameModal());
-// btn-add-tournament moved to admin panel; no static listener needed
+$('#btn-add-tournament').addEventListener('click', () => showNewTournamentModal());
 
 $('#btn-sign-in').addEventListener('click', () => showAuthModal('signin'));
 $('#btn-sign-out').addEventListener('click', () => { closeUserMenu(); signOutUser(); });

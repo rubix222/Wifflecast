@@ -67,6 +67,15 @@
   </section>
 
   <section id="view-tournaments" class="view">
+    <div class="toolbar">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <label id="lbl-show-finished-events" style="display:none;align-items:center;gap:5px;font-size:13px;color:#6b7280;cursor:pointer;user-select:none">
+          <input type="checkbox" id="chk-show-finished-events" onchange="showFinishedEvents=this.checked;Render.tournaments()">
+          Show finished
+        </label>
+        <button id="btn-add-tournament" class="btn btn-primary" style="display:none">+ New Event</button>
+      </div>
+    </div>
     <div class="player-split" id="tournaments-split">
       <div class="player-list-panel" id="tournaments-list"></div>
       <div class="player-detail-panel" id="tournaments-detail"></div>
@@ -257,6 +266,6 @@
      content changes, so GitHub Pages / browser caches don't serve stale JS. -->
 <script src="state.js?v=2"></script>
 <script src="live.js?v=3"></script>
-<script src="app.js?v=10"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>
