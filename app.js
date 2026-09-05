@@ -1460,10 +1460,9 @@ function buildHomeContentHtml(profile, { readOnly = false, signedIn = true } = {
       </div>`;
   }
 
-  // Recent games — filtered to this player's games when linked.
-  // Non-event games in 'setup' stay hidden until started (as before), but
-  // an event's freshly-generated bracket matchups are worth surfacing even
-  // before they've started, so those are let through.
+  // Recent games — filtered to this player's games when linked. Upcoming
+  // (setup) games are always shown, regular or event, so a scheduled match
+  // is visible on Home before anyone starts it.
   // Sort priority: live > upcoming (setup) > finished; most recent first
   // within each group.
   const gameRank = g => g.status === 'in_progress' ? 0 : g.status === 'setup' ? 1 : 2;
@@ -1471,7 +1470,6 @@ function buildHomeContentHtml(profile, { readOnly = false, signedIn = true } = {
   const recent = [...State.games]
     .filter(g => {
       if (!showFinished && g.status === 'completed') return false;
-      if (g.status === 'setup' && !g.tournamentId) return false;
       if (!myPid) return true;
       return (g.homeBattingOrder || []).includes(myPid) ||
              (g.awayBattingOrder || []).includes(myPid);
