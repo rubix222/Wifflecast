@@ -2809,6 +2809,9 @@ function buildGameListItem(g) {
   const eventBadge2 = eventName2
     ? `<span style="font-size:11px;color:#0369a1">📋 ${escapeHtml(eventName2)}</span>`
     : '';
+  const exhibitionBadge2 = g.isExhibition
+    ? `<span style="font-size:11px;color:#b45309">🎯 Exhibition</span>`
+    : '';
   const clickAttr = (isSetup && !canUserScore()) ? 'style="cursor:default;opacity:0.6"' : `onclick="openGame('${g.id}')"`;
   return `<div class="player-list-item game-list-item" ${clickAttr}>
     <div style="width:100%">
@@ -2821,7 +2824,7 @@ function buildGameListItem(g) {
         ${showScore ? `<div style="font-size:14px;font-weight:700;color:#374151;text-align:right;line-height:1.4">${g.score.away}<br>${g.score.home}</div>` : ''}
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px">
-        <span>${eventBadge2}</span>
+        <span style="display:flex;gap:6px">${eventBadge2}${exhibitionBadge2}</span>
         <span style="font-size:11px;color:#9ca3af">${date}</span>
       </div>
     </div>
