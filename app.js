@@ -1643,7 +1643,7 @@ function buildHomeContentHtml(profile, { readOnly = false, signedIn = true } = {
     playerCard = `
       <div class="home-card">
         <div class="home-section-title">Welcome to WiffleCast</div>
-        <p style="color:#6b7280;margin:0 0 12px 0;font-size:14px">Sign in to track your stats, manage your team, and score games.</p>
+        <p style="color:#6b7280;margin:0 0 12px 0;font-size:14px">Sign in to manage your players and teams, or just follow along with players you like.</p>
         <button class="btn btn-primary btn-sm" onclick="showAuthModal('signin')">Sign In</button>
       </div>`;
   }
