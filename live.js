@@ -67,6 +67,7 @@ async function redoPlay() {
 }
 
 function renderLiveGame(gameId, watchOnly = false) {
+  closeAdminUserHomeOverlay(); // both are full-screen overlays; the game view should win
   const isNewGame = gameId !== _lastLiveGameId;
   if (isNewGame) {
     _liveTab = 'score';

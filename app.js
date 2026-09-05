@@ -1392,6 +1392,156 @@ async function toggleCanScore(uid) {
   toast(`${updated.name || uid}: scoring ${updated.canScore ? 'enabled' : 'disabled'}`, 'success');
 }
 
+// Builds the Home tab content for a given user profile. Shared by the real
+// Home tab (profile = currentUserProfile) and the admin "view as" overlay
+// (profile = any other user's profile, readOnly = true so nothing here can
+// edit that user's data or leave stray global-state side effects).
+function buildHomeContentHtml(profile, { readOnly = false, signedIn = true } = {}) {
+  const myPid = profile?.playerId;
+  const myPlayer = myPid ? State.getPlayer(myPid) : null;
+
+  let playerCard = '';
+  if (myPlayer) {
+    const s = State.computePlayerStats(myPid);
+    playerCard = `
+      <div class="home-card">
+        <div class="home-section-title">${readOnly ? 'Player' : 'My Player'}</div>
+        <div class="home-player-name" style="display:flex;align-items:center;gap:8px">
+          <span>${escapeHtml(myPlayer.jerseyNumber ? '#' + myPlayer.jerseyNumber + ' ' + myPlayer.name : myPlayer.name)}</span>
+          ${readOnly ? '' : `<button class="btn-icon" title="Edit name/number" onclick="showPlayerModal('${myPid}')" style="font-size:13px;padding:2px 5px">✎</button>`}
+        </div>
+        ${renderPlayerStatTable(s)}
+      </div>`;
+  } else if (signedIn) {
+    playerCard = `
+      <div class="home-card">
+        <div class="home-section-title">${readOnly ? 'Player' : 'My Player'}</div>
+        <p style="color:#6b7280;margin:0 0 12px 0;font-size:14px">${readOnly ? 'Not linked to a player.' : "You haven't linked to a player yet."}</p>
+        ${readOnly ? '' : `<button class="btn btn-primary btn-sm" onclick="showCreateMyPlayerModal()">+ Create My Player</button>`}
+      </div>`;
+  } else {
+    playerCard = `
+      <div class="home-card">
+        <div class="home-section-title">Welcome to WiffleCast</div>
+        <p style="color:#6b7280;margin:0 0 12px 0;font-size:14px">Sign in to track your stats, manage your team, and score games.</p>
+        <button class="btn btn-primary btn-sm" onclick="showAuthModal('signin')">Sign In</button>
+      </div>`;
+  }
+
+  // Not signed in — show welcome card only
+  if (!signedIn) {
+    return `<div style="padding-top:8px"><div class="home-grid">${playerCard}</div></div>`;
+  }
+
+  // Teams
+  const myTeams = myPlayer
+    ? State.teams.filter(t => t.playerIds && t.playerIds.includes(myPid))
+    : [];
+  let teamsCard;
+  if (readOnly) {
+    // Static snapshot — no sortable/tabbed interactivity, since those
+    // controls re-render the real Home tab, not this overlay.
+    teamsCard = `
+      <div class="home-card">
+        <div class="home-section-title">Teams</div>
+        ${renderHomeTeamsSection(myTeams, 'record')}
+      </div>`;
+  } else {
+    const tv = homeTeamsView;
+    const tTabBtn = (v, label) =>
+      `<button class="${tv===v?'active':''}" onclick="setHomeTeamsView('${v}')">${label}</button>`;
+    teamsCard = `
+      <div class="home-card">
+        <div class="home-section-title">My Teams</div>
+        <div class="players-subnav" style="margin-bottom:8px">
+          ${tTabBtn('record','Record')}${tTabBtn('batting','Batting')}${tTabBtn('pitching','Pitching')}${tTabBtn('fielding','Fielding')}
+        </div>
+        ${renderHomeTeamsSection(myTeams, tv)}
+      </div>`;
+  }
+
+  // Recent games — filtered to this player's games when linked.
+  // Non-event games in 'setup' stay hidden until started (as before), but
+  // an event's freshly-generated bracket matchups are worth surfacing even
+  // before they've started, so those are let through.
+  // Sort priority: live > upcoming (setup) > finished; most recent first
+  // within each group.
+  const gameRank = g => g.status === 'in_progress' ? 0 : g.status === 'setup' ? 1 : 2;
+  const showFinished = readOnly ? true : homeShowFinished; // read-only snapshot shows everything
+  const recent = [...State.games]
+    .filter(g => {
+      if (!showFinished && g.status === 'completed') return false;
+      if (g.status === 'setup' && !g.tournamentId) return false;
+      if (!myPid) return true;
+      return (g.homeBattingOrder || []).includes(myPid) ||
+             (g.awayBattingOrder || []).includes(myPid);
+    })
+    .sort((a, b) => gameRank(a) - gameRank(b) || b.createdAt - a.createdAt)
+    .slice(0, 6);
+  const recentToggle = readOnly ? '' : `<label style="display:flex;align-items:center;gap:5px;font-size:13px;color:#6b7280;cursor:pointer;user-select:none">
+    <input type="checkbox" ${homeShowFinished ? 'checked' : ''} onchange="homeShowFinished=this.checked;Render.home()">
+    Show finished
+  </label>`;
+  const recentHtml = recent.map(g => buildGameListItem(g)).join('')
+    || '<p style="color:#6b7280;font-size:14px;margin:0">No active games.</p>';
+
+  // Events — any event where one of these teams is entered. Active/undecided
+  // events sort ahead of finished ones; within each group, most recent first.
+  const myTeamIds = new Set(myTeams.map(t => t.id));
+  const myEvents = State.tournaments
+    .filter(t => (t.teamIds || []).some(tid => myTeamIds.has(tid)))
+    .sort((a, b) => {
+      const aDone = isTournamentComplete(a.id), bDone = isTournamentComplete(b.id);
+      if (aDone !== bDone) return aDone ? 1 : -1;
+      return b.createdAt - a.createdAt;
+    });
+  const eventsHtml = myEvents.map(t => {
+    const games = State.games.filter(g => g.tournamentId === t.id);
+    const done  = games.filter(g => g.status === 'completed').length;
+    return `<div class="player-list-item" onclick="switchTab('tournaments');selectTournament('${t.id}')">
+      <div class="pli-name">${escapeHtml(t.name)}</div>
+      <div class="pli-sub">${isTournamentComplete(t.id) ? 'Finished' : 'In progress'} · ${done}/${games.length} games played</div>
+    </div>`;
+  }).join('') || '<p style="color:#6b7280;font-size:14px;margin:0">No events yet.</p>';
+
+  return `
+    <div style="padding-top:8px">
+      <div class="home-grid">
+        ${playerCard}
+        ${teamsCard}
+        <div class="home-card home-card-full">
+          <div class="home-section-title" style="display:flex;justify-content:space-between;align-items:center">
+            <span>${myPid ? (readOnly ? 'Games' : 'My Games') : 'Recent Games'}</span>
+            ${recentToggle}
+          </div>
+          ${recentHtml}
+        </div>
+        ${myPid ? `
+        <div class="home-card home-card-full">
+          <div class="home-section-title">${readOnly ? 'Events' : 'My Events'}</div>
+          ${eventsHtml}
+        </div>` : ''}
+      </div>
+    </div>`;
+}
+
+// Admin-only: view another user's Home tab as a read-only snapshot.
+function showUserHomeView(uid) {
+  if (!isAdminUser()) return;
+  const u = State.getUser(uid); if (!u) return;
+  const overlay = document.getElementById('admin-user-home-overlay');
+  const title   = document.getElementById('admin-user-home-title');
+  const content = document.getElementById('admin-user-home-content');
+  if (!overlay || !content) return;
+  if (title) title.textContent = `Viewing ${u.name || u.email || 'user'}'s Home`;
+  content.innerHTML = buildHomeContentHtml(u, { readOnly: true, signedIn: true });
+  overlay.classList.add('open');
+}
+function closeAdminUserHomeOverlay() {
+  const overlay = document.getElementById('admin-user-home-overlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
 const Render = {
   all() { this.home(); this.players(); this.teams(); this.games(); this.users(); this.adminPlayers(); this.adminTeams(); this.adminGames(); this.adminEvents(); this.tournaments(); },
 
@@ -1438,123 +1588,7 @@ const Render = {
 
   home() {
     const c = $('#home-container'); if (!c) return;
-    const myPid = currentUserProfile?.playerId;
-    const myPlayer = myPid ? State.getPlayer(myPid) : null;
-
-    // My player card
-    let playerCard = '';
-    if (myPlayer) {
-      const s = State.computePlayerStats(myPid);
-      playerCard = `
-        <div class="home-card">
-          <div class="home-section-title">My Player</div>
-          <div class="home-player-name" style="display:flex;align-items:center;gap:8px">
-            <span>${escapeHtml(myPlayer.jerseyNumber ? '#' + myPlayer.jerseyNumber + ' ' + myPlayer.name : myPlayer.name)}</span>
-            <button class="btn-icon" title="Edit name/number" onclick="showPlayerModal('${myPid}')" style="font-size:13px;padding:2px 5px">✎</button>
-          </div>
-          ${renderPlayerStatTable(s)}
-        </div>`;
-    } else if (currentUser) {
-      playerCard = `
-        <div class="home-card">
-          <div class="home-section-title">My Player</div>
-          <p style="color:#6b7280;margin:0 0 12px 0;font-size:14px">You haven't linked to a player yet.</p>
-          <button class="btn btn-primary btn-sm" onclick="showCreateMyPlayerModal()">+ Create My Player</button>
-        </div>`;
-    } else {
-      playerCard = `
-        <div class="home-card">
-          <div class="home-section-title">Welcome to WiffleCast</div>
-          <p style="color:#6b7280;margin:0 0 12px 0;font-size:14px">Sign in to track your stats, manage your team, and score games.</p>
-          <button class="btn btn-primary btn-sm" onclick="showAuthModal('signin')">Sign In</button>
-        </div>`;
-    }
-
-    // Not signed in — show welcome card only
-    if (!currentUser) {
-      c.innerHTML = `<div style="padding-top:8px"><div class="home-grid">${playerCard}</div></div>`;
-      return;
-    }
-
-    // My teams
-    const myTeams = myPlayer
-      ? State.teams.filter(t => t.playerIds && t.playerIds.includes(myPid))
-      : [];
-    const tv = homeTeamsView;
-    const tTabBtn = (v, label) =>
-      `<button class="${tv===v?'active':''}" onclick="setHomeTeamsView('${v}')">${label}</button>`;
-    const teamsCard = `
-      <div class="home-card">
-        <div class="home-section-title">My Teams</div>
-        <div class="players-subnav" style="margin-bottom:8px">
-          ${tTabBtn('record','Record')}${tTabBtn('batting','Batting')}${tTabBtn('pitching','Pitching')}${tTabBtn('fielding','Fielding')}
-        </div>
-        ${renderHomeTeamsSection(myTeams, tv)}
-      </div>`;
-
-    // Recent games — filtered to current player's games when linked.
-    // Non-event games in 'setup' stay hidden until started (as before), but
-    // an event's freshly-generated bracket matchups are worth surfacing even
-    // before they've started, so those are let through.
-    // Sort priority: live > upcoming (setup) > finished; most recent first
-    // within each group.
-    const gameRank = g => g.status === 'in_progress' ? 0 : g.status === 'setup' ? 1 : 2;
-    const recent = [...State.games]
-      .filter(g => {
-        if (!homeShowFinished && g.status === 'completed') return false;
-        if (g.status === 'setup' && !g.tournamentId) return false;
-        if (!myPid) return true;
-        return (g.homeBattingOrder || []).includes(myPid) ||
-               (g.awayBattingOrder || []).includes(myPid);
-      })
-      .sort((a, b) => gameRank(a) - gameRank(b) || b.createdAt - a.createdAt)
-      .slice(0, 6);
-    const recentToggle = `<label style="display:flex;align-items:center;gap:5px;font-size:13px;color:#6b7280;cursor:pointer;user-select:none">
-      <input type="checkbox" ${homeShowFinished ? 'checked' : ''} onchange="homeShowFinished=this.checked;Render.home()">
-      Show finished
-    </label>`;
-    const recentHtml = recent.map(g => buildGameListItem(g)).join('')
-      || '<p style="color:#6b7280;font-size:14px;margin:0">No active games.</p>';
-
-    // My events — any event where one of my current teams is entered.
-    // Active/undecided events sort ahead of finished ones; within each
-    // group, most recently created first.
-    const myTeamIds = new Set(myTeams.map(t => t.id));
-    const myEvents = State.tournaments
-      .filter(t => (t.teamIds || []).some(tid => myTeamIds.has(tid)))
-      .sort((a, b) => {
-        const aDone = isTournamentComplete(a.id), bDone = isTournamentComplete(b.id);
-        if (aDone !== bDone) return aDone ? 1 : -1;
-        return b.createdAt - a.createdAt;
-      });
-    const eventsHtml = myEvents.map(t => {
-      const games = State.games.filter(g => g.tournamentId === t.id);
-      const done  = games.filter(g => g.status === 'completed').length;
-      return `<div class="player-list-item" onclick="switchTab('tournaments');selectTournament('${t.id}')">
-        <div class="pli-name">${escapeHtml(t.name)}</div>
-        <div class="pli-sub">${isTournamentComplete(t.id) ? 'Finished' : 'In progress'} · ${done}/${games.length} games played</div>
-      </div>`;
-    }).join('') || '<p style="color:#6b7280;font-size:14px;margin:0">No events yet.</p>';
-
-    c.innerHTML = `
-      <div style="padding-top:8px">
-        <div class="home-grid">
-          ${playerCard}
-          ${teamsCard}
-          <div class="home-card home-card-full">
-            <div class="home-section-title" style="display:flex;justify-content:space-between;align-items:center">
-              <span>${myPid ? 'My Games' : 'Recent Games'}</span>
-              ${recentToggle}
-            </div>
-            ${recentHtml}
-          </div>
-          ${myPid ? `
-          <div class="home-card home-card-full">
-            <div class="home-section-title">My Events</div>
-            ${eventsHtml}
-          </div>` : ''}
-        </div>
-      </div>`;
+    c.innerHTML = buildHomeContentHtml(currentUserProfile, { readOnly: false, signedIn: !!currentUser });
   },
 
   users() {
@@ -1573,7 +1607,7 @@ const Render = {
     const rows = State.users.map(u => {
       const player = u.playerId ? State.getPlayer(u.playerId) : null;
       return `<tr>
-        <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(u.name || '')}">${escapeHtml(u.name || '—')}</td>
+        <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;color:#0369a1" title="${escapeHtml(u.name || '')} — click to view their Home" onclick="showUserHomeView('${u.uid}')">${escapeHtml(u.name || '—')}</td>
         <td><span class="muted small">${escapeHtml(u.email || u.uid)}</span></td>
         <td>
           <span style="margin-right:6px">${player ? escapeHtml(player.name) : '<span class="muted">—</span>'}</span>
@@ -2424,6 +2458,7 @@ function deselectGame() {
   if (detail) detail.innerHTML = '';
 }
 function openGame(id) {
+  closeAdminUserHomeOverlay(); // both are full-screen overlays; the game view should win
   selectedGameId = id;
   const g = State.getGame(id);
   if (!g) return;
@@ -2464,6 +2499,7 @@ function toggleTournShowFinished(checked) {
 }
 
 function selectTournament(id) {
+  closeAdminUserHomeOverlay(); // full-screen overlay would otherwise sit on top of the tab
   selectedTournamentId = id;
   Render.tournaments();
   // <main> is the actual scrollable container (overflow-y:auto), not window.
@@ -3829,7 +3865,7 @@ Object.assign(window, {
   bipChooseKind, bipChooseDetail, bipCancel,
   showDoublePlayResult, applyDoublePlay,
   showTagUpResult, applyTagUp,
-  toggleCanScore, showLinkPlayerModal, submitLinkPlayer,
+  toggleCanScore, showLinkPlayerModal, submitLinkPlayer, showUserHomeView, closeAdminUserHomeOverlay,
   showNewGameModal, openGame, selectGame, deselectGame, deleteGame, toggleExhibitionGame, openGameForScoring, showSetupModal,
   submitPlayer, submitTeam, submitNewGame,
   startGame, setPosition, moveBatter,
