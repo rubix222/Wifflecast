@@ -313,9 +313,14 @@ function showPlayerStatsModal(playerId) {
   const p = State.getPlayer(playerId); if (!p) return;
   const s = State.computePlayerStats(playerId);
   const name = p.jerseyNumber ? `#${p.jerseyNumber} ${p.name}` : p.name;
-  const canEdit = isAdmin() || currentUserProfile?.playerId === playerId;
+  const isMe = currentUserProfile?.playerId === playerId;
+  const canEdit = isAdmin() || isMe;
   const editBtn = canEdit
     ? `<button class="btn btn-sm" onclick="Modal.hide();showPlayerModal('${playerId}')" style="margin-right:8px">✎ Edit</button>`
+    : '';
+  const isFollowing = (currentUserProfile?.followedPlayerIds || []).includes(playerId);
+  const followBtn = (currentUser && !isMe)
+    ? `<button class="btn btn-sm" onclick="${isFollowing ? `unfollowPlayer('${playerId}')` : `followPlayer('${playerId}')`};showPlayerStatsModal('${playerId}')" style="margin-right:8px">${isFollowing ? '★ Following' : '☆ Follow'}</button>`
     : '';
   Modal.show(`
     <div class="modal-header">
@@ -326,6 +331,7 @@ function showPlayerStatsModal(playerId) {
       ${renderPlayerStatTable(s)}
     </div>
     <div class="modal-footer">
+      ${followBtn}
       ${editBtn}
       <button class="btn" onclick="Modal.hide()">Close</button>
     </div>`);
@@ -400,6 +406,7 @@ let _currentTab = 'home';  // tracks active tab for back-navigation after live g
 let homePlayerView    = 'batting'; // 'batting' | 'pitching' | 'fielding'
 let homeTeamsView     = 'record';  // 'record' | 'batting' | 'pitching' | 'fielding'
 let homeShowFinished  = false;
+let homeFollowTab     = null;      // playerId currently shown in the "Following" switcher
 const homeTeamSort = {
   record:   { col: 'W',   dir: -1 },
   batting:  { col: 'AVG', dir:  1 }, // descending: best teams first
@@ -1384,6 +1391,106 @@ async function submitLinkPlayer(uid) {
   }
 }
 
+// Self-service equivalent of admin's showLinkPlayerModal — lets a user claim
+// an already-existing but unlinked player (e.g. a guest roster entry that's
+// actually them) instead of creating a duplicate.
+function showClaimPlayerModal() {
+  if (!currentUser || !currentUserProfile) { showAuthModal('signin'); return; }
+  if (currentUserProfile.playerId) { toast('You already have a linked player', 'error'); return; }
+  const unlinked = State.players.filter(p => !p.userId).sort((a, b) => a.name.localeCompare(b.name));
+  const opts = unlinked.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+  Modal.show(`
+    <div class="modal-header">
+      <h3>Claim an Existing Player</h3>
+      <button class="btn-icon" onclick="Modal.hide()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="help-text" style="margin-bottom:12px">If you're already listed on a team roster, claim that player instead of creating a duplicate.</p>
+      ${unlinked.length ? `
+      <label class="form-label">Player</label>
+      <select id="claim-player-select" class="form-input">
+        <option value="">— pick —</option>
+        ${opts}
+      </select>` : '<p class="help-text">No unlinked players available right now.</p>'}
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="Modal.hide()">Cancel</button>
+      ${unlinked.length ? `<button class="btn btn-primary" onclick="submitClaimPlayer()">Claim</button>` : ''}
+    </div>`);
+}
+
+async function submitClaimPlayer() {
+  if (!currentUser || !currentUserProfile) return;
+  if (currentUserProfile.playerId) { toast('You already have a linked player', 'error'); Modal.hide(); return; }
+  const pid = document.getElementById('claim-player-select')?.value;
+  if (!pid) { toast('Pick a player', 'error'); return; }
+  const p = State.getPlayer(pid);
+  if (!p || p.userId) { toast('That player is no longer available', 'error'); Modal.hide(); return; }
+  p.userId = currentUser.uid;
+  p.invitePending = false;
+  await Storage.savePlayer(p);
+  currentUserProfile.playerId = p.id;
+  await Storage.saveUser(currentUserProfile);
+  Modal.hide();
+  Render.all();
+  toast('Player claimed!', 'success');
+}
+
+// Follow/unfollow — read-only "fan" view of a player, independent of the
+// account's own linked player. Mutates currentUserProfile directly, so this
+// is only ever for the signed-in user's own follows, never another user's
+// (the admin "view as" overlay never calls these).
+async function followPlayer(pid) {
+  if (!currentUser || !currentUserProfile) { showAuthModal('signin'); return; }
+  if (currentUserProfile.playerId === pid) return; // already "my player"
+  const set = new Set(currentUserProfile.followedPlayerIds || []);
+  if (set.has(pid)) return;
+  set.add(pid);
+  currentUserProfile.followedPlayerIds = [...set];
+  homeFollowTab = pid;
+  await Storage.saveUser(currentUserProfile);
+  Render.home();
+}
+async function unfollowPlayer(pid) {
+  if (!currentUserProfile) return;
+  currentUserProfile.followedPlayerIds = (currentUserProfile.followedPlayerIds || []).filter(id => id !== pid);
+  if (homeFollowTab === pid) homeFollowTab = null;
+  await Storage.saveUser(currentUserProfile);
+  Render.home();
+}
+function setHomeFollowTab(pid) { homeFollowTab = pid; Render.home(); }
+
+function showFollowPlayerModal() {
+  if (!currentUser || !currentUserProfile) { showAuthModal('signin'); return; }
+  renderFollowPlayerModalBody();
+}
+function renderFollowPlayerModalBody() {
+  const myPid = currentUserProfile?.playerId;
+  const followed = new Set(currentUserProfile?.followedPlayerIds || []);
+  const candidates = State.players
+    .filter(p => p.id !== myPid)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const rows = candidates.map(p => {
+    const isFollowing = followed.has(p.id);
+    return `<div class="player-picker-item">
+      <span style="flex:1">${escapeHtml(p.name)}</span>
+      <button class="btn btn-sm ${isFollowing ? '' : 'btn-primary'}" onclick="${isFollowing ? `unfollowPlayer('${p.id}')` : `followPlayer('${p.id}')`};renderFollowPlayerModalBody()">${isFollowing ? '★ Unfollow' : '☆ Follow'}</button>
+    </div>`;
+  }).join('') || '<p class="help-text">No players yet.</p>';
+  Modal.show(`
+    <div class="modal-header">
+      <h3>Follow Players</h3>
+      <button class="btn-icon" onclick="Modal.hide()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="help-text" style="margin-bottom:10px">Follow any player to see their stats and games on your Home tab.</p>
+      <div class="player-picker">${rows}</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="Modal.hide();Render.home()">Done</button>
+    </div>`);
+}
+
 async function toggleCanScore(uid) {
   const user = State.getUser(uid);
   if (!user) return;
@@ -1396,10 +1503,99 @@ async function toggleCanScore(uid) {
 // Home tab (profile = currentUserProfile) and the admin "view as" overlay
 // (profile = any other user's profile, readOnly = true so nothing here can
 // edit that user's data or leave stray global-state side effects).
+// Builds the Teams/Games/Events cards for one specific player id. Shared by
+// the account's own linked player and each followed player's snapshot.
+// interactive=true wires up the sort/tab controls (only ever used for the
+// real Home tab's own player, since those controls call Render.home()).
+function buildPlayerHomeSections(pid, { interactive = false, labelPrefix = '' } = {}) {
+  const player = State.getPlayer(pid);
+  const teams = player
+    ? State.teams.filter(t => t.playerIds && t.playerIds.includes(pid))
+    : [];
+
+  // Always a half-width card — it's meant to sit beside a stat card (the
+  // "My Player" card, or a followed player's stat card) in the same row.
+  let teamsCard;
+  if (interactive) {
+    const tv = homeTeamsView;
+    const tTabBtn = (v, label) =>
+      `<button class="${tv===v?'active':''}" onclick="setHomeTeamsView('${v}')">${label}</button>`;
+    teamsCard = `
+      <div class="home-card">
+        <div class="home-section-title">${labelPrefix}Teams</div>
+        <div class="players-subnav" style="margin-bottom:8px">
+          ${tTabBtn('record','Record')}${tTabBtn('batting','Batting')}${tTabBtn('pitching','Pitching')}${tTabBtn('fielding','Fielding')}
+        </div>
+        ${renderHomeTeamsSection(teams, tv)}
+      </div>`;
+  } else {
+    teamsCard = `
+      <div class="home-card">
+        <div class="home-section-title">${labelPrefix}Teams</div>
+        ${renderHomeTeamsSection(teams, 'record')}
+      </div>`;
+  }
+
+  // Upcoming (setup) games are always shown, regular or event, so a
+  // scheduled match is visible before anyone starts it. Sort priority:
+  // live > upcoming > finished; most recent first within each group.
+  const gameRank = g => g.status === 'in_progress' ? 0 : g.status === 'setup' ? 1 : 2;
+  const showFinished = interactive ? homeShowFinished : true; // non-interactive snapshot shows everything
+  const games = [...State.games]
+    .filter(g => {
+      if (!showFinished && g.status === 'completed') return false;
+      return (g.homeBattingOrder || []).includes(pid) || (g.awayBattingOrder || []).includes(pid);
+    })
+    .sort((a, b) => gameRank(a) - gameRank(b) || b.createdAt - a.createdAt)
+    .slice(0, 6);
+  const gamesToggle = interactive ? `<label style="display:flex;align-items:center;gap:5px;font-size:13px;color:#6b7280;cursor:pointer;user-select:none">
+    <input type="checkbox" ${homeShowFinished ? 'checked' : ''} onchange="homeShowFinished=this.checked;Render.home()">
+    Show finished
+  </label>` : '';
+  const gamesHtml = games.map(g => buildGameListItem(g)).join('')
+    || '<p style="color:#6b7280;font-size:14px;margin:0">No active games.</p>';
+  const gamesCard = `
+    <div class="home-card home-card-full">
+      <div class="home-section-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>${labelPrefix}Games</span>
+        ${gamesToggle}
+      </div>
+      ${gamesHtml}
+    </div>`;
+
+  // Events — any event where one of these teams is entered. Active/undecided
+  // events sort ahead of finished ones; within each group, most recent first.
+  const teamIds = new Set(teams.map(t => t.id));
+  const events = State.tournaments
+    .filter(t => (t.teamIds || []).some(tid => teamIds.has(tid)))
+    .sort((a, b) => {
+      const aDone = isTournamentComplete(a.id), bDone = isTournamentComplete(b.id);
+      if (aDone !== bDone) return aDone ? 1 : -1;
+      return b.createdAt - a.createdAt;
+    });
+  const eventsHtml = events.map(t => {
+    const g2 = State.games.filter(g => g.tournamentId === t.id);
+    const done = g2.filter(g => g.status === 'completed').length;
+    return `<div class="player-list-item" onclick="switchTab('tournaments');selectTournament('${t.id}')">
+      <div class="pli-name">${escapeHtml(t.name)}</div>
+      <div class="pli-sub">${isTournamentComplete(t.id) ? 'Finished' : 'In progress'} · ${done}/${g2.length} games played</div>
+    </div>`;
+  }).join('') || '<p style="color:#6b7280;font-size:14px;margin:0">No events yet.</p>';
+  const eventsCard = `
+    <div class="home-card home-card-full">
+      <div class="home-section-title">${labelPrefix}Events</div>
+      ${eventsHtml}
+    </div>`;
+
+  return { teamsCard, gamesCard, eventsCard };
+}
+
 function buildHomeContentHtml(profile, { readOnly = false, signedIn = true } = {}) {
   const myPid = profile?.playerId;
   const myPlayer = myPid ? State.getPlayer(myPid) : null;
+  const followedIds = (profile?.followedPlayerIds || []).filter(pid => pid !== myPid && State.getPlayer(pid));
 
+  // ── Player card: "My Player", or a path to becoming one / following one ──
   let playerCard = '';
   if (myPlayer) {
     const s = State.computePlayerStats(myPid);
@@ -1412,12 +1608,34 @@ function buildHomeContentHtml(profile, { readOnly = false, signedIn = true } = {
         </div>
         ${renderPlayerStatTable(s)}
       </div>`;
+  } else if (readOnly) {
+    playerCard = signedIn ? `
+      <div class="home-card">
+        <div class="home-section-title">Player</div>
+        <p style="color:#6b7280;margin:0;font-size:14px">Not linked to a player.</p>
+      </div>` : '';
+  } else if (signedIn && followedIds.length) {
+    // Already following someone — keep the door open to becoming a player
+    // too, without repeating the full first-run pitch below.
+    playerCard = `
+      <div class="home-card">
+        <div class="home-section-title">My Player</div>
+        <p style="color:#6b7280;margin:0 0 12px 0;font-size:14px">Don't have a player yet?</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" onclick="showCreateMyPlayerModal()">+ Create My Player</button>
+          <button class="btn btn-sm" onclick="showClaimPlayerModal()">🔗 Claim Existing</button>
+        </div>
+      </div>`;
   } else if (signedIn) {
     playerCard = `
       <div class="home-card">
-        <div class="home-section-title">${readOnly ? 'Player' : 'My Player'}</div>
-        <p style="color:#6b7280;margin:0 0 12px 0;font-size:14px">${readOnly ? 'Not linked to a player.' : "You haven't linked to a player yet."}</p>
-        ${readOnly ? '' : `<button class="btn btn-primary btn-sm" onclick="showCreateMyPlayerModal()">+ Create My Player</button>`}
+        <div class="home-section-title">Get Started</div>
+        <p style="color:#6b7280;margin:0 0 12px 0;font-size:14px">Are you a player, or just following along?</p>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <button class="btn btn-primary btn-sm" onclick="showCreateMyPlayerModal()">+ Create My Player</button>
+          <button class="btn btn-sm" onclick="showClaimPlayerModal()">🔗 Claim an Existing Player</button>
+          <button class="btn btn-sm" onclick="showFollowPlayerModal()">⭐ Follow a Player</button>
+        </div>
       </div>`;
   } else {
     playerCard = `
@@ -1433,92 +1651,88 @@ function buildHomeContentHtml(profile, { readOnly = false, signedIn = true } = {
     return `<div style="padding-top:8px"><div class="home-grid">${playerCard}</div></div>`;
   }
 
-  // Teams
-  const myTeams = myPlayer
-    ? State.teams.filter(t => t.playerIds && t.playerIds.includes(myPid))
-    : [];
-  let teamsCard;
-  if (readOnly) {
-    // Static snapshot — no sortable/tabbed interactivity, since those
-    // controls re-render the real Home tab, not this overlay.
-    teamsCard = `
-      <div class="home-card">
-        <div class="home-section-title">Teams</div>
-        ${renderHomeTeamsSection(myTeams, 'record')}
-      </div>`;
-  } else {
-    const tv = homeTeamsView;
-    const tTabBtn = (v, label) =>
-      `<button class="${tv===v?'active':''}" onclick="setHomeTeamsView('${v}')">${label}</button>`;
-    teamsCard = `
-      <div class="home-card">
-        <div class="home-section-title">My Teams</div>
-        <div class="players-subnav" style="margin-bottom:8px">
-          ${tTabBtn('record','Record')}${tTabBtn('batting','Batting')}${tTabBtn('pitching','Pitching')}${tTabBtn('fielding','Fielding')}
+  // ── My Player's own teams/games/events ──
+  let myTeamsCard = '', myGamesCard = '', myEventsCard = '';
+  if (myPid) {
+    const sections = buildPlayerHomeSections(myPid, { interactive: !readOnly, labelPrefix: readOnly ? '' : 'My ' });
+    myTeamsCard = sections.teamsCard;
+    myGamesCard = sections.gamesCard;
+    myEventsCard = sections.eventsCard;
+  } else if (!readOnly && !followedIds.length) {
+    // Genuinely empty state (no player, no follows) — fall back to a
+    // generic recent-games feed so there's still something to look at.
+    const gameRank = g => g.status === 'in_progress' ? 0 : g.status === 'setup' ? 1 : 2;
+    const games = [...State.games]
+      .filter(g => homeShowFinished || g.status !== 'completed')
+      .sort((a, b) => gameRank(a) - gameRank(b) || b.createdAt - a.createdAt)
+      .slice(0, 6);
+    const toggle = `<label style="display:flex;align-items:center;gap:5px;font-size:13px;color:#6b7280;cursor:pointer;user-select:none">
+      <input type="checkbox" ${homeShowFinished ? 'checked' : ''} onchange="homeShowFinished=this.checked;Render.home()">
+      Show finished
+    </label>`;
+    const html = games.map(g => buildGameListItem(g)).join('') || '<p style="color:#6b7280;font-size:14px;margin:0">No active games.</p>';
+    myGamesCard = `
+      <div class="home-card home-card-full">
+        <div class="home-section-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>Recent Games</span>
+          ${toggle}
         </div>
-        ${renderHomeTeamsSection(myTeams, tv)}
+        ${html}
       </div>`;
   }
 
-  // Recent games — filtered to this player's games when linked. Upcoming
-  // (setup) games are always shown, regular or event, so a scheduled match
-  // is visible on Home before anyone starts it.
-  // Sort priority: live > upcoming (setup) > finished; most recent first
-  // within each group.
-  const gameRank = g => g.status === 'in_progress' ? 0 : g.status === 'setup' ? 1 : 2;
-  const showFinished = readOnly ? true : homeShowFinished; // read-only snapshot shows everything
-  const recent = [...State.games]
-    .filter(g => {
-      if (!showFinished && g.status === 'completed') return false;
-      if (!myPid) return true;
-      return (g.homeBattingOrder || []).includes(myPid) ||
-             (g.awayBattingOrder || []).includes(myPid);
-    })
-    .sort((a, b) => gameRank(a) - gameRank(b) || b.createdAt - a.createdAt)
-    .slice(0, 6);
-  const recentToggle = readOnly ? '' : `<label style="display:flex;align-items:center;gap:5px;font-size:13px;color:#6b7280;cursor:pointer;user-select:none">
-    <input type="checkbox" ${homeShowFinished ? 'checked' : ''} onchange="homeShowFinished=this.checked;Render.home()">
-    Show finished
-  </label>`;
-  const recentHtml = recent.map(g => buildGameListItem(g)).join('')
-    || '<p style="color:#6b7280;font-size:14px;margin:0">No active games.</p>';
-
-  // Events — any event where one of these teams is entered. Active/undecided
-  // events sort ahead of finished ones; within each group, most recent first.
-  const myTeamIds = new Set(myTeams.map(t => t.id));
-  const myEvents = State.tournaments
-    .filter(t => (t.teamIds || []).some(tid => myTeamIds.has(tid)))
-    .sort((a, b) => {
-      const aDone = isTournamentComplete(a.id), bDone = isTournamentComplete(b.id);
-      if (aDone !== bDone) return aDone ? 1 : -1;
-      return b.createdAt - a.createdAt;
-    });
-  const eventsHtml = myEvents.map(t => {
-    const games = State.games.filter(g => g.tournamentId === t.id);
-    const done  = games.filter(g => g.status === 'completed').length;
-    return `<div class="player-list-item" onclick="switchTab('tournaments');selectTournament('${t.id}')">
-      <div class="pli-name">${escapeHtml(t.name)}</div>
-      <div class="pli-sub">${isTournamentComplete(t.id) ? 'Finished' : 'In progress'} · ${done}/${games.length} games played</div>
-    </div>`;
-  }).join('') || '<p style="color:#6b7280;font-size:14px;margin:0">No events yet.</p>';
+  // ── Following: read-only snapshot of each followed player ──
+  let followingHtml = '';
+  if (followedIds.length) {
+    if (readOnly) {
+      // Stack every followed player's full snapshot — no switcher needed
+      // for a one-time admin inspection.
+      // Each followed player gets its own stat+teams pair (half-width, side
+      // by side) followed by their games/events, same shape as "My Player".
+      followingHtml = followedIds.map(pid => {
+        const fp = State.getPlayer(pid);
+        const sections = buildPlayerHomeSections(pid, { interactive: false });
+        const statCard = `
+          <div class="home-card">
+            <div class="home-section-title">⭐ Following: ${escapeHtml(fp.name)}</div>
+            ${renderPlayerStatTable(State.computePlayerStats(pid))}
+          </div>`;
+        return statCard + sections.teamsCard + sections.gamesCard + sections.eventsCard;
+      }).join('');
+    } else {
+      const activeId = followedIds.includes(homeFollowTab) ? homeFollowTab : followedIds[0];
+      const activePlayer = State.getPlayer(activeId);
+      const tabs = followedIds.map(pid => {
+        const fp = State.getPlayer(pid);
+        return `<button class="${pid===activeId?'active':''}" onclick="setHomeFollowTab('${pid}')">${escapeHtml(fp.name)}</button>`;
+      }).join('');
+      const sections = buildPlayerHomeSections(activeId, { interactive: false });
+      const header = `
+        <div class="home-card home-card-full" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <div class="home-section-title" style="margin:0">⭐ Following</div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            ${followedIds.length > 1 ? `<div class="players-subnav" style="margin:0">${tabs}</div>` : ''}
+            <button class="btn-icon" title="Unfollow ${escapeHtml(activePlayer.name)}" onclick="unfollowPlayer('${activeId}')">✕</button>
+            <button class="btn-icon" title="Follow another player" onclick="showFollowPlayerModal()">+</button>
+          </div>
+        </div>`;
+      const statCard = `
+        <div class="home-card">
+          <div class="home-player-name">${escapeHtml(activePlayer.jerseyNumber ? '#' + activePlayer.jerseyNumber + ' ' + activePlayer.name : activePlayer.name)}</div>
+          ${renderPlayerStatTable(State.computePlayerStats(activeId))}
+        </div>`;
+      followingHtml = header + statCard + sections.teamsCard + sections.gamesCard + sections.eventsCard;
+    }
+  }
 
   return `
     <div style="padding-top:8px">
       <div class="home-grid">
         ${playerCard}
-        ${teamsCard}
-        <div class="home-card home-card-full">
-          <div class="home-section-title" style="display:flex;justify-content:space-between;align-items:center">
-            <span>${myPid ? (readOnly ? 'Games' : 'My Games') : 'Recent Games'}</span>
-            ${recentToggle}
-          </div>
-          ${recentHtml}
-        </div>
-        ${myPid ? `
-        <div class="home-card home-card-full">
-          <div class="home-section-title">${readOnly ? 'Events' : 'My Events'}</div>
-          ${eventsHtml}
-        </div>` : ''}
+        ${myTeamsCard}
+        ${myGamesCard}
+        ${myEventsCard}
+        ${followingHtml}
       </div>
     </div>`;
 }
@@ -3864,6 +4078,8 @@ Object.assign(window, {
   showDoublePlayResult, applyDoublePlay,
   showTagUpResult, applyTagUp,
   toggleCanScore, showLinkPlayerModal, submitLinkPlayer, showUserHomeView, closeAdminUserHomeOverlay,
+  showClaimPlayerModal, submitClaimPlayer, followPlayer, unfollowPlayer, setHomeFollowTab,
+  showFollowPlayerModal, renderFollowPlayerModalBody,
   showNewGameModal, openGame, selectGame, deselectGame, deleteGame, toggleExhibitionGame, openGameForScoring, showSetupModal,
   submitPlayer, submitTeam, submitNewGame,
   startGame, setPosition, moveBatter,
