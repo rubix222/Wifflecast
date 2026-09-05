@@ -407,6 +407,7 @@ let homePlayerView    = 'batting'; // 'batting' | 'pitching' | 'fielding'
 let homeTeamsView     = 'record';  // 'record' | 'batting' | 'pitching' | 'fielding'
 let homeShowFinished  = false;
 let homeFollowTab     = null;      // playerId currently shown in the "Following" switcher
+let homeMainTab       = 'me';      // 'me' | 'following' — top-level switcher when both exist
 const homeTeamSort = {
   record:   { col: 'W',   dir: -1 },
   batting:  { col: 'AVG', dir:  1 }, // descending: best teams first
@@ -1459,6 +1460,7 @@ async function unfollowPlayer(pid) {
   Render.home();
 }
 function setHomeFollowTab(pid) { homeFollowTab = pid; Render.home(); }
+function setHomeMainTab(tab) { homeMainTab = tab; Render.home(); }
 
 function showFollowPlayerModal() {
   if (!currentUser || !currentUserProfile) { showAuthModal('signin'); return; }
@@ -1702,16 +1704,18 @@ function buildHomeContentHtml(profile, { readOnly = false, signedIn = true } = {
     } else {
       const activeId = followedIds.includes(homeFollowTab) ? homeFollowTab : followedIds[0];
       const activePlayer = State.getPlayer(activeId);
-      const tabs = followedIds.map(pid => {
+      // A dropdown scales to any number of followed players; a row of
+      // buttons per player wouldn't.
+      const options = followedIds.map(pid => {
         const fp = State.getPlayer(pid);
-        return `<button class="${pid===activeId?'active':''}" onclick="setHomeFollowTab('${pid}')">${escapeHtml(fp.name)}</button>`;
+        return `<option value="${pid}" ${pid===activeId?'selected':''}>${escapeHtml(fp.name)}</option>`;
       }).join('');
       const sections = buildPlayerHomeSections(activeId, { interactive: false });
       const header = `
         <div class="home-card home-card-full" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
           <div class="home-section-title" style="margin:0">⭐ Following</div>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-            ${followedIds.length > 1 ? `<div class="players-subnav" style="margin:0">${tabs}</div>` : ''}
+            ${followedIds.length > 1 ? `<select class="form-input" style="width:auto" onchange="setHomeFollowTab(this.value)">${options}</select>` : ''}
             <button class="btn-icon" title="Unfollow ${escapeHtml(activePlayer.name)}" onclick="unfollowPlayer('${activeId}')">✕</button>
             <button class="btn-icon" title="Follow another player" onclick="showFollowPlayerModal()">+</button>
           </div>
@@ -1725,14 +1729,34 @@ function buildHomeContentHtml(profile, { readOnly = false, signedIn = true } = {
     }
   }
 
+  // ── Top-level My Player / Following switcher (only when both exist) ──
+  const hasMyPlayer = !!myPid;
+  const hasFollows  = followedIds.length > 0;
+  const showMainTabs = !readOnly && hasMyPlayer && hasFollows;
+
+  let bodyHtml;
+  if (readOnly || !showMainTabs) {
+    // Only one side exists (or this is the admin's read-only snapshot,
+    // which always shows everything) — no tabs needed, just stack whatever
+    // applies. Whichever side doesn't apply is already an empty string.
+    bodyHtml = `${playerCard}${myTeamsCard}${myGamesCard}${myEventsCard}${followingHtml}`;
+  } else {
+    if (homeMainTab !== 'me' && homeMainTab !== 'following') homeMainTab = 'me';
+    bodyHtml = homeMainTab === 'following'
+      ? followingHtml
+      : `${playerCard}${myTeamsCard}${myGamesCard}${myEventsCard}`;
+  }
+  const mainTabBar = showMainTabs ? `
+    <div class="players-subnav" style="margin-bottom:12px">
+      <button class="${homeMainTab==='me' ? 'active' : ''}" onclick="setHomeMainTab('me')">My Player</button>
+      <button class="${homeMainTab==='following' ? 'active' : ''}" onclick="setHomeMainTab('following')">⭐ Following</button>
+    </div>` : '';
+
   return `
     <div style="padding-top:8px">
+      ${mainTabBar}
       <div class="home-grid">
-        ${playerCard}
-        ${myTeamsCard}
-        ${myGamesCard}
-        ${myEventsCard}
-        ${followingHtml}
+        ${bodyHtml}
       </div>
     </div>`;
 }
@@ -4078,7 +4102,7 @@ Object.assign(window, {
   showDoublePlayResult, applyDoublePlay,
   showTagUpResult, applyTagUp,
   toggleCanScore, showLinkPlayerModal, submitLinkPlayer, showUserHomeView, closeAdminUserHomeOverlay,
-  showClaimPlayerModal, submitClaimPlayer, followPlayer, unfollowPlayer, setHomeFollowTab,
+  showClaimPlayerModal, submitClaimPlayer, followPlayer, unfollowPlayer, setHomeFollowTab, setHomeMainTab,
   showFollowPlayerModal, renderFollowPlayerModalBody,
   showNewGameModal, openGame, selectGame, deselectGame, deleteGame, toggleExhibitionGame, openGameForScoring, showSetupModal,
   submitPlayer, submitTeam, submitNewGame,
