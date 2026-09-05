@@ -1573,7 +1573,7 @@ const Render = {
     const rows = State.users.map(u => {
       const player = u.playerId ? State.getPlayer(u.playerId) : null;
       return `<tr>
-        <td>${escapeHtml(u.name || '—')}</td>
+        <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(u.name || '')}">${escapeHtml(u.name || '—')}</td>
         <td><span class="muted small">${escapeHtml(u.email || u.uid)}</span></td>
         <td>
           <span style="margin-right:6px">${player ? escapeHtml(player.name) : '<span class="muted">—</span>'}</span>
