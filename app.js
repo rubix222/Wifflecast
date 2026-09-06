@@ -1947,28 +1947,10 @@ const Render = {
       c.innerHTML = '<div class="empty-state"><p>No games yet.</p></div>';
       return;
     }
+    // Same card formatting as Home/Events (buildGameListItem), plus the
+    // exhibition-toggle and delete admin controls.
     const sorted = [...State.games].sort((a, b) => b.createdAt - a.createdAt);
-    const rows = sorted.map(g => {
-      const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
-      const date = new Date(g.createdAt).toLocaleDateString();
-      const statusLabel = g.status === 'completed' ? `Final ${g.score.away}–${g.score.home}`
-        : g.status === 'in_progress' ? 'Live'
-        : 'Not Started';
-      const eventName = g.tournamentId ? (State.getTournament(g.tournamentId)?.name || g.tournamentName || null) : null;
-      return `<tr>
-        <td>${matchupHtml(away, home)}<div class="muted small" style="margin-top:2px">${date}${eventName ? ` · 📋 ${escapeHtml(eventName)}` : ''}${g.isExhibition ? ` · <span style="color:#b45309">🎯 Exhibition</span>` : ''}</div></td>
-        <td style="white-space:nowrap"><span class="game-card-status status-${g.status}" style="font-size:11px">${statusLabel}</span></td>
-        <td style="white-space:nowrap">
-          <button class="btn-icon" title="Open" onclick="selectGame('${g.id}');switchTab('games')">↗</button>
-          <button class="btn-icon" title="${g.isExhibition ? 'Unmark exhibition' : 'Mark as exhibition'}" onclick="toggleExhibitionGame('${g.id}')" style="${g.isExhibition ? '' : 'opacity:0.35'}">🎯</button>
-          <button class="btn-icon" title="Delete" onclick="deleteGame('${g.id}');Render.adminGames()">🗑</button>
-        </td>
-      </tr>`;
-    }).join('');
-    c.innerHTML = `<div class="stats-table-wrap"><table class="stats-table">
-      <thead><tr><th>Matchup</th><th>Status</th><th></th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table></div>`;
+    c.innerHTML = `<div>${sorted.map(g => buildGameListItem(g, { showAdminControls: true })).join('')}</div>`;
   },
 
   adminEvents() {
@@ -2785,7 +2767,7 @@ function buildChampSection(id, champGame, finalists, useGenerateFn) {
   </div>`;
 }
 
-function buildGameListItem(g) {
+function buildGameListItem(g, { showAdminControls = false } = {}) {
   const home = State.getTeam(g.homeTeamId), away = State.getTeam(g.awayTeamId);
   const isLive  = g.status === 'in_progress';
   const isSetup = g.status === 'setup';
@@ -2797,14 +2779,19 @@ function buildGameListItem(g) {
     : isLive ? `Live${inningStr ? ' · ' + inningStr : ''}`
     : isCompleted ? 'Final'
     : g.status.replace('_', ' ');
-  const topActions = isLive
-    ? `<div style="display:flex;gap:5px;align-items:center" onclick="event.stopPropagation()">
-         <button class="btn btn-sm" onclick="renderLiveGame('${g.id}',true)">👁 Watch</button>
-         ${canUserScore() ? `<button class="btn btn-sm btn-primary" onclick="openGameForScoring('${g.id}')">▶ Score</button>` : ''}
-       </div>`
+  const primaryActions = isLive
+    ? `<button class="btn btn-sm" onclick="renderLiveGame('${g.id}',true)">👁 Watch</button>
+       ${canUserScore() ? `<button class="btn btn-sm btn-primary" onclick="openGameForScoring('${g.id}')">▶ Score</button>` : ''}`
     : isSetup && canUserScore()
-      ? `<div onclick="event.stopPropagation()"><button class="btn btn-sm btn-primary" onclick="showSetupModal('${g.id}')">▶ Start</button></div>`
+      ? `<button class="btn btn-sm btn-primary" onclick="showSetupModal('${g.id}')">▶ Start</button>`
       : '';
+  const adminActions = showAdminControls
+    ? `<button class="btn-icon" title="${g.isExhibition ? 'Unmark exhibition' : 'Mark as exhibition'}" onclick="toggleExhibitionGame('${g.id}')" style="${g.isExhibition ? '' : 'opacity:0.35'}">🎯</button>
+       <button class="btn-icon" title="Delete" onclick="deleteGame('${g.id}')">🗑</button>`
+    : '';
+  const topActions = (primaryActions || adminActions)
+    ? `<div style="display:flex;gap:5px;align-items:center" onclick="event.stopPropagation()">${primaryActions}${adminActions}</div>`
+    : '';
   const eventName2 = g.tournamentId ? (State.getTournament(g.tournamentId)?.name || g.tournamentName || null) : null;
   const eventBadge2 = eventName2
     ? `<span style="font-size:11px;color:#0369a1">📋 ${escapeHtml(eventName2)}</span>`
