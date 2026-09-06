@@ -46,6 +46,10 @@ function toast(msg, type = '') {
 let _lastFirestoreErrorToast = 0;
 function _notifyFirestoreError(context, err) {
   console.error(context + ':', err?.code || '', err?.message || err);
+  // An anonymous visitor is expected to get permission-denied on collections
+  // restricted to signed-in users (e.g. 'users') -- that's normal, not a
+  // problem worth alarming them about. Still log it, just skip the toast.
+  if (err?.code === 'permission-denied' && !currentUser) return;
   const now = Date.now();
   if (now - _lastFirestoreErrorToast < 8000) return;
   _lastFirestoreErrorToast = now;
