@@ -1632,10 +1632,15 @@ function buildHomeContentHtml(profile, { readOnly = false, signedIn = true } = {
     playerCard = `
       <div class="home-card">
         <div class="home-section-title">Get Started</div>
-        <p style="color:#6b7280;margin:0 0 12px 0;font-size:14px">Are you a player, or just following along?</p>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          <button class="btn btn-primary btn-sm" onclick="showCreateMyPlayerModal()">+ Create My Player</button>
-          <button class="btn btn-sm" onclick="showClaimPlayerModal()">🔗 Claim an Existing Player</button>
+        <div style="margin-bottom:14px">
+          <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px">🏏 I'm a Player</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <button class="btn btn-primary btn-sm" onclick="showCreateMyPlayerModal()">+ Create My Player</button>
+            <button class="btn btn-sm" onclick="showClaimPlayerModal()">🔗 Claim an Existing Player</button>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px">👀 I'm Just Watching</div>
           <button class="btn btn-sm" onclick="showFollowPlayerModal()">⭐ Follow a Player</button>
         </div>
       </div>`;
