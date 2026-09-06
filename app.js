@@ -3262,17 +3262,35 @@ async function generateTournamentGames(tournId) {
     return;
   }
 
-  // Round Robin / Playoff: generate all unplayed pairs at once
-  const existing = State.games.filter(g => g.tournamentId === tournId && !g.isChampionship)
-    .map(g => `${g.homeTeamId}|${g.awayTeamId}`);
-  const pairs = [];
+  // Round Robin / Playoff: generate all unplayed pairs at once. Home/away is
+  // balanced with a running tally (fewer home games so far gets home; ties
+  // broken randomly) instead of always giving home to whichever team came
+  // first in teamIds -- that used to guarantee the first team picked was
+  // home in every one of its games and the last team home in none.
+  const allExisting = State.games.filter(g => g.tournamentId === tournId && !g.isChampionship);
+  const existingKeys = allExisting.map(g => `${g.homeTeamId}|${g.awayTeamId}`);
+  const homeCount = {};
+  t.teamIds.forEach(id => { homeCount[id] = 0; });
+  allExisting.forEach(g => { if (homeCount[g.homeTeamId] !== undefined) homeCount[g.homeTeamId]++; });
+
+  const unorderedPairs = [];
   for (let i=0; i<t.teamIds.length; i++)
     for (let j=i+1; j<t.teamIds.length; j++) {
       const a = t.teamIds[i], b = t.teamIds[j];
-      if (!existing.includes(`${a}|${b}`) && !existing.includes(`${b}|${a}`))
-        pairs.push([a, b]);
+      if (!existingKeys.includes(`${a}|${b}`) && !existingKeys.includes(`${b}|${a}`))
+        unorderedPairs.push([a, b]);
     }
-  if (!pairs.length) { toast('All round-robin matchups already generated', 'error'); return; }
+  if (!unorderedPairs.length) { toast('All round-robin matchups already generated', 'error'); return; }
+
+  const pairs = unorderedPairs.map(([a, b]) => {
+    let homeId, awayId;
+    if (homeCount[a] < homeCount[b]) { homeId = a; awayId = b; }
+    else if (homeCount[b] < homeCount[a]) { homeId = b; awayId = a; }
+    else [homeId, awayId] = Math.random() < 0.5 ? [a, b] : [b, a];
+    homeCount[homeId]++;
+    return [homeId, awayId];
+  });
+
   await Promise.all(pairs.map(([homeId, awayId]) =>
     State.addGame({ homeTeamId: homeId, awayTeamId: awayId, numInnings: 6, tournamentId: tournId, allowSharedPlayers: true })
   ));
