@@ -1659,33 +1659,15 @@ function buildHomeContentHtml(profile, { readOnly = false, signedIn = true } = {
   }
 
   // ── My Player's own teams/games/events ──
+  // (No fallback games feed when there's neither a player nor a follow --
+  // the Get Started card is the point of focus there; a generic list of
+  // other people's games was just confusing clutter alongside it.)
   let myTeamsCard = '', myGamesCard = '', myEventsCard = '';
   if (myPid) {
     const sections = buildPlayerHomeSections(myPid, { interactive: !readOnly, labelPrefix: readOnly ? '' : 'My ' });
     myTeamsCard = sections.teamsCard;
     myGamesCard = sections.gamesCard;
     myEventsCard = sections.eventsCard;
-  } else if (!readOnly && !followedIds.length) {
-    // Genuinely empty state (no player, no follows) — fall back to a
-    // generic recent-games feed so there's still something to look at.
-    const gameRank = g => g.status === 'in_progress' ? 0 : g.status === 'setup' ? 1 : 2;
-    const games = [...State.games]
-      .filter(g => homeShowFinished || g.status !== 'completed')
-      .sort((a, b) => gameRank(a) - gameRank(b) || b.createdAt - a.createdAt)
-      .slice(0, 6);
-    const toggle = `<label style="display:flex;align-items:center;gap:5px;font-size:13px;color:#6b7280;cursor:pointer;user-select:none">
-      <input type="checkbox" ${homeShowFinished ? 'checked' : ''} onchange="homeShowFinished=this.checked;Render.home()">
-      Show finished
-    </label>`;
-    const html = games.map(g => buildGameListItem(g)).join('') || '<p style="color:#6b7280;font-size:14px;margin:0">No active games.</p>';
-    myGamesCard = `
-      <div class="home-card home-card-full">
-        <div class="home-section-title" style="display:flex;justify-content:space-between;align-items:center">
-          <span>Recent Games</span>
-          ${toggle}
-        </div>
-        ${html}
-      </div>`;
   }
 
   // ── Following: read-only snapshot of each followed player ──
