@@ -1419,7 +1419,7 @@
   }
   .player-list-item:last-child { border-bottom: none; }
   .player-list-item:hover { background: var(--surface-alt); }
-  .player-list-item.selected { background: #f0fdf4; border-left-color: #166534; }
+  .player-list-item.selected { background: var(--surface-alt); border-left-color: #166534; }
   .player-list-item.selected .pli-name { color: #166534; font-weight: 700; }
   .pli-name { font-size: 14px; font-weight: 600; color: var(--text-strong); }
   .pli-sub { font-size: 11px; color: var(--text-faint); margin-top: 1px; }
@@ -1437,7 +1437,6 @@
   }
   .game-list-item:last-child { border-bottom: 1px solid var(--border) !important; margin-bottom: 0; }
   .game-list-item:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.11); transform: translateY(-1px); }
-  .game-list-item.selected { background: #f0fdf4 !important; border-color: #6ee7b7 !important; border-left-color: #6ee7b7 !important; box-shadow: 0 2px 8px rgba(22,163,74,0.12) !important; }
 
   /* Container that holds game cards — remove the panel border so cards stand alone */
   #games-list {
