@@ -1723,7 +1723,7 @@ function buildHomeContentHtml(profile, { readOnly = false, signedIn = true } = {
       const sections = buildPlayerHomeSections(activeId, { interactive: false });
       const header = `
         <div class="home-card home-card-full" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-          <div class="home-section-title" style="margin:0">⭐ Following</div>
+          <div class="home-section-title" style="margin:0;border-radius:8px">⭐ Following</div>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             ${followedIds.length > 1 ? `<select class="form-input" style="width:auto" onchange="setHomeFollowTab(this.value)">${options}</select>` : ''}
             <button class="btn-icon" title="Unfollow ${escapeHtml(activePlayer.name)}" onclick="unfollowPlayer('${activeId}')">✕</button>

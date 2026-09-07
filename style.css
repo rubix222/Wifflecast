@@ -208,32 +208,45 @@
   .view { display: none; }
   .view.active { display: block; }
 
-  /* ---------- Sticky page header (per main tab) ---------- */
+  /* ---------- Sticky page header (per main tab, except Home) ---------- */
   .page-sticky-header {
     position: sticky;
     top: 0;
     z-index: 15;
-    height: 44px;
+    height: 52px;
     display: flex;
     align-items: center;
+    justify-content: center;
     background: var(--bg);
     margin: -24px -24px 16px;
     padding: 0 24px;
-    font-size: 17px;
-    font-weight: 700;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 0.3px;
     color: #14532d;
     border-bottom: 1px solid var(--border);
   }
+  :root[data-theme="dark"] .page-sticky-header { color: #4ade80; }
+  /* A sticky row (toolbar, stats event filter) that pins directly below the
+     page title, so only the list/table content beneath it scrolls. */
+  .sticky-below-title {
+    position: sticky;
+    top: 52px;
+    z-index: 13;
+    background: var(--bg);
+  }
+  .sticky-below-title:empty { display: none; }
   .home-subnav-sticky {
     position: sticky;
-    top: 44px;
+    top: 0;
     z-index: 14;
     background: var(--bg);
     padding: 8px 0;
     margin: 0 0 4px;
   }
   @media (max-width: 430px) {
-    .page-sticky-header { margin: -6px -6px 12px; padding: 0 6px; }
+    .page-sticky-header { height: 44px; font-size: 18px; margin: -6px -6px 12px; padding: 0 6px; }
+    .sticky-below-title { top: 44px; }
   }
 
   /* ---------- Toolbar ---------- */
@@ -1362,6 +1375,7 @@
     /* Reduce panel/card/header padding at narrow widths */
     .player-detail-panel { padding: 14px; }
     .home-card { padding: 14px; }
+    .home-section-title { margin: -14px -14px 14px; padding: 8px 14px; }
     .tourn-detail-body { padding: 14px; }
     .inline-game-header { padding: 10px 14px 10px; }
     .admin-panel-section { padding: 14px; }
@@ -1383,6 +1397,7 @@
     main { padding: 6px; }
     .player-detail-panel { padding: 10px; }
     .home-card { padding: 10px 12px; }
+    .home-section-title { margin: -10px -12px 10px; padding: 7px 12px; }
     .tourn-detail-body { padding: 10px; }
     .admin-panel-section { padding: 10px; }
     .admin-panel-heading { margin: -10px -10px 10px; padding: 7px 10px; }
@@ -2273,9 +2288,9 @@
     letter-spacing: 0.6px;
     color: #fff;
     background: linear-gradient(135deg, #14532d 0%, #166534 100%);
-    padding: 8px 14px;
-    border-radius: 8px;
-    margin: 0 0 14px 0;
+    padding: 9px 20px;
+    border-radius: 12px 12px 0 0;
+    margin: -20px -20px 14px;
   }
   .home-card {
     background: var(--surface);
