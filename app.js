@@ -301,7 +301,7 @@ function renderHomeTeamsSection(teams, view) {
   const trs = teamData.map(row => {
     const d = row[view];
     const tds = cols.map(c => `<td>${c.fmt ? c.fmt(d[c.key]) : (d[c.key] ?? '—')}</td>`).join('');
-    return `<tr style="cursor:pointer" onclick="showTeamStatsModal('${row.t.id}')"><td>${teamSwatch(row.t)}</td>${tds}</tr>`;
+    return `<tr style="cursor:pointer" onclick="showTeamStatsModal('${row.t.id}')"><td><span style="display:inline-flex;align-items:center;gap:5px">${teamSwatch(row.t)}${escapeHtml(row.t.name)}</span></td>${tds}</tr>`;
   }).join('');
   return `<div class="stats-table-wrap"><table class="stats-table">
     <thead><tr><th onclick="sortHomeTeams('name','${view}')">Team${nameSortArr}</th>${cols.map(thArr).join('')}</tr></thead>
@@ -1215,7 +1215,7 @@ function renderTournTeamStats(tournId) {
 
   const tbody = rows.map(({ team, d }) =>
     `<tr style="cursor:pointer" onclick="showTeamStatsModal('${team.id}')">
-      <td>${teamSwatch(team)}</td>
+      <td><span style="display:inline-flex;align-items:center;gap:5px">${teamSwatch(team)}${escapeHtml(team.name)}</span></td>
       ${COLS.map(col => `<td>${col.fmt ? col.fmt(d[col.key]) : (d[col.key] ?? '—')}</td>`).join('')}
     </tr>`
   ).join('');
@@ -1923,7 +1923,7 @@ const Render = {
     const rows = sorted.map(t => {
       const playerCount = (t.playerIds || []).length;
       return `<tr>
-        <td>${teamSwatch(t)}</td>
+        <td><span style="display:inline-flex;align-items:center;gap:5px">${teamSwatch(t)}${escapeHtml(t.name)}</span></td>
         <td><span class="muted small">${playerCount} player${playerCount !== 1 ? 's' : ''}</span></td>
         <td style="white-space:nowrap">
           <button class="btn-icon" title="Edit" onclick="showTeamModal('${t.id}', true)">✎</button>
@@ -2092,7 +2092,7 @@ const Render = {
     const myPid = currentUserProfile?.playerId;
     const isMyTeam = (t) => !!(myPid && (t.playerIds || []).includes(myPid));
     const teamNameCell = (t) => {
-      return `<td><span style="cursor:pointer" onclick="event.stopPropagation();showTeamStatsModal('${t.id}')">${teamSwatch(t)}</span></td>`;
+      return `<td><span style="cursor:pointer;border-bottom:1px dashed #9ca3af;display:inline-flex;align-items:center;gap:5px" onclick="event.stopPropagation();showTeamStatsModal('${t.id}')">${teamSwatch(t)}${escapeHtml(t.name)}</span></td>`;
     };
     const teamRowClass = (t) => isMyTeam(t) ? 'mine' : '';
     const _gameIds = getFilteredGameIds();
@@ -2495,20 +2495,17 @@ function _teamColor(team) {
   return palette[h % palette.length];
 }
 
-// Returns aligned two-row team matchup HTML with @ hanging left.
 function matchupHtml(away, home) {
-  return `<div style="line-height:1.7">
-    <div>${teamSwatch(away)}</div>
-    <div><span style="color:#9ca3af;font-size:0.8em;margin-right:3px">@</span>${teamSwatch(home)}</div>
+  return `<div style="display:grid;grid-template-columns:1em 1fr;align-items:center;column-gap:2px;line-height:1.5">
+    <span></span><span>${teamSwatch(away)}${escapeHtml(away?.name||'?')}</span>
+    <span style="color:#9ca3af;font-size:0.8em;text-align:right">@</span><span>${teamSwatch(home)}${escapeHtml(home?.name||'?')}</span>
   </div>`;
 }
 
-// Returns a rounded, team-colored "pill" containing the team's name --
-// white text with a black stroke so it stays readable against any color.
+// Returns a small colored square HTML swatch for a team.
 function teamSwatch(team) {
   const c = _teamColor(team);
-  const name = escapeHtml(team?.name || '?');
-  return `<span class="team-pill" style="background:${c}">${name}</span>`;
+  return `<span class="team-swatch" style="background:${c}"></span>`;
 }
 
 function showTeamModal(id = null, forceAdmin = false) {
@@ -2692,7 +2689,7 @@ function openGame(id) {
       const eventName = g.tournamentId ? (State.getTournament(g.tournamentId)?.name || g.tournamentName || null) : null;
       detail.innerHTML = `
         <div class="inline-game-header">
-          <h3 style="line-height:1.4">${teamSwatch(away)}<br><span style="font-size:0.75em;font-weight:400;color:#9ca3af">@</span> ${teamSwatch(home)}</h3>
+          <h3 style="line-height:1.4">${teamSwatch(away)}${escapeHtml(away?.name||'?')}<br><span style="font-size:0.75em;font-weight:400;color:#9ca3af">@</span> ${teamSwatch(home)}${escapeHtml(home?.name||'?')}</h3>
           ${eventName ? `<div style="font-size:12px;color:#0369a1;margin-top:4px">📋 ${escapeHtml(eventName)}</div>` : ''}
         </div>
         <div style="padding:24px;text-align:center;color:#6b7280">
@@ -2764,9 +2761,9 @@ function buildChampSection(id, champGame, finalists, useGenerateFn) {
     <div class="champ-bracket-label">🏆 Championship</div>
     ${isComplete && winnerName ? `<div class="champ-winner">🎉 ${escapeHtml(winnerName)} wins the tournament!</div>` : ''}
     <div class="champ-finalists" style="cursor:pointer" onclick="openGame('${champGame.id}')">
-      <div class="champ-finalist${isComplete && champGame.score.away >= champGame.score.home ? ' champ-finalist-winner' : ''}">${teamSwatch(chAway)}</div>
+      <div class="champ-finalist${isComplete && champGame.score.away >= champGame.score.home ? ' champ-finalist-winner' : ''}">${teamSwatch(chAway)}${escapeHtml(chAway?.name||'?')}</div>
       <div class="champ-score">${isComplete ? `${champGame.score.away}–${champGame.score.home}` : champGame.status.replace('_',' ')}</div>
-      <div class="champ-finalist${isComplete && champGame.score.home >= champGame.score.away ? ' champ-finalist-winner' : ''}">${teamSwatch(chHome)}</div>
+      <div class="champ-finalist${isComplete && champGame.score.home >= champGame.score.away ? ' champ-finalist-winner' : ''}">${teamSwatch(chHome)}${escapeHtml(chHome?.name||'?')}</div>
     </div>
   </div>`;
 }
@@ -2847,7 +2844,7 @@ function renderTournamentDetail(id) {
       const badge = row.eliminated ? `<span style="font-size:11px;color:#dc2626;font-weight:600;margin-left:4px">OUT</span>` : '';
       return `<tr class="${i === 0 && !row.eliminated ? 'tourn-leader' : ''}${row.eliminated ? ' tourn-eliminated' : ''}">
         <td>${row.eliminated ? '✗' : i+1}</td>
-        <td><span style="display:inline-flex;align-items:center;gap:5px">${teamSwatch(row.team)}${badge}</span></td>
+        <td><span style="display:inline-flex;align-items:center;gap:5px"><strong>${teamSwatch(row.team)}${escapeHtml(row.team.name)}</strong>${badge}</span></td>
         <td>${row.W}</td><td>${row.L}</td><td>${row.gamesPlayed}</td>
       </tr>`;
     }).join('');
@@ -2912,7 +2909,7 @@ function renderTournamentDetail(id) {
       const isFinalist = isPlayoff && rrComplete && i < 2;
       return `<tr class="${i === 0 ? 'tourn-leader' : ''}${isFinalist ? ' tourn-finalist' : ''}">
         <td>${isFinalist ? (i === 0 ? '🥇' : '🥈') : i+1}</td>
-        <td>${teamSwatch(row.team)}</td>
+        <td><span style="display:inline-flex;align-items:center;gap:5px"><strong>${teamSwatch(row.team)}${escapeHtml(row.team.name)}</strong></span></td>
         <td>${row.W}</td><td>${row.L}</td><td>${row.T}</td>
         <td>${row.pts}</td><td>${row.RF}</td><td>${row.RA}</td>
         <td>${row.rd >= 0 ? '+' : ''}${row.rd}</td>
@@ -3411,7 +3408,7 @@ function renderGameSetup(g) {
   if (!detail) return;
   detail.innerHTML = `
     <div class="inline-game-header">
-      <h3 style="line-height:1.4">${teamSwatch(away)}<br><span style="font-size:0.75em;font-weight:400;color:#9ca3af">@</span> ${teamSwatch(home)}
+      <h3 style="line-height:1.4">${teamSwatch(away)}${escapeHtml(away.name)}<br><span style="font-size:0.75em;font-weight:400;color:#9ca3af">@</span> ${teamSwatch(home)}${escapeHtml(home.name)}
         <span class="game-card-status status-setup" style="margin-left:8px">setup</span>
       </h3>
     </div>
@@ -3422,11 +3419,11 @@ function renderGameSetup(g) {
       </p>
       <div class="game-setup-grid">
         <div class="lineup-team-block">
-          <h4>${teamSwatch(away)} <span class="team-tag away">Away</span></h4>
+          <h4>${teamSwatch(away)}${escapeHtml(away.name)} <span class="team-tag away">Away</span></h4>
           <ul class="lineup-list" id="lineup-away" data-team="away" data-game="${g.id}"></ul>
         </div>
         <div class="lineup-team-block">
-          <h4>${teamSwatch(home)} <span class="team-tag">Home</span></h4>
+          <h4>${teamSwatch(home)}${escapeHtml(home.name)} <span class="team-tag">Home</span></h4>
           <ul class="lineup-list" id="lineup-home" data-team="home" data-game="${g.id}"></ul>
         </div>
       </div>
@@ -3446,7 +3443,7 @@ function showSetupModal(gameId) {
   Modal.show(`
     <div class="modal-header">
       <div>
-        <h2 style="margin:0;line-height:1.4">${teamSwatch(away)}<br><span style="font-size:0.75em;font-weight:400;color:#9ca3af">@</span> ${teamSwatch(home)}</h2>
+        <h2 style="margin:0;line-height:1.4">${escapeHtml(away.name)}<br><span style="font-size:0.75em;font-weight:400;color:#9ca3af">@</span> ${escapeHtml(home.name)}</h2>
         ${eventName ? `<div style="font-size:12px;color:#0369a1;margin-top:2px">📋 ${escapeHtml(eventName)}</div>` : ''}
       </div>
       <button class="btn-icon" onclick="Modal.hide()">✕</button>
@@ -3457,11 +3454,11 @@ function showSetupModal(gameId) {
       </p>
       <div class="game-setup-grid">
         <div class="lineup-team-block">
-          <h4>${teamSwatch(away)} <span class="team-tag away">Away</span></h4>
+          <h4>${escapeHtml(away.name)} <span class="team-tag away">Away</span></h4>
           <ul class="lineup-list" id="lineup-away" data-team="away" data-game="${g.id}"></ul>
         </div>
         <div class="lineup-team-block">
-          <h4>${teamSwatch(home)} <span class="team-tag">Home</span></h4>
+          <h4>${teamSwatch(home)}${escapeHtml(home.name)} <span class="team-tag">Home</span></h4>
           <ul class="lineup-list" id="lineup-home" data-team="home" data-game="${g.id}"></ul>
         </div>
       </div>

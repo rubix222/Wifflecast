@@ -156,6 +156,13 @@
     color: #374151;
     flex-shrink: 0;
   }
+  /* The arrow glyph's own font metrics sit visually low even inside a
+     centered flex box; nudge it up directly rather than fighting baseline
+     behavior, and go heavier than the shared 700 so it reads as bold too. */
+  .live-game .lg-back-btn {
+    font-weight: 900;
+    transform: translateY(-1.5px);
+  }
 
   main {
     max-width: 1100px;
@@ -780,20 +787,15 @@
   }
   .stats-key span strong { color: #374151; }
 
-  /* ── Team color swatch (small square next to team name) ── */
-  /* Rounded, team-colored pill wrapping a team's name -- white text with a
-     black stroke keeps it readable against any team color. */
-  .team-pill {
+  .team-swatch {
     display: inline-block;
-    padding: 1px 9px;
-    border-radius: 999px;
-    color: #fff;
-    -webkit-text-stroke: 0.6px #000;
-    paint-order: stroke fill;
-    font-weight: 700;
-    line-height: 1.5;
-    white-space: nowrap;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+    vertical-align: middle;
     border: 1px solid rgba(0,0,0,0.15);
+    margin-right: 4px;
   }
 
   /* ── Stats legend (collapsible glossary under stat tables) ── */

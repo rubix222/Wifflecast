@@ -455,7 +455,7 @@ function renderHittingStats(g, away, home) {
     }).join('');
   };
   const colHdr = () => `<tr class="stats-col-hdr">${nameTh()}${th('AB','AB')}${th('H','H')}${th('AVG','AVG')}${th('1B','1B')}${th('2B','2B')}${th('HR','HR')}${th('R','R')}${th('RBI','RBI')}${th('BB','BB')}${th('K','K')}${th('FO','FO')}</tr>`;
-  const teamHdr = (team) => `<tr class="stats-team-hdr"><th colspan="12">${teamSwatch(team)}</th></tr>${colHdr()}`;
+  const teamHdr = (team) => `<tr class="stats-team-hdr"><th colspan="12">${teamSwatch(team)}${escapeHtml(team.name)}</th></tr>${colHdr()}`;
   return `<table>
     <thead>${teamHdr(away)}</thead><tbody>${renderTeam(away,'awayBattingOrder')}</tbody>
     <thead>${teamHdr(home)}</thead><tbody>${renderTeam(home,'homeBattingOrder')}</tbody>
@@ -544,7 +544,7 @@ function renderPitchingStats(g, away, home) {
     }).join('');
   };
   const colHdr = () => `<tr class="stats-col-hdr">${nameTh()}${th('IP','IP')}${th('ERA','ERA')}${th('H','H')}${th('HR','HR')}${th('BB','BB')}${th('K','K')}${th('ER','ER')}${th('PC','PC')}</tr>`;
-  const teamHdr = (team) => `<tr class="stats-team-hdr"><th colspan="9">${teamSwatch(team)}</th></tr>${colHdr()}`;
+  const teamHdr = (team) => `<tr class="stats-team-hdr"><th colspan="9">${teamSwatch(team)}${escapeHtml(team.name)}</th></tr>${colHdr()}`;
   return `<table>
     <thead>${teamHdr(away)}</thead><tbody>${renderTeam(away, g.awayPositions, 'bottom')}</tbody>
     <thead>${teamHdr(home)}</thead><tbody>${renderTeam(home, g.homePositions, 'top')}</tbody>
@@ -603,7 +603,7 @@ function renderFieldingStats(g, away, home) {
     }).join('');
   };
   const colHdr = () => `<tr class="stats-col-hdr">${nameTh()}${th('PO','PO')}${th('E','E')}${th('DP','DP')}${th('TAG','TAG')}</tr>`;
-  const teamHdr = (team) => `<tr class="stats-team-hdr"><th colspan="5">${teamSwatch(team)}</th></tr>${colHdr()}`;
+  const teamHdr = (team) => `<tr class="stats-team-hdr"><th colspan="5">${teamSwatch(team)}${escapeHtml(team.name)}</th></tr>${colHdr()}`;
   return `<table>
     <thead>${teamHdr(away)}</thead><tbody>${renderTeam(away, 'bottom')}</tbody>
     <thead>${teamHdr(home)}</thead><tbody>${renderTeam(home, 'top')}</tbody>
@@ -636,7 +636,7 @@ function liveGameHTML(g, home, away) {
   return `
     <div class="live-game">
       <div class="lg-topbar">
-        <button class="btn-icon lg-back-btn" onclick="exitLiveGame()" title="Back">←</button>
+        <button class="btn-icon lg-back-btn" onclick="exitLiveGame()" title="Back">⬅</button>
         <div class="lg-title">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:nowrap;min-width:0">
             <span class="game-card-status status-${g.status}" style="font-size:11px;flex-shrink:0">${isCompleted ? 'Final' : canScore ? 'Scoring' : 'Live'}</span>
@@ -665,7 +665,7 @@ function liveGameHTML(g, home, away) {
 
       <div class="scoreboard">
         <div class="team-side ${battingSide === 'away' && !isCompleted ? 'batting' : ''}">
-          <div class="name">${teamSwatch(away)}</div>
+          <div class="name">${teamSwatch(away)}${escapeHtml(away.name)}</div>
           <div class="score" id="sb-score-away">${(_frozenScore || g.score).away}</div>
         </div>
         <div class="middle">
@@ -673,7 +673,7 @@ function liveGameHTML(g, home, away) {
           <div class="outs" id="sb-outs">${isCompleted ? '' : (function(){const o=_frozenOuts??g.outs;return`<span class="outs-label">Outs</span><span class="out-dots"><span class="out-dot${o>=1?' on':''}"></span><span class="out-dot${o>=2?' on':''}"></span><span class="out-dot${o>=3?' on':''}"></span></span>`;})()}</div>
         </div>
         <div class="team-side ${battingSide === 'home' && !isCompleted ? 'batting' : ''}">
-          <div class="name">${teamSwatch(home)}</div>
+          <div class="name">${teamSwatch(home)}${escapeHtml(home.name)}</div>
           <div class="score" id="sb-score-home">${(_frozenScore || g.score).home}</div>
         </div>
         ${!isCompleted ? `
