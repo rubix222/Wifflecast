@@ -474,7 +474,16 @@ function setTeamsView(view) {
 }
 function setHomePlayerView(view) { homePlayerView = view; Render.home(); }
 function setHomeTeamsView(view)  { homeTeamsView  = view; Render.home(); }
-function _withScrollPreserved(containerSel, fn) {
+// NOTE: deliberately NOT named _withScrollPreserved -- state.js already
+// defines a same-named, different-signature (fn-only) helper for whole-page
+// scroll preservation across the Firestore listeners. Two global function
+// declarations sharing a name meant this one silently overwrote that one
+// (app.js loads last), breaking every listener call site that passed just
+// a callback -- they were instead calling THIS function with a callback
+// where a selector string was expected, throwing on the invalid selector
+// and aborting the rest of that render pass (including rerenderLive(),
+// which is why live-watchers stopped getting updates).
+function _withTableScrollPreserved(containerSel, fn) {
   const wrap = document.querySelector(containerSel + ' .stats-table-wrap');
   const savedScroll = wrap ? wrap.scrollLeft : 0;
   fn();
@@ -488,7 +497,7 @@ function sortHomeTeams(col, view) {
   const s = homeTeamSort[view];
   s.dir = s.col === col ? -s.dir : -1;
   s.col = col;
-  _withScrollPreserved('#home-container', () => Render.home());
+  _withTableScrollPreserved('#home-container', () => Render.home());
 }
 
 function sortTeamStats(col, which) {
@@ -498,13 +507,13 @@ function sortTeamStats(col, which) {
           : teamBatSort;
   s.dir = s.col === col ? -s.dir : -1;
   s.col = col;
-  _withScrollPreserved('#teams-container', () => Render.teams());
+  _withTableScrollPreserved('#teams-container', () => Render.teams());
 }
 function sortStats(col, which) {
   const s = which === 'pitching' ? pitchSort : which === 'fielding' ? fieldSort : statsSort;
   s.dir = s.col === col ? -s.dir : -1;
   s.col = col;
-  _withScrollPreserved('#players-container', () => Render.players());
+  _withTableScrollPreserved('#players-container', () => Render.players());
 }
 function showCreateMyPlayerModal() {
   Modal.show(`
@@ -1236,14 +1245,14 @@ function sortTournPlayerStats(tournId, col, view) {
   const sort = view === 'pitching' ? _tppSort : view === 'fielding' ? _tpfSort : _tpSort;
   if (sort.col === col) sort.dir *= -1;
   else { sort.col = col; sort.dir = (col === 'ERA' || col === 'WHIP' || col === 'BB') ? 1 : -1; }
-  _withScrollPreserved('#tourn-player-stats', () => renderTournPlayerStats(tournId));
+  _withTableScrollPreserved('#tourn-player-stats', () => renderTournPlayerStats(tournId));
 }
 
 function sortTournTeamStats(tournId, col, view) {
   const sort = view === 'pitching' ? _ttpSort : _ttbSort;
   if (sort.col === col) sort.dir *= -1;
   else { sort.col = col; sort.dir = (col === 'ERA' || col === 'WHIP') ? 1 : -1; }
-  _withScrollPreserved('#tourn-team-stats', () => renderTournTeamStats(tournId));
+  _withTableScrollPreserved('#tourn-team-stats', () => renderTournTeamStats(tournId));
 }
 
 async function invitePlayer(playerId) {
