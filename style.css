@@ -878,19 +878,18 @@
     opacity: 0.75;
   }
   .pitch-buttons-compact button:hover { background: #f9fafb; }
-  .pitch-buttons-compact button[data-pitch="ball"] { background: #111827; color: #fff; border-color: #111827; }
-  .pitch-buttons-compact button[data-pitch="ball"]:hover { background: #000; }
+  .pitch-buttons-compact button[data-pitch="ball"] { background: #16a34a; color: #fff; border-color: #16a34a; }
+  .pitch-buttons-compact button[data-pitch="ball"]:hover { background: #15803d; }
   .pitch-buttons-compact button[data-pitch^="strike"] { background: #dc2626; color: #fff; border-color: #dc2626; }
   .pitch-buttons-compact button[data-pitch^="strike"]:hover { background: #b91c1c; }
   .pitch-buttons-compact button[data-pitch="foul"] { background: #eab308; color: #fff; border-color: #eab308; }
   .pitch-buttons-compact button[data-pitch="foul"]:hover { background: #ca8a04; }
   .pitch-buttons-compact .btn-bip {
-    background: #166534;
+    background: #2563eb;
     color: #fff;
-    border-color: #166534;
-    flex: 1.4;
+    border-color: #2563eb;
   }
-  .pitch-buttons-compact .btn-bip:hover { background: #14532d; }
+  .pitch-buttons-compact .btn-bip:hover { background: #1d4ed8; }
 
   .scoreboard {
     background: #14532d;
