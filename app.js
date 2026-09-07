@@ -1796,6 +1796,7 @@ const Render = {
       selectedTournamentId = null;
       const detail = $('#tournaments-detail');
       if (detail) detail.innerHTML = '';
+      syncUrlFromState();
     }
 
     if (!sorted.length) {
@@ -2242,6 +2243,7 @@ const Render = {
       selectedGameId = null;
       const detail = $('#games-detail');
       if (detail) detail.innerHTML = '';
+      syncUrlFromState();
     }
 
     if (!sorted.length) {
@@ -2252,7 +2254,7 @@ const Render = {
       return;
     }
     // Keep selectedGameId valid
-    if (selectedGameId && !State.getGame(selectedGameId)) selectedGameId = null;
+    if (selectedGameId && !State.getGame(selectedGameId)) { selectedGameId = null; syncUrlFromState(); }
     listEl.innerHTML = sorted.map(g => {
       const home = State.getTeam(g.homeTeamId);
       const away = State.getTeam(g.awayTeamId);
@@ -2672,12 +2674,13 @@ function deselectGame() {
   Render.games();
   const detail = $('#games-detail');
   if (detail) detail.innerHTML = '';
+  syncUrlFromState();
 }
 function openGame(id) {
   closeAdminUserHomeOverlay(); // both are full-screen overlays; the game view should win
   selectedGameId = id;
   const g = State.getGame(id);
-  if (!g) return;
+  if (!g) { syncUrlFromState(); return; }
   if (g.status === 'setup') {
     switchTab('games');
     Render.games();
@@ -2701,6 +2704,7 @@ function openGame(id) {
   } else {
     renderLiveGame(g.id, true); // watch-only — use Score button to take scoring lock
   }
+  syncUrlFromState();
 }
 
 /* ============================================================
@@ -2721,6 +2725,7 @@ function selectTournament(id) {
   // <main> is the actual scrollable container (overflow-y:auto), not window.
   const mainEl = document.querySelector('main');
   if (mainEl) mainEl.scrollTop = 0;
+  syncUrlFromState();
 }
 
 function tournamentBack() {
@@ -2731,6 +2736,7 @@ function tournamentBack() {
   if (detail) detail.innerHTML = '';
   // Re-render list to clear selected highlight
   Render.tournaments();
+  syncUrlFromState();
 }
 
 function buildChampSection(id, champGame, finalists, useGenerateFn) {
@@ -3390,6 +3396,7 @@ async function confirmDeleteTournament(id) {
   Render.all();
   const detail = $('#tournaments-detail');
   if (detail) detail.innerHTML = '';
+  syncUrlFromState();
   toast('Event deleted');
 }
 
@@ -3962,11 +3969,31 @@ function renderLineScore(g, away, home) {
 /* ============================================================
    TAB NAVIGATION + WIRE-UP
    ============================================================ */
+// Keeps the address bar reflecting current location (tab / open game / open
+// event) so a URL can be copied and shared to land on the same place.
+// Uses replaceState (not pushState) so this doesn't add browser-history
+// entries for every click -- it just keeps the current URL accurate.
+function syncUrlFromState() {
+  const params = new URLSearchParams();
+  if (selectedGameId && State.getGame(selectedGameId)) {
+    params.set('game', selectedGameId);
+  } else if (_currentTab === 'tournaments' && selectedTournamentId) {
+    params.set('tab', 'tournaments');
+    params.set('event', selectedTournamentId);
+  } else if (_currentTab && _currentTab !== 'home') {
+    params.set('tab', _currentTab);
+  }
+  const qs = params.toString();
+  const url = window.location.pathname + (qs ? '?' + qs : '');
+  history.replaceState({}, '', url);
+}
+
 function switchTab(view) {
   _currentTab = view;
   $$('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
   $$('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + view));
   if (view === 'admin') syncAdminEmailToggle();
+  syncUrlFromState();
 }
 $$('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => switchTab(btn.dataset.view));
@@ -4083,12 +4110,20 @@ async function boot() {
 
     Render.all();
 
-    // Deep-link: ?game=<id> opens that game directly (used by recap email links)
-    const dlParams = new URLSearchParams(window.location.search);
-    const dlGameId = dlParams.get('game');
+    // Deep-link: the URL can name a game, an event, or just a tab (kept in
+    // sync by syncUrlFromState as people navigate, so links can be shared).
+    const dlParams  = new URLSearchParams(window.location.search);
+    const dlGameId  = dlParams.get('game');
+    const dlEventId = dlParams.get('event');
+    const dlTab     = dlParams.get('tab');
+    const validTabs = ['stats', 'games', 'tournaments', 'rules', 'admin'];
     if (dlGameId && State.getGame(dlGameId)) {
-      history.replaceState({}, '', window.location.pathname); // clean URL
       openGame(dlGameId);
+    } else if (dlTab === 'tournaments' && dlEventId && State.getTournament(dlEventId)) {
+      switchTab('tournaments');
+      selectTournament(dlEventId);
+    } else if (dlTab && validTabs.includes(dlTab)) {
+      switchTab(dlTab);
     }
   });
 }

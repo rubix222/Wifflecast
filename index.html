@@ -11,12 +11,11 @@
 <body>
 
 <header>
-  <h1>
+  <h1 style="cursor:pointer" onclick="switchTab('home')" title="Go to Home">
     <img src="wc_color.jpg?v=2" class="site-logo" width="64" height="64" alt="WiffleCast" />
     WiffleCast
   </h1>
   <div class="storage-controls">
-    <span id="storage-status" class="storage-status connected">☁️ Firestore</span>
     <button id="btn-sign-in" class="btn btn-sm">Sign In</button>
     <div id="user-menu-wrap" class="user-menu-wrap" style="display:none">
       <button id="user-menu-btn" class="user-menu-btn" onclick="toggleUserMenu()">
@@ -275,7 +274,7 @@
 <!-- Cache-busting note: bump the ?v= on these three + style.css whenever their
      content changes, so GitHub Pages / browser caches don't serve stale JS. -->
 <script src="state.js?v=3"></script>
-<script src="live.js?v=10"></script>
-<script src="app.js?v=26"></script>
+<script src="live.js?v=11"></script>
+<script src="app.js?v=27"></script>
 </body>
 </html>

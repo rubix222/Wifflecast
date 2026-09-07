@@ -141,9 +141,11 @@ function exitLiveGame() {
   }
   LiveGameId = null;
   LiveGameWatchOnly = false;
+  selectedGameId = null;
   const returnTo = _returnTab;
   _returnTab = null;
-  if (returnTo && returnTo !== 'games') switchTab(returnTo);
+  if (returnTo && returnTo !== 'games') switchTab(returnTo); // switchTab syncs the URL itself
+  else syncUrlFromState();
 }
 
 // ---- Scoring lock ----
