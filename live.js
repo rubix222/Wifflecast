@@ -687,7 +687,6 @@ function liveGameHTML(g, home, away) {
       <div class="lg-tab-body">
         <div class="lg-pane" data-tab="score" ${scorePaneHidden ? 'hidden' : ''}>
           ${canScore && isScoringLockStale(g) ? `<div id="stale-scoring-banner" style="background:#fef9c3;border-bottom:1px solid #fde68a;padding:8px 14px;font-size:12px;color:#92400e">⚠️ Scoring session timed out. Press any pitch button — if no one else took over, you'll resume automatically.</div>` : ''}
-          ${!isCompleted ? renderMatchupStrip(g, _betweenInnings) : ''}
           <div class="field-wrap">
             <div class="field-and-bases">
               <div class="field-panel">
@@ -701,25 +700,13 @@ function liveGameHTML(g, home, away) {
                   }</span>
                   <button class="bip-instruction-cancel" onclick="bipCancel()">✕</button>
                 </div>
-                ${!isCompleted && batterId ? `
-                <div class="spray-chart-controls">
-                  <button class="btn-icon spray-toggle-btn${_sprayChartVisible ? ' active' : ''}" id="spray-toggle-btn" onclick="toggleSprayChart()" title="Toggle hit chart">📍 Hit Chart</button>
-                  <div id="spray-chart-key" class="spray-chart-key" style="visibility:${_sprayChartVisible ? 'visible' : 'hidden'}">
-                    <div class="spray-key-title">HIT CHART</div>
-                    <div class="spray-key-grid">
-                      <span class="spray-key-item"><span class="spray-key-dot" style="background:#4ade80"></span>Single</span>
-                      <span class="spray-key-item"><span class="spray-key-dot" style="background:#60a5fa"></span>Double</span>
-                      <span class="spray-key-item"><span class="spray-key-dot" style="background:#fde68a"></span>HR</span>
-                      <span class="spray-key-item"><span class="spray-key-dot" style="background:#fb923c"></span>Out/Error</span>
-                    </div>
-                  </div>
-                </div>` : ''}
                 ${!isCompleted && canScore ? `
                 <button class="btn-icon field-undo-btn" onclick="undoPlay()" ${(!_animInputLocked && g.undoStack?.length > 0) ? '' : 'disabled'} title="Undo">↩</button>
                 <button class="btn-icon field-redo-btn" onclick="redoPlay()" ${(!_animInputLocked && g.redoStack?.length > 0) ? '' : 'disabled'} title="Redo">↪</button>` : ''}
               </div>
             </div>
           </div>
+          ${!isCompleted ? renderMatchupStrip(g, _betweenInnings) : ''}
           ${!isCompleted && canScore ? `<div id="bip-panel">${renderBipPanel(g)}</div>` : ''}
           ${isCompleted ? renderAccolades(g) : ''}
         </div>
@@ -828,10 +815,15 @@ function renderMatchupStrip(g, hidden = false) {
   const displayG    = displayHalf !== g.currentHalf ? { ...g, currentHalf: displayHalf } : g;
   const batterColor  = _teamColor(State.getTeam(battingTeamId(displayG)));
   const pitcherColor = _teamColor(State.getTeam(fieldingTeamId(displayG)));
+  const hitChartToggle = (g.status !== 'completed' && batterId)
+    ? `<button class="btn-icon spray-toggle-btn${_sprayChartVisible ? ' active' : ''}" id="spray-toggle-btn" onclick="toggleSprayChart()" title="Toggle hit chart">📍</button>`
+    : '';
   return `
     <div class="lg-matchup-strip"${hidden ? ' style="visibility:hidden"' : ''}>
       <div class="lg-matchup-side" style="border-left:3px solid ${batterColor};padding-left:7px">
-        <div class="lg-matchup-label">At bat</div>
+        <div class="lg-matchup-label" style="display:flex;align-items:center;justify-content:space-between;gap:6px">
+          <span>At bat</span>${hitChartToggle}
+        </div>
         <div class="lg-matchup-name">${batterName}</div>
         <div class="lg-matchup-stats">${batterId ? batterMatchupStats(g, batterId) : '—'}</div>
       </div>
@@ -1766,9 +1758,7 @@ let __bipDetail = null;
 function toggleSprayChart() {
   _sprayChartVisible = !_sprayChartVisible;
   drawField();
-  const keyEl = document.getElementById('spray-chart-key');
   const btnEl = document.getElementById('spray-toggle-btn');
-  if (keyEl) keyEl.style.visibility = _sprayChartVisible ? 'visible' : 'hidden';
   if (btnEl) btnEl.classList.toggle('active', _sprayChartVisible);
 }
 
@@ -1865,8 +1855,9 @@ function drawField(overrideBases = null) {
       </g>`
   };
 
-  // Spray chart dots + legend
-  const SPRAY_COLORS = { '1B': '#4ade80', '2B': '#60a5fa', 'HR': '#fde68a', 'OUT': '#fb923c' };
+  // Spray chart dots — all outcomes share one color, no more differentiating
+  // hits/errors/outs (and no key needed to explain them).
+  const SPRAY_COLOR = '#2563eb';
   const sprayLayer = (() => {
     if (!_sprayChartVisible) return '';
     // During animation: use cached snapshot (excludes the just-recorded hit) for the
@@ -1874,8 +1865,7 @@ function drawField(overrideBases = null) {
     const sprayPid = _sprayBatterId || batterId;
     if (!sprayPid) return '';
     const dots = (_sprayCachedDots !== null ? _sprayCachedDots : getSprayData(sprayPid)).map(d => {
-      const color = SPRAY_COLORS[d.outcome] || '#94a3b8';
-      return `<circle cx="${d.x}" cy="${d.y}" r="5" fill="${color}" fill-opacity="0.7" stroke="#fff" stroke-width="1" stroke-opacity="0.6" pointer-events="none"/>`;
+      return `<circle cx="${d.x}" cy="${d.y}" r="5" fill="${SPRAY_COLOR}" fill-opacity="0.7" stroke="#fff" stroke-width="1" stroke-opacity="0.6" pointer-events="none"/>`;
     }).join('');
     return dots;
   })();

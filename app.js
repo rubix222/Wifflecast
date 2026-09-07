@@ -391,6 +391,13 @@ let adminFeaturesEnabled = localStorage.getItem('wc_admin_features') !== 'false'
 function isAdminUser() { return currentUser?.email === ADMIN_EMAIL; }
 function isAdmin() { return isAdminUser() && adminFeaturesEnabled; }
 
+// Dark mode is a per-user preference (currentUserProfile.darkMode), set from
+// the Email Preferences modal. Signed-out visitors always see the light theme.
+function applyDarkMode() {
+  const on = !!(currentUserProfile && currentUserProfile.darkMode);
+  document.documentElement.setAttribute('data-theme', on ? 'dark' : 'light');
+}
+
 function toggleAdminFeatures() {
   adminFeaturesEnabled = !adminFeaturesEnabled;
   localStorage.setItem('wc_admin_features', String(adminFeaturesEnabled));
@@ -879,15 +886,22 @@ async function submitChangePassword(event) {
 function showEmailPreferencesModal() {
   if (!currentUserProfile) return;
   const wantsRecap = currentUserProfile.wantsRecap !== false;
+  const darkMode = !!currentUserProfile.darkMode;
   Modal.show(`
     <div class="modal-header">
-      <h3>Email Preferences</h3>
+      <h3>Preferences</h3>
       <button class="btn-icon" onclick="Modal.hide()">✕</button>
     </div>
     <div class="modal-body">
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-        <input id="pref-recap" type="checkbox" style="width:auto" ${wantsRecap ? 'checked' : ''} />
+      <label class="toggle-option" style="margin-bottom:10px">
+        <input id="pref-recap" type="checkbox" ${wantsRecap ? 'checked' : ''} />
+        <span class="toggle-switch"></span>
         Receive game &amp; event recap emails
+      </label>
+      <label class="toggle-option">
+        <input id="pref-dark-mode" type="checkbox" ${darkMode ? 'checked' : ''} />
+        <span class="toggle-switch"></span>
+        🌙 Dark mode
       </label>
     </div>
     <div class="modal-footer">
@@ -899,11 +913,13 @@ function showEmailPreferencesModal() {
 async function saveEmailPreferences() {
   if (!currentUserProfile) return;
   const wantsRecap = document.getElementById('pref-recap')?.checked ?? true;
-  const updated = { ...currentUserProfile, wantsRecap };
+  const darkMode = document.getElementById('pref-dark-mode')?.checked ?? false;
+  const updated = { ...currentUserProfile, wantsRecap, darkMode };
   await Storage.saveUser(updated);
   currentUserProfile = updated;
+  applyDarkMode();
   Modal.hide();
-  toast('Email preferences saved', 'success');
+  toast('Preferences saved', 'success');
 }
 
 async function adminResetPassword(uid) {
@@ -1743,7 +1759,7 @@ function buildHomeContentHtml(profile, { readOnly = false, signedIn = true } = {
       : `${playerCard}${myTeamsCard}${myGamesCard}${myEventsCard}`;
   }
   const mainTabBar = showMainTabs ? `
-    <div class="players-subnav" style="margin-bottom:12px">
+    <div class="players-subnav home-subnav-sticky">
       <button class="${homeMainTab==='me' ? 'active' : ''}" onclick="setHomeMainTab('me')">My Player</button>
       <button class="${homeMainTab==='following' ? 'active' : ''}" onclick="setHomeMainTab('following')">⭐ Following</button>
     </div>` : '';
@@ -4093,6 +4109,7 @@ async function boot() {
     if (user) {
       currentUserProfile = await Storage.getUser(user.uid).catch(() => null);
     }
+    applyDarkMode();
 
     updateAuthUI();
 
