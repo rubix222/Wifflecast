@@ -3016,7 +3016,10 @@ async function finishGame(g, _reason) {
     // game-ending path where postPlayCheck's normal EOI cleanup doesn't run.
     _queueAnim({ fn: _unfreezeDisplay });
   }
-  await State.updateGame(g.id, { status: 'completed', isOver: true });
+  // undoStack/redoStack snapshots are only useful during active scoring and
+  // are by far the largest thing in a game document (often 15x the size of
+  // the actual events log) -- no reason to keep paying to store them forever.
+  await State.updateGame(g.id, { status: 'completed', isOver: true, undoStack: [], redoStack: [] });
   autoSendRecapEmails(g.id);
   Render.games();
   Render.adminGames();
@@ -3127,7 +3130,7 @@ async function endGameEarly(gameId) {
   if (!await assertScoringLock(gameId)) return;
   if (!confirm('End the game now? Final scores will be locked.')) return;
   const g = State.getGame(gameId); if (!g) return;
-  await State.updateGame(gameId, { status: 'completed', isOver: true });
+  await State.updateGame(gameId, { status: 'completed', isOver: true, undoStack: [], redoStack: [] });
   autoSendRecapEmails(gameId);
   renderLiveGame(gameId);
   Render.games();
