@@ -2937,11 +2937,21 @@ function buildPitcherCyclePatch(g, side) {
 
   const nextPid = order[nextIdx];
 
-  // Swap P with next pitcher's current position
+  // Swap P with next pitcher's current position. A mid-inning relief sub
+  // (swapFielder) deliberately leaves pitcherIdx untouched so EOI still
+  // advances from the rotation-tracked slot -- but that means curPid isn't
+  // necessarily who's physically at P right now (the reliever is). Find the
+  // actual current P holder rather than assuming it's curPid.
   const positions = { ...(g[posKey] || {}) };
-  const nextOldPos = positions[nextPid] || 'BENCH';
-  positions[nextPid] = 'P';
-  positions[curPid]  = nextOldPos;
+  const actualPid = Object.keys(positions).find(pid => positions[pid] === 'P') || curPid;
+
+  if (nextPid !== actualPid) {
+    const nextOldPos = positions[nextPid] || 'BENCH';
+    positions[nextPid] = 'P';
+    positions[actualPid] = nextOldPos;
+  }
+  // else: the computed next pitcher is already the one physically pitching
+  // (e.g. they relieved mid-inning) -- nothing to change on the field.
 
   return {
     [posKey]:  positions,

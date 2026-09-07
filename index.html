@@ -143,19 +143,20 @@
       <div class="rules-card">
         <h3>⚾ Batting</h3>
         <ul>
-          <li><strong>Double</strong> — a ball that lands past the double line in the air</li>
+          <li><strong>Home Run</strong> — a ball that lands on or past the home run line in the air. Landing on the line counts as past it.</li>
+          <li><strong>Double</strong> — a ball that lands on or past the double line in the air (but before the home run line). Landing on the line counts as past it.</li>
           <li><strong>Single</strong> — a ball that lands before the double line and comes to rest without being fielded</li>
           <li><strong>Tag up</strong> — the batter must yell "Tag" while the ball is in the air. The fielder who caught or fielded the ball throws it to home and tries to hit any part of the strike zone. The ball can bounce and roll into the zone.</li>
           <li>Batters cannot lean in to get hit by a pitch — this is ruled a strike. The batter must make a reasonable attempt to get out of the way.</li>
-          <li>Runners only advance when forced</li>
-          <li>Any ball that does not reach the first curved foul line is a foul ball</li>
+          <li>On a hit, all runners advance the same number of bases as the batter. On a walk, runners only advance if forced.</li>
+          <li>Any ball that does not reach the first curved foul line is a foul ball — unless a fielder touches it first, in which case it counts as a hit for the batter</li>
         </ul>
       </div>
       <div class="rules-card">
         <h3>🧤 Fielding</h3>
         <ul>
           <li><strong>Ground Out</strong> — picking up a ball cleanly before it comes to rest — this only applies to balls that first land before the double line and cross the first curved foul line</li>
-          <li><strong>Fly Out</strong> — any caught ball in the air — fielders may not cross the home run line to make the catch</li>
+          <li><strong>Fly Out</strong> — any caught ball in the air. The fielder must make the catch and remain entirely inside the home run line the whole time — crossing the line at any point, even after the catch, means it does not count as an out.</li>
           <li><strong>Double play</strong> — can be attempted after fielding a ball cleanly. The fielder throws the ball and must hit the strike zone in the air (no bouncing) to record the second out</li>
         </ul>
       </div>
@@ -273,7 +274,7 @@
 <!-- Cache-busting note: bump the ?v= on these three + style.css whenever their
      content changes, so GitHub Pages / browser caches don't serve stale JS. -->
 <script src="state.js?v=3"></script>
-<script src="live.js?v=4"></script>
+<script src="live.js?v=5"></script>
 <script src="app.js?v=25"></script>
 </body>
 </html>
