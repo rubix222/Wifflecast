@@ -1031,7 +1031,7 @@
   /* shared pos text (circle center or badge) */
   .field-svg .fielder text.pos {
     fill: #fff;
-    font-size: 11px;
+    font-size: 15px;
     font-weight: 800;
     pointer-events: none;
     text-anchor: middle;
@@ -1060,7 +1060,7 @@
   }
   .field-svg .batter-marker text.pos {
     fill: #fff;
-    font-size: 11px;
+    font-size: 15px;
     font-weight: 800;
     text-anchor: middle;
     dominant-baseline: central;

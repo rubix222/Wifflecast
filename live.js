@@ -1914,7 +1914,7 @@ function drawField(overrideBases = null) {
           : `class="batter-marker"`;
         return `<g ${gAttrs} transform="translate(${FIELD.HOME.x},${FIELD.HOME.y + 26})">
           <circle class="batter-circle" cx="0" cy="0" r="14" style="fill:${batterFill};fill-opacity:0.85"/>
-          <text class="pos" x="0" y="0">🏏</text>
+          <text class="pos" x="0" y="0">B</text>
           <text class="name bg" y="22">${escapeHtml(batter.name)}</text>
           <text class="name"    y="22">${escapeHtml(batter.name)}</text>
         </g>`;
