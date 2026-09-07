@@ -1313,6 +1313,7 @@
   @media (max-width: 600px) {
     .player-split, .games-split { grid-template-columns: 1fr; }
     main { padding: 8px; }
+    .page-sticky-header { margin: -8px -8px 12px; padding: 0 8px; }
     .toolbar { flex-wrap: wrap; gap: 8px; }
     .modal-backdrop .modal { margin: 0 8px; }
     /* Shrink the scrollable team/player picker list so the whole modal

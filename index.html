@@ -5,10 +5,24 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>WiffleCast</title>
 <link rel="icon" type="image/png" href="wc_color.png" />
-<link rel="stylesheet" href="style.css?v=13" />
+<link rel="stylesheet" href="style.css?v=14" />
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 </head>
 <body>
+
+<script>
+  // GitHub Pages has no server-side routing: a direct visit to a path like
+  // /stats gets served 404.html, which stashes the intended path and bounces
+  // back to /. Restore it here before anything else runs so the deep-link
+  // parsing in app.js's boot() sees the real path.
+  (function () {
+    var redirectPath = sessionStorage.getItem('wc_redirect_path');
+    if (redirectPath) {
+      sessionStorage.removeItem('wc_redirect_path');
+      if (redirectPath !== '/') history.replaceState(null, '', redirectPath);
+    }
+  })();
+</script>
 
 <header>
   <h1 style="cursor:pointer" onclick="switchTab('home')" title="Go to Home">
@@ -278,7 +292,7 @@
 <!-- Cache-busting note: bump the ?v= on these three + style.css whenever their
      content changes, so GitHub Pages / browser caches don't serve stale JS. -->
 <script src="state.js?v=3"></script>
-<script src="live.js?v=13"></script>
-<script src="app.js?v=30"></script>
+<script src="live.js?v=14"></script>
+<script src="app.js?v=31"></script>
 </body>
 </html>

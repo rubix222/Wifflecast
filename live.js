@@ -3615,7 +3615,7 @@ function buildRecapHtml(g, recipientName) {
   <tr><td style="background:#f9fafb;padding:16px 24px;text-align:center;border-top:1px solid #e5e7eb">
     <div style="font-size:12px;color:#9ca3af">Tracked with <strong style="color:#6b7280">WiffleCast</strong></div>
     <div style="margin-top:8px">
-      <a href="${window.location.origin}${window.location.pathname}?game=${g.id}" style="font-size:12px;color:#15803d;text-decoration:none;font-weight:600">View this game ↗</a>
+      <a href="${window.location.origin}/games/${g.id}" style="font-size:12px;color:#15803d;text-decoration:none;font-weight:600">View this game ↗</a>
     </div>
   </td></tr>
 

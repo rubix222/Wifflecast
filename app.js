@@ -3989,18 +3989,15 @@ function renderLineScore(g, away, home) {
 // Uses replaceState (not pushState) so this doesn't add browser-history
 // entries for every click -- it just keeps the current URL accurate.
 function syncUrlFromState() {
-  const params = new URLSearchParams();
+  let path = '/';
   if (selectedGameId && State.getGame(selectedGameId)) {
-    params.set('game', selectedGameId);
+    path = '/games/' + selectedGameId;
   } else if (_currentTab === 'tournaments' && selectedTournamentId) {
-    params.set('tab', 'tournaments');
-    params.set('event', selectedTournamentId);
+    path = '/tournaments/' + selectedTournamentId;
   } else if (_currentTab && _currentTab !== 'home') {
-    params.set('tab', _currentTab);
+    path = '/' + _currentTab;
   }
-  const qs = params.toString();
-  const url = window.location.pathname + (qs ? '?' + qs : '');
-  history.replaceState({}, '', url);
+  history.replaceState({}, '', path);
 }
 
 function switchTab(view) {
@@ -4128,18 +4125,16 @@ async function boot() {
 
     // Deep-link: the URL can name a game, an event, or just a tab (kept in
     // sync by syncUrlFromState as people navigate, so links can be shared).
-    const dlParams  = new URLSearchParams(window.location.search);
-    const dlGameId  = dlParams.get('game');
-    const dlEventId = dlParams.get('event');
-    const dlTab     = dlParams.get('tab');
+    // Paths look like /games/<id>, /tournaments/<id>, or just /<tab>.
+    const segments  = window.location.pathname.split('/').filter(Boolean);
     const validTabs = ['stats', 'games', 'tournaments', 'rules', 'admin'];
-    if (dlGameId && State.getGame(dlGameId)) {
-      openGame(dlGameId);
-    } else if (dlTab === 'tournaments' && dlEventId && State.getTournament(dlEventId)) {
+    if (segments[0] === 'games' && segments[1] && State.getGame(segments[1])) {
+      openGame(segments[1]);
+    } else if (segments[0] === 'tournaments' && segments[1] && State.getTournament(segments[1])) {
       switchTab('tournaments');
-      selectTournament(dlEventId);
-    } else if (dlTab && validTabs.includes(dlTab)) {
-      switchTab(dlTab);
+      selectTournament(segments[1]);
+    } else if (validTabs.includes(segments[0])) {
+      switchTab(segments[0]);
     }
   });
 }

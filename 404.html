@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>WiffleCast</title>
+<script>
+  // GitHub Pages serves this file for any path with no matching static file
+  // (e.g. a direct visit or refresh on /stats or /games/abc123). Stash the
+  // path the visitor actually wanted, then bounce to the real app at /,
+  // which restores it via the inline script at the top of index.html.
+  sessionStorage.setItem('wc_redirect_path', location.pathname + location.search + location.hash);
+  location.replace(location.origin + '/');
+</script>
+</head>
+<body></body>
+</html>
