@@ -1703,7 +1703,7 @@ function _buildOutcomeAnim(ev, g) {
 
   // All balls-in-play: pitch travels mound→plate first, then out to the field
   switch (ev.outcome) {
-    case 'BB':  return { text: 'Walk! 🥊',      color: '#4ade80',
+    case 'BB':  return { text: 'Walk! 🚶',      color: '#4ade80',
                          fromSvg: FIELD.MOUND,  toSvg: { x: 200, y: 368 } };
     case 'K':   return { text: 'Strikeout! 🔥',
                          color: '#f87171', fromSvg: FIELD.MOUND, toSvg: FIELD.HOME };
