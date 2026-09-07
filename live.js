@@ -1114,7 +1114,9 @@ function replayToEvent(g, targetPaIdx) {
       const res = hitAdvance(bases, ({ '1B':1,'2B':2,'3B':3,'HR':4 })[e.outcome], br);
       bases = res.newBases; runsCount = res.runnerIdsScored.length;
     } else if (e.outcome === 'ERR_REACH') {
-      const res = advanceRunners(bases, ({ '1B':1,'2B':2,'3B':3,'HR':4 })[e.errBase] || 1, br);
+      // Errors advance runners the same way a hit of that value would (an
+      // error "worth a double" moves everyone up 2, not just force-cascade).
+      const res = hitAdvance(bases, ({ '1B':1,'2B':2,'3B':3,'HR':4 })[e.errBase] || 1, br);
       bases = res.newBases; runsCount = res.runnerIdsScored.length;
     }
     if (e.half === 'top') score.away += runsCount; else score.home += runsCount;
@@ -2645,9 +2647,11 @@ async function applyPaEnd(g, ev, prePitchCount = null) {
     Object.assign(newBases, res.newBases);
     runs = res.runnerIdsScored;
   } else if (ev.outcome === 'ERR_REACH') {
+    // Errors advance runners the same way a hit of that value would (an
+    // error "worth a double" moves everyone up 2, not just force-cascade).
     const target = ({ '1B': 1, '2B': 2, '3B': 3, 'HR': 4 })[ev.errBase] || 1;
     batterRunner = makeRunner(g, batterId);
-    const res = advanceRunners(newBases, target, batterRunner);
+    const res = hitAdvance(newBases, target, batterRunner);
     Object.assign(newBases, res.newBases);
     runs = res.runnerIdsScored;
   }
