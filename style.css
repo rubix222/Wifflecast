@@ -795,38 +795,45 @@
     overflow: hidden;
   }
   .lg-pane[hidden] { display: none; }
-  .lg-matchup-strip {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 7px 14px;
-    background: var(--surface-alt);
+  /* Blank spacer where the At Bat/Pitching strip used to sit above the field
+     -- that info now floats over the field's own corners instead (see
+     .lg-matchup-float below), but the space stays reserved so the field
+     doesn't grow to fill it. */
+  .lg-matchup-spacer { height: 54px; flex-shrink: 0; }
+  /* At Bat / Pitching cards float over the empty corners beside home plate
+     (the field graphic narrows to a point there), instead of taking their
+     own row above or below the field. */
+  .lg-matchup-float {
+    position: absolute;
+    bottom: 46px;
+    z-index: 4;
+    max-width: 42%;
+    padding: 6px 8px;
+    background: rgba(255,255,255,0.92);
     border: 1px solid var(--border);
     border-radius: 8px;
-    margin: 0 8px 0;
-    flex-shrink: 0;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.12);
   }
-  .lg-matchup-side { flex: 1; min-width: 0; }
-  .lg-matchup-right { text-align: right; }
+  .lg-matchup-float-left  { left: 6px; }
+  .lg-matchup-float-right { right: 6px; text-align: right; }
   .lg-matchup-label {
     font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: var(--text-strong);
+    color: #111827;
     font-weight: 600;
     margin-bottom: 1px;
   }
   .lg-matchup-name {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 700;
-    color: var(--text-strong);
+    color: #111827;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .matchup-num { color: var(--text-faint); font-size: 11px; font-weight: 500; }
-  .lg-matchup-stats { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+  .matchup-num { color: #6b7280; font-size: 11px; font-weight: 500; }
+  .lg-matchup-stats { font-size: 10px; color: #4b5563; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .lg-tab-bar {
     display: flex;
     border-top: 2px solid var(--border);
@@ -1592,7 +1599,7 @@
   }
 
   .field-svg.location-mode { cursor: crosshair; }
-  .lg-matchup-strip.location-mode { cursor: crosshair; }
+  .lg-matchup-float.location-mode { cursor: crosshair; }
   .bip-instruction {
     display: flex;
     align-items: center;

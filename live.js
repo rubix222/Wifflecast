@@ -687,6 +687,7 @@ function liveGameHTML(g, home, away) {
       <div class="lg-tab-body">
         <div class="lg-pane" data-tab="score" ${scorePaneHidden ? 'hidden' : ''}>
           ${canScore && isScoringLockStale(g) ? `<div id="stale-scoring-banner" style="background:#fef9c3;border-bottom:1px solid #fde68a;padding:8px 14px;font-size:12px;color:#92400e">⚠️ Scoring session timed out. Press any pitch button — if no one else took over, you'll resume automatically.</div>` : ''}
+          <div class="lg-matchup-spacer"></div>
           <div class="field-wrap">
             <div class="field-and-bases">
               <div class="field-panel">
@@ -700,13 +701,13 @@ function liveGameHTML(g, home, away) {
                   }</span>
                   <button class="bip-instruction-cancel" onclick="bipCancel()">✕</button>
                 </div>
+                ${!isCompleted ? renderMatchupStrip(g, _betweenInnings) : ''}
                 ${!isCompleted && canScore ? `
                 <button class="btn-icon field-undo-btn" onclick="undoPlay()" ${(!_animInputLocked && g.undoStack?.length > 0) ? '' : 'disabled'} title="Undo">↩</button>
                 <button class="btn-icon field-redo-btn" onclick="redoPlay()" ${(!_animInputLocked && g.redoStack?.length > 0) ? '' : 'disabled'} title="Redo">↪</button>` : ''}
               </div>
             </div>
           </div>
-          ${!isCompleted ? renderMatchupStrip(g, _betweenInnings) : ''}
           ${!isCompleted && canScore ? `<div id="bip-panel">${renderBipPanel(g)}</div>` : ''}
           ${isCompleted ? renderAccolades(g) : ''}
         </div>
@@ -818,20 +819,19 @@ function renderMatchupStrip(g, hidden = false) {
   const hitChartToggle = (g.status !== 'completed' && batterId)
     ? `<button class="btn-icon spray-toggle-btn${_sprayChartVisible ? ' active' : ''}" id="spray-toggle-btn" onclick="toggleSprayChart()" title="Toggle hit chart">📍</button>`
     : '';
+  const visStyle = hidden ? 'visibility:hidden;' : '';
   return `
-    <div class="lg-matchup-strip"${hidden ? ' style="visibility:hidden"' : ''}>
-      <div class="lg-matchup-side" style="border-left:3px solid ${batterColor};padding-left:7px">
-        <div class="lg-matchup-label" style="display:flex;align-items:center;justify-content:space-between;gap:6px">
-          <span>At bat</span>${hitChartToggle}
-        </div>
-        <div class="lg-matchup-name">${batterName}</div>
-        <div class="lg-matchup-stats">${batterId ? batterMatchupStats(g, batterId) : '—'}</div>
+    <div class="lg-matchup-float lg-matchup-float-left" style="${visStyle}border-left:3px solid ${batterColor}">
+      <div class="lg-matchup-label" style="display:flex;align-items:center;justify-content:space-between;gap:6px">
+        <span>At bat</span>${hitChartToggle}
       </div>
-      <div class="lg-matchup-side lg-matchup-right" style="border-right:3px solid ${pitcherColor};padding-right:7px">
-        <div class="lg-matchup-label">Pitching</div>
-        <div class="lg-matchup-name">${pn}</div>
-        <div class="lg-matchup-stats">${pitcherId ? pitcherMatchupStats(g, pitcherId) : '—'}</div>
-      </div>
+      <div class="lg-matchup-name">${batterName}</div>
+      <div class="lg-matchup-stats">${batterId ? batterMatchupStats(g, batterId) : '—'}</div>
+    </div>
+    <div class="lg-matchup-float lg-matchup-float-right" style="${visStyle}border-right:3px solid ${pitcherColor}">
+      <div class="lg-matchup-label">Pitching</div>
+      <div class="lg-matchup-name">${pn}</div>
+      <div class="lg-matchup-stats">${pitcherId ? pitcherMatchupStats(g, pitcherId) : '—'}</div>
     </div>`;
 }
 
@@ -1918,13 +1918,13 @@ function drawField(overrideBases = null) {
   container.innerHTML = svg;
 
   const svgEl = $('#field-svg');
-  const matchupEl = document.querySelector('.lg-matchup-strip');
-  attachSvgLocationHandlers(svgEl, matchupEl ? [matchupEl] : []);
+  const matchupEls = Array.from(document.querySelectorAll('.lg-matchup-float'));
+  attachSvgLocationHandlers(svgEl, matchupEls);
 
   if (__bipStep === 'locate' && svgEl) {
     svgEl.classList.add('location-mode');
   }
-  if (matchupEl) matchupEl.classList.toggle('location-mode', __bipStep === 'locate' && !__fieldClickMode?.needFielder);
+  matchupEls.forEach(el => el.classList.toggle('location-mode', __bipStep === 'locate' && !__fieldClickMode?.needFielder));
 }
 
 function drawBases(overrideBases = null) {
