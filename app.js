@@ -405,7 +405,7 @@ let _currentTab = 'home';  // tracks active tab for back-navigation after live g
 // Home tab card view state
 let homePlayerView    = 'batting'; // 'batting' | 'pitching' | 'fielding'
 let homeTeamsView     = 'record';  // 'record' | 'batting' | 'pitching' | 'fielding'
-let homeShowFinished  = false;
+let homeHideFinished  = false;
 let homeFollowTab     = null;      // playerId currently shown in the "Following" switcher
 let homeMainTab       = 'me';      // 'me' | 'following' — top-level switcher when both exist
 const homeTeamSort = {
@@ -424,9 +424,8 @@ let selectedTeamId = null;
 
 // Game view state
 let selectedGameId = null;
-let showFinishedGames = false;
-let showMyGamesOnly = true;
-let showFinishedEvents = false;
+let hideFinishedGames = false;
+let hideFinishedEvents = false;
 let statsSort    = { col: 'AVG', dir:  1 }; // descending: best batters first
 let pitchSort    = { col: 'ERA', dir: -1 }; // ascending: best (lowest) ERA first
 let fieldSort    = { col: 'PO',  dir:  1 }; // descending: most putouts first
@@ -1551,7 +1550,7 @@ function buildPlayerHomeSections(pid, { interactive = false, labelPrefix = '' } 
   // scheduled match is visible before anyone starts it. Sort priority:
   // live > upcoming > finished; most recent first within each group.
   const gameRank = g => g.status === 'in_progress' ? 0 : g.status === 'setup' ? 1 : 2;
-  const showFinished = interactive ? homeShowFinished : true; // non-interactive snapshot shows everything
+  const showFinished = interactive ? !homeHideFinished : true; // non-interactive snapshot shows everything
   const games = [...State.games]
     .filter(g => {
       if (!showFinished && g.status === 'completed') return false;
@@ -1559,9 +1558,10 @@ function buildPlayerHomeSections(pid, { interactive = false, labelPrefix = '' } 
     })
     .sort((a, b) => gameRank(a) - gameRank(b) || b.createdAt - a.createdAt)
     .slice(0, 6);
-  const gamesToggle = interactive ? `<label style="display:flex;align-items:center;gap:5px;font-size:13px;color:#6b7280;cursor:pointer;user-select:none">
-    <input type="checkbox" ${homeShowFinished ? 'checked' : ''} onchange="homeShowFinished=this.checked;Render.home()">
-    Show finished
+  const gamesToggle = interactive ? `<label class="toggle-option">
+    <input type="checkbox" ${homeHideFinished ? 'checked' : ''} onchange="homeHideFinished=this.checked;Render.home()">
+    <span class="toggle-switch"></span>
+    Hide Finished
   </label>` : '';
   const gamesHtml = games.map(g => buildGameListItem(g)).join('')
     || '<p style="color:#6b7280;font-size:14px;margin:0">No active games.</p>';
@@ -1780,16 +1780,16 @@ const Render = {
   tournaments() {
     const listEl = $('#tournaments-list'); if (!listEl) return;
 
-    // Sync "Show finished" checkbox — only shown when there's at least one
+    // Sync "Hide Finished" toggle — only shown when there's at least one
     // finished event to actually filter out.
     const anyFinished = State.tournaments.some(t => isTournamentComplete(t.id));
-    const lbl = $('#lbl-show-finished-events');
-    if (lbl) lbl.style.display = anyFinished ? 'flex' : 'none';
-    const chk = $('#chk-show-finished-events');
-    if (chk) chk.checked = showFinishedEvents;
+    const lbl = $('#lbl-hide-finished-events');
+    if (lbl) lbl.style.display = anyFinished ? 'inline-flex' : 'none';
+    const chk = $('#chk-hide-finished-events');
+    if (chk) chk.checked = hideFinishedEvents;
 
     const allSorted = [...State.tournaments].sort((a, b) => b.createdAt - a.createdAt);
-    const sorted = showFinishedEvents ? allSorted : allSorted.filter(t => !isTournamentComplete(t.id));
+    const sorted = hideFinishedEvents ? allSorted.filter(t => !isTournamentComplete(t.id)) : allSorted;
 
     // If the selected event is now hidden by the filter, deselect it
     if (selectedTournamentId && !sorted.find(t => t.id === selectedTournamentId)) {
@@ -1800,13 +1800,16 @@ const Render = {
     }
 
     if (!sorted.length) {
-      listEl.innerHTML = `<div class="empty-state" style="padding:24px"><p>${allSorted.length ? 'No active events. <label style="cursor:pointer;color:#0369a1" onclick="showFinishedEvents=true;Render.tournaments()">Show finished?</label>' : 'No events found.'}</p></div>`;
+      listEl.innerHTML = `<div class="empty-state" style="padding:24px"><p>${allSorted.length ? 'No active events. <label style="cursor:pointer;color:#0369a1" onclick="hideFinishedEvents=false;Render.tournaments()">Show finished?</label>' : 'No events found.'}</p></div>`;
     } else {
       listEl.innerHTML = sorted.map(t => {
         const games = State.games.filter(g => g.tournamentId === t.id);
         const done  = games.filter(g => g.status === 'completed').length;
+        const status = tournamentStatus(t);
+        const statusLabel = status === 'setup' ? 'Not Started' : status === 'in_progress' ? 'Live' : 'Finished';
         return `<div class="player-list-item${selectedTournamentId === t.id ? ' selected' : ''}" onclick="selectTournament('${t.id}')">
-          <div class="pli-name">${escapeHtml(t.name)}</div>
+          <div><span class="game-card-status status-${status}" style="font-size:11px">${statusLabel}</span></div>
+          <div class="pli-name" style="margin-top:3px">${escapeHtml(t.name)}</div>
           <div class="pli-sub">${t.teamIds.length} teams · ${done}/${games.length} games played</div>
         </div>`;
       }).join('');
@@ -2210,17 +2213,9 @@ const Render = {
     const listEl = $('#games-list');
     if (!listEl) return;
 
-    // Sync checkboxes with state (survives re-renders)
-    const chk = $('#chk-show-finished');
-    if (chk) chk.checked = showFinishedGames;
-    const myPid = currentUserProfile?.playerId;
-    const myTeamIds = myPid
-      ? new Set(State.teams.filter(t => (t.playerIds || []).includes(myPid)).map(t => t.id))
-      : new Set();
-    const lblMy = $('#lbl-my-games');
-    const chkMy = $('#chk-my-games');
-    if (lblMy) lblMy.style.display = myTeamIds.size ? 'flex' : 'none';
-    if (chkMy) chkMy.checked = showMyGamesOnly;
+    // Sync toggle with state (survives re-renders)
+    const chk = $('#chk-hide-finished');
+    if (chk) chk.checked = hideFinishedGames;
 
     if (!State.games.length) {
       const hasTwoTeams = State.teams.length >= 2;
@@ -2231,12 +2226,9 @@ const Render = {
       return;
     }
     const allSorted = [...State.games].sort((a, b) => b.createdAt - a.createdAt);
-    let sorted = showFinishedGames
-      ? allSorted
-      : allSorted.filter(g => g.status !== 'completed');
-    if (showMyGamesOnly && myTeamIds.size) {
-      sorted = sorted.filter(g => myTeamIds.has(g.homeTeamId) || myTeamIds.has(g.awayTeamId));
-    }
+    const sorted = hideFinishedGames
+      ? allSorted.filter(g => g.status !== 'completed')
+      : allSorted;
 
     // If the selected game is now hidden, deselect it
     if (selectedGameId && !sorted.find(g => g.id === selectedGameId)) {
@@ -2247,9 +2239,9 @@ const Render = {
     }
 
     if (!sorted.length) {
-      const emptyMsg = showMyGamesOnly
-        ? `No${showFinishedGames ? '' : ' active'} games for your team. <label style="cursor:pointer;color:#0369a1" onclick="showMyGamesOnly=false;Render.games()">Show all?</label>`
-        : `No active games. <label style="cursor:pointer;color:#0369a1" onclick="showFinishedGames=true;Render.games()">Show finished?</label>`;
+      const emptyMsg = hideFinishedGames
+        ? `No active games. <label style="cursor:pointer;color:#0369a1" onclick="hideFinishedGames=false;Render.games()">Show finished?</label>`
+        : 'No games found.';
       listEl.innerHTML = `<div style="padding:16px;color:#6b7280;font-size:13px">${emptyMsg}</div>`;
       return;
     }
@@ -2993,8 +2985,9 @@ function renderTournamentDetail(id) {
 
       <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;row-gap:4px">
         <div class="tourn-section-title" style="margin:0">Games</div>
-        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:#6b7280;flex-shrink:0">
-          <input type="checkbox" style="width:auto;flex-shrink:0" ${tournShowFinishedGames ? 'checked' : ''} onchange="toggleTournShowFinished(this.checked)">
+        <label class="toggle-option" style="font-size:12px;padding:4px 10px">
+          <input type="checkbox" ${tournShowFinishedGames ? 'checked' : ''} onchange="toggleTournShowFinished(this.checked)">
+          <span class="toggle-switch"></span>
           Show finished
         </label>
       </div>
@@ -3848,6 +3841,15 @@ function isTournamentComplete(tournId) {
   const nonChamp   = allGames.filter(g => !g.isChampionship);
   const totalPairs = t.teamIds.length * (t.teamIds.length - 1) / 2;
   return totalPairs > 0 && nonChamp.filter(g => g.status === 'completed').length >= totalPairs;
+}
+
+// One of 'setup' | 'in_progress' | 'completed' — mirrors game status naming
+// so the same .status-* CSS classes/colors apply to event badges too.
+function tournamentStatus(t) {
+  if (isTournamentComplete(t.id)) return 'completed';
+  const games = State.games.filter(g => g.tournamentId === t.id);
+  const anyStarted = games.some(g => g.status !== 'setup');
+  return anyStarted ? 'in_progress' : 'setup';
 }
 
 async function maybeSendEventRecap(tournId) {
