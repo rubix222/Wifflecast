@@ -1583,10 +1583,8 @@ function buildPlayerHomeSections(pid, { interactive = false, labelPrefix = '' } 
     || '<p style="color:#6b7280;font-size:14px;margin:0">No active games.</p>';
   const gamesCard = `
     <div class="home-card home-card-full">
-      <div class="home-section-title" style="display:flex;justify-content:space-between;align-items:center">
-        <span>${labelPrefix}Games</span>
-        ${gamesToggle}
-      </div>
+      <div class="home-section-title">${labelPrefix}Games</div>
+      ${gamesToggle ? `<div style="display:flex;justify-content:flex-end;margin-bottom:10px">${gamesToggle}</div>` : ''}
       ${gamesHtml}
     </div>`;
 
