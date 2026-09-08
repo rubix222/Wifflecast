@@ -1686,7 +1686,11 @@ function buildHomeContentHtml(profile, { readOnly = false, signedIn = true } = {
   }
 
   // ── Following: read-only snapshot of each followed player ──
+  // The player-picker row (dropdown + unfollow/follow buttons) is kept
+  // separate from the rest so it can go in the fixed header instead of
+  // scrolling away with the stat cards below it.
   let followingHtml = '';
+  let followingSelectorHtml = '';
   if (followedIds.length) {
     if (readOnly) {
       // Stack every followed player's full snapshot — no switcher needed
@@ -1713,20 +1717,18 @@ function buildHomeContentHtml(profile, { readOnly = false, signedIn = true } = {
         return `<option value="${pid}" ${pid===activeId?'selected':''}>${escapeHtml(fp.name)}</option>`;
       }).join('');
       const sections = buildPlayerHomeSections(activeId, { interactive: false });
-      const header = `
-        <div class="home-card home-card-full" style="display:flex;justify-content:flex-end;align-items:center;flex-wrap:wrap;gap:8px">
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-            ${followedIds.length > 1 ? `<select class="form-input" style="width:auto" onchange="setHomeFollowTab(this.value)">${options}</select>` : ''}
-            <button class="btn-icon" title="Unfollow ${escapeHtml(activePlayer.name)}" onclick="unfollowPlayer('${activeId}')">🗑</button>
-            <button class="btn-icon" title="Follow another player" onclick="showFollowPlayerModal()">+</button>
-          </div>
+      followingSelectorHtml = `
+        <div style="display:flex;justify-content:flex-start;align-items:center;flex-wrap:wrap;gap:8px;padding:8px 0">
+          ${followedIds.length > 1 ? `<select class="form-input" style="width:auto" onchange="setHomeFollowTab(this.value)">${options}</select>` : ''}
+          <button class="btn-icon" title="Unfollow ${escapeHtml(activePlayer.name)}" onclick="unfollowPlayer('${activeId}')">🗑</button>
+          <button class="btn-icon" title="Follow another player" onclick="showFollowPlayerModal()">+</button>
         </div>`;
       const statCard = `
         <div class="home-card">
           <div class="home-player-name">${escapeHtml(activePlayer.name)}</div>
           ${renderPlayerStatTable(State.computePlayerStats(activeId))}
         </div>`;
-      followingHtml = header + statCard + sections.teamsCard + sections.gamesCard + sections.eventsCard;
+      followingHtml = statCard + sections.teamsCard + sections.gamesCard + sections.eventsCard;
     }
   }
 
@@ -1734,6 +1736,9 @@ function buildHomeContentHtml(profile, { readOnly = false, signedIn = true } = {
   const hasMyPlayer = !!myPid;
   const hasFollows  = followedIds.length > 0;
   const showMainTabs = !readOnly && hasMyPlayer && hasFollows;
+  // Following's player-selector shows in the fixed header whenever the
+  // Following content is what's currently visible.
+  const showingFollowing = !readOnly && hasFollows && (!showMainTabs || homeMainTab === 'following');
 
   let bodyHtml;
   if (readOnly || !showMainTabs) {
@@ -1758,7 +1763,7 @@ function buildHomeContentHtml(profile, { readOnly = false, signedIn = true } = {
   // the scrolling area. Callers that just want one blob (the admin "view as"
   // overlay) can concatenate the two pieces themselves.
   return {
-    header: mainTabBar,
+    header: mainTabBar + (showingFollowing ? followingSelectorHtml : ''),
     body: `<div class="home-grid">${bodyHtml}</div>`,
   };
 }
