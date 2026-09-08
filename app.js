@@ -1757,7 +1757,7 @@ function buildHomeContentHtml(profile, { readOnly = false, signedIn = true } = {
       : `${playerCard}${myTeamsCard}${myGamesCard}${myEventsCard}`;
   }
   const mainTabBar = showMainTabs ? `
-    <div class="players-subnav home-subnav-sticky">
+    <div class="players-subnav">
       <button class="${homeMainTab==='me' ? 'active' : ''}" onclick="setHomeMainTab('me')">My Player</button>
       <button class="${homeMainTab==='following' ? 'active' : ''}" onclick="setHomeMainTab('following')">⭐ Following</button>
     </div>` : '';

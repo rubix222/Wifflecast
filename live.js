@@ -702,6 +702,7 @@ function liveGameHTML(g, home, away) {
                   <button class="bip-instruction-cancel" onclick="bipCancel()">✕</button>
                 </div>
                 ${!isCompleted ? renderMatchupStrip(g, _betweenInnings) : ''}
+                ${!isCompleted ? renderHitChartToggle(g) : ''}
                 ${!isCompleted && canScore ? `
                 <button class="btn-icon field-undo-btn" onclick="undoPlay()" ${(!_animInputLocked && g.undoStack?.length > 0) ? '' : 'disabled'} title="Undo">↩</button>
                 <button class="btn-icon field-redo-btn" onclick="redoPlay()" ${(!_animInputLocked && g.redoStack?.length > 0) ? '' : 'disabled'} title="Redo">↪</button>` : ''}
@@ -816,15 +817,10 @@ function renderMatchupStrip(g, hidden = false) {
   const displayG    = displayHalf !== g.currentHalf ? { ...g, currentHalf: displayHalf } : g;
   const batterColor  = _teamColor(State.getTeam(battingTeamId(displayG)));
   const pitcherColor = _teamColor(State.getTeam(fieldingTeamId(displayG)));
-  const hitChartToggle = (g.status !== 'completed' && batterId)
-    ? `<button class="btn-icon spray-toggle-btn${_sprayChartVisible ? ' active' : ''}" id="spray-toggle-btn" onclick="toggleSprayChart()" title="Toggle hit chart">📍</button>`
-    : '';
   const visStyle = hidden ? 'visibility:hidden;' : '';
   return `
     <div class="lg-matchup-float lg-matchup-float-left" style="${visStyle}border-left:3px solid ${batterColor}">
-      <div class="lg-matchup-label" style="display:flex;align-items:center;justify-content:space-between;gap:6px">
-        <span>At bat</span>${hitChartToggle}
-      </div>
+      <div class="lg-matchup-label">At bat</div>
       <div class="lg-matchup-name">${batterName}</div>
       <div class="lg-matchup-stats">${batterId ? batterMatchupStats(g, batterId) : '—'}</div>
     </div>
@@ -833,6 +829,14 @@ function renderMatchupStrip(g, hidden = false) {
       <div class="lg-matchup-name">${pn}</div>
       <div class="lg-matchup-stats">${pitcherId ? pitcherMatchupStats(g, pitcherId) : '—'}</div>
     </div>`;
+}
+
+// Hit-chart toggle -- floats bottom-right of the field, independent of who's
+// scoring (watchers can see it too, unlike undo/redo).
+function renderHitChartToggle(g) {
+  const batterId = _frozenBatterId || currentBatterId(g);
+  if (g.status === 'completed' || !batterId) return '';
+  return `<button class="btn-icon spray-toggle-btn${_sprayChartVisible ? ' active' : ''}" id="spray-toggle-btn" onclick="toggleSprayChart()" title="Toggle hit chart">🎯</button>`;
 }
 
 function pitcherGameStats(g, pitcherId) {

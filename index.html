@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>WiffleCast</title>
 <link rel="icon" type="image/png" href="wc_color.png" />
-<link rel="stylesheet" href="style.css?v=19" />
+<link rel="stylesheet" href="style.css?v=20" />
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 </head>
 <body>
@@ -48,12 +48,15 @@
 
 <main>
   <section id="view-home" class="view active">
-    <div id="home-container"></div>
+    <div class="view-body"><div id="home-container"></div></div>
   </section>
 
   <section id="view-stats" class="view">
-    <div class="page-sticky-header">Stats</div>
-    <div id="stats-filter-bar" class="sticky-below-title"></div>
+    <div class="view-header">
+      <div class="view-title">Stats</div>
+      <div id="stats-filter-bar"></div>
+    </div>
+    <div class="view-body">
     <div id="stats-players-section">
       <div class="stats-section-header">
         <span class="stats-section-heading">Players</span>
@@ -79,31 +82,39 @@
       </div>
       <div id="teams-container"></div>
     </div>
+    </div>
   </section>
 
   <section id="view-tournaments" class="view">
-    <div class="page-sticky-header">Events</div>
-    <div class="toolbar sticky-below-title">
-      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-        <label id="lbl-hide-finished-events" class="toggle-option" style="display:none">
-          <input type="checkbox" id="chk-hide-finished-events" onchange="hideFinishedEvents=this.checked;Render.tournaments()">
-          <span class="toggle-switch"></span>
-          Hide Finished
-        </label>
-        <button id="btn-add-tournament" class="btn btn-primary" style="display:none">+ New Event</button>
+    <div class="view-header">
+      <div class="view-title">Events</div>
+      <div class="toolbar">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <label id="lbl-hide-finished-events" class="toggle-option" style="display:none">
+            <input type="checkbox" id="chk-hide-finished-events" onchange="hideFinishedEvents=this.checked;Render.tournaments()">
+            <span class="toggle-switch"></span>
+            Hide Finished
+          </label>
+          <button id="btn-add-tournament" class="btn btn-primary" style="display:none">+ New Event</button>
+        </div>
       </div>
     </div>
+    <div class="view-body">
     <div class="player-split" id="tournaments-split">
       <div class="player-list-panel" id="tournaments-list"></div>
       <div class="player-detail-panel" id="tournaments-detail"></div>
     </div>
+    </div>
   </section>
 
   <section id="view-admin" class="view">
-    <div class="page-sticky-header">Admin</div>
-    <div class="toolbar">
-      <div id="admin-features-toggle"></div>
+    <div class="view-header">
+      <div class="view-title">Admin</div>
+      <div class="toolbar">
+        <div id="admin-features-toggle"></div>
+      </div>
     </div>
+    <div class="view-body">
     <div class="admin-panel-section">
       <h3 class="admin-panel-heading">Users</h3>
       <div id="users-container"></div>
@@ -154,10 +165,12 @@
       </label>
       <button class="btn" onclick="showEmailSetupModal()">⚙️ Configure EmailJS</button>
     </div>
+    </div>
   </section>
 
   <section id="view-rules" class="view">
-    <div class="page-sticky-header">Rules</div>
+    <div class="view-header"><div class="view-title">Rules</div></div>
+    <div class="view-body">
     <div class="rules-grid">
       <div class="rules-card">
         <h3>⚾ Batting</h3>
@@ -191,23 +204,28 @@
         </ul>
       </div>
     </div>
+    </div>
   </section>
 
   <section id="view-games" class="view">
-    <div class="page-sticky-header">Games</div>
-    <div class="toolbar sticky-below-title">
-      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-        <label class="toggle-option">
-          <input type="checkbox" id="chk-hide-finished" onchange="hideFinishedGames=this.checked;Render.games()">
-          <span class="toggle-switch"></span>
-          Hide Finished
-        </label>
-        <button id="btn-add-game" class="btn btn-primary" style="display:none">+ New Game</button>
+    <div class="view-header">
+      <div class="view-title">Games</div>
+      <div class="toolbar">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <label class="toggle-option">
+            <input type="checkbox" id="chk-hide-finished" onchange="hideFinishedGames=this.checked;Render.games()">
+            <span class="toggle-switch"></span>
+            Hide Finished
+          </label>
+          <button id="btn-add-game" class="btn btn-primary" style="display:none">+ New Game</button>
+        </div>
       </div>
     </div>
+    <div class="view-body">
     <div class="player-split games-split">
       <div class="player-list-panel" id="games-list"></div>
       <div class="player-detail-panel games-detail-panel" id="games-detail"></div>
+    </div>
     </div>
   </section>
 </main>
@@ -291,7 +309,7 @@
 <!-- Cache-busting note: bump the ?v= on these three + style.css whenever their
      content changes, so GitHub Pages / browser caches don't serve stale JS. -->
 <script src="state.js?v=3"></script>
-<script src="live.js?v=16"></script>
-<script src="app.js?v=33"></script>
+<script src="live.js?v=17"></script>
+<script src="app.js?v=34"></script>
 </body>
 </html>
