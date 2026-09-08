@@ -812,6 +812,10 @@
     overflow: hidden;
   }
   .lg-pane[hidden] { display: none; }
+  /* Blank space above the field, kept at the same size the At Bat/Pitching
+     strip used to occupy there. Colored to match the field's own background
+     so it reads as one continuous surface instead of a mismatched gap. */
+  .lg-matchup-spacer { height: 54px; flex-shrink: 0; background: var(--surface); }
   /* At Bat / Pitching cards float over the empty corners beside home plate
      (the field graphic narrows to a point there), instead of taking their
      own row above or below the field. Sit right at the bottom edge, with
