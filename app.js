@@ -2277,7 +2277,7 @@ const Render = {
         ? `<span style="font-size:11px;color:#0369a1">📋 ${escapeHtml(eventName)}</span>`
         : '';
       const exhibitionBadge = g.isExhibition
-        ? `<span style="font-size:11px;color:#b45309">🎯 Exhibition</span>`
+        ? `<span style="font-size:11px;color:#b45309">🎪 Exhibition</span>`
         : '';
 
       // Top-right action buttons
@@ -2287,7 +2287,7 @@ const Render = {
              ${canUserScore() ? `<button class="btn btn-sm btn-primary" onclick="openGameForScoring('${g.id}')">▶ Score</button>` : ''}
            </div>`
         : isSetup && canUserScore()
-          ? `<div onclick="event.stopPropagation()"><button class="btn btn-sm btn-primary" onclick="showSetupModal('${g.id}')">▶ Start</button></div>`
+          ? `<div onclick="event.stopPropagation()"><button class="btn btn-sm btn-primary" onclick="showSetupModal('${g.id}')">▶ Score</button></div>`
           : '';
 
       // Status label
@@ -2778,10 +2778,10 @@ function buildGameListItem(g, { showAdminControls = false } = {}) {
     ? `<button class="btn btn-sm" onclick="renderLiveGame('${g.id}',true)">👁 Watch</button>
        ${canUserScore() ? `<button class="btn btn-sm btn-primary" onclick="openGameForScoring('${g.id}')">▶ Score</button>` : ''}`
     : isSetup && canUserScore()
-      ? `<button class="btn btn-sm btn-primary" onclick="showSetupModal('${g.id}')">▶ Start</button>`
+      ? `<button class="btn btn-sm btn-primary" onclick="showSetupModal('${g.id}')">▶ Score</button>`
       : '';
   const adminActions = showAdminControls
-    ? `<button class="btn-icon" title="${g.isExhibition ? 'Unmark exhibition' : 'Mark as exhibition'}" onclick="toggleExhibitionGame('${g.id}')" style="${g.isExhibition ? '' : 'opacity:0.35'}">🎯</button>
+    ? `<button class="btn-icon" title="${g.isExhibition ? 'Unmark exhibition' : 'Mark as exhibition'}" onclick="toggleExhibitionGame('${g.id}')" style="${g.isExhibition ? '' : 'opacity:0.35'}">🎪</button>
        <button class="btn-icon" title="Delete" onclick="deleteGame('${g.id}')">🗑</button>`
     : '';
   const topActions = (primaryActions || adminActions)
@@ -2792,7 +2792,7 @@ function buildGameListItem(g, { showAdminControls = false } = {}) {
     ? `<span style="font-size:11px;color:#0369a1">📋 ${escapeHtml(eventName2)}</span>`
     : '';
   const exhibitionBadge2 = g.isExhibition
-    ? `<span style="font-size:11px;color:#b45309">🎯 Exhibition</span>`
+    ? `<span style="font-size:11px;color:#b45309">🎪 Exhibition</span>`
     : '';
   const clickAttr = (isSetup && !canUserScore()) ? 'style="cursor:default;opacity:0.6"' : `onclick="openGame('${g.id}')"`;
   return `<div class="player-list-item game-list-item" ${clickAttr}>
