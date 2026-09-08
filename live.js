@@ -142,6 +142,7 @@ function exitLiveGame() {
   LiveGameId = null;
   LiveGameWatchOnly = false;
   selectedGameId = null;
+  _liveTab = 'score'; // next time any game is opened (same or different), start on Score
   const returnTo = _returnTab;
   _returnTab = null;
   if (returnTo && returnTo !== 'games') switchTab(returnTo); // switchTab syncs the URL itself
