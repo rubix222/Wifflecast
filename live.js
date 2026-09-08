@@ -702,7 +702,6 @@ function liveGameHTML(g, home, away) {
                   <button class="bip-instruction-cancel" onclick="bipCancel()">✕</button>
                 </div>
                 ${!isCompleted ? renderMatchupStrip(g, _betweenInnings) : ''}
-                ${!isCompleted ? renderHitChartToggle(g) : ''}
                 ${!isCompleted && canScore ? `
                 <button class="btn-icon field-undo-btn" onclick="undoPlay()" ${(!_animInputLocked && g.undoStack?.length > 0) ? '' : 'disabled'} title="Undo">↩</button>
                 <button class="btn-icon field-redo-btn" onclick="redoPlay()" ${(!_animInputLocked && g.redoStack?.length > 0) ? '' : 'disabled'} title="Redo">↪</button>` : ''}
@@ -714,7 +713,7 @@ function liveGameHTML(g, home, away) {
         </div>
 
         <div class="lg-pane" data-tab="plays" ${playsPaneHidden ? 'hidden' : ''}>
-          <div class="play-log" style="flex:1;overflow-y:auto;border-radius:0;box-shadow:none;background:#fff">
+          <div class="play-log" style="flex:1;overflow-y:auto;border-radius:0;box-shadow:none">
             <table id="play-log-list" style="width:100%;border-collapse:collapse">${renderPlayLog(g)}</table>
           </div>
         </div>
@@ -738,7 +737,6 @@ function renderPitcherRow(g) {
   const pitcher = pitcherId ? State.getPlayer(pitcherId) : null;
   return `
     <div style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #f3f4f6">
-      <span class="player-num">#${escapeHtml(pitcher?.jerseyNumber || '-')}</span>
       <span>${escapeHtml(pitcher?.name || '?')}</span>
       <div class="game-stats">${pitcherId ? pitcherGameStats(g, pitcherId) : ''}</div>
     </div>
@@ -808,35 +806,29 @@ function renderMatchupStrip(g, hidden = false) {
   const batter  = State.getPlayer(batterId);
   const pitcher = State.getPlayer(pitcherId);
   const canScore = !LiveGameWatchOnly && canUserScore();
-  const batterName = batter
-    ? `<span class="matchup-num">#${escapeHtml(batter.jerseyNumber || '-')}</span> ${escapeHtml(batter.name)}`
-    : '?';
-  const pn = pitcher ? `<span class="matchup-num">#${escapeHtml(pitcher.jerseyNumber || '-')}</span> ${escapeHtml(pitcher.name)}` : '?';
+  const batterName = batter ? escapeHtml(batter.name) : '?';
+  const pn = pitcher ? escapeHtml(pitcher.name) : '?';
   // Use display half (frozen during animations) to pick the right teams
   const displayHalf = _frozenHalf ?? g.currentHalf;
   const displayG    = displayHalf !== g.currentHalf ? { ...g, currentHalf: displayHalf } : g;
   const batterColor  = _teamColor(State.getTeam(battingTeamId(displayG)));
   const pitcherColor = _teamColor(State.getTeam(fieldingTeamId(displayG)));
   const visStyle = hidden ? 'visibility:hidden;' : '';
+  const hitChartToggle = (g.status !== 'completed' && batterId)
+    ? `<button class="spray-toggle-btn${_sprayChartVisible ? ' active' : ''}" id="spray-toggle-btn" onclick="toggleSprayChart()" title="Toggle hit chart">🎯</button>`
+    : '';
   return `
     <div class="lg-matchup-float lg-matchup-float-left" style="${visStyle}border-left:3px solid ${batterColor}">
       <div class="lg-matchup-label">At bat</div>
       <div class="lg-matchup-name">${batterName}</div>
       <div class="lg-matchup-stats">${batterId ? batterMatchupStats(g, batterId) : '—'}</div>
+      ${hitChartToggle}
     </div>
     <div class="lg-matchup-float lg-matchup-float-right" style="${visStyle}border-right:3px solid ${pitcherColor}">
       <div class="lg-matchup-label">Pitching</div>
       <div class="lg-matchup-name">${pn}</div>
       <div class="lg-matchup-stats">${pitcherId ? pitcherMatchupStats(g, pitcherId) : '—'}</div>
     </div>`;
-}
-
-// Hit-chart toggle -- floats bottom-right of the field, independent of who's
-// scoring (watchers can see it too, unlike undo/redo).
-function renderHitChartToggle(g) {
-  const batterId = _frozenBatterId || currentBatterId(g);
-  if (g.status === 'completed' || !batterId) return '';
-  return `<button class="btn-icon spray-toggle-btn${_sprayChartVisible ? ' active' : ''}" id="spray-toggle-btn" onclick="toggleSprayChart()" title="Toggle hit chart">🎯</button>`;
 }
 
 function pitcherGameStats(g, pitcherId) {
@@ -890,7 +882,6 @@ function renderBatterRow(g) {
   return `
     <div class="at-bat-row">
       <div>
-        <span class="player-num">#${escapeHtml(batter?.jerseyNumber || '-')}</span>
         ${nameEl}
         <div class="game-stats">${batterId ? batterGameStats(g, batterId) : ''}</div>
       </div>
@@ -1830,7 +1821,7 @@ function drawField(overrideBases = null) {
       const sz = 28, h = sz / 2;
       return `<g class="fielder" data-pid="${pid}" data-pos="${pos}" transform="translate(${cx},${cy})">
         <rect x="${-h}" y="${-h}" width="${sz}" height="${sz + 20}" fill="transparent" style="pointer-events:all"/>
-        <image href="glove.png" x="${-h}" y="${-h}" width="${sz}" height="${sz}" style="pointer-events:none"/>
+        <image href="/glove.png" x="${-h}" y="${-h}" width="${sz}" height="${sz}" style="pointer-events:none"/>
         <text class="name bg" y="${h + 8}">${escapeHtml(player.name)}</text>
         <text class="name" y="${h + 8}">${escapeHtml(player.name)}</text>
       </g>`;
@@ -1892,7 +1883,7 @@ function drawField(overrideBases = null) {
     <svg viewBox="0 0 400 400" class="field-svg" id="field-svg">
       <!-- Field.svg stretched to fill — provides all field visuals (grass, dirt,
            foul lines, arcs, bases, home plate, batter's boxes, pitcher's rubber) -->
-      <image href="Field.svg" x="0" y="0" width="400" height="400" preserveAspectRatio="none"/>
+      <image href="/Field.svg" x="0" y="0" width="400" height="400" preserveAspectRatio="none"/>
       <!-- Occupied base highlights (yellow overlay, aligned to Field.svg base centres) -->
       ${sq(FIELD.FIRST.x,  FIELD.FIRST.y,  bases && bases[1])}
       ${sq(FIELD.SECOND.x, FIELD.SECOND.y, bases && bases[2])}

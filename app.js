@@ -312,7 +312,7 @@ function renderHomeTeamsSection(teams, view) {
 function showPlayerStatsModal(playerId) {
   const p = State.getPlayer(playerId); if (!p) return;
   const s = State.computePlayerStats(playerId);
-  const name = p.jerseyNumber ? `#${p.jerseyNumber} ${p.name}` : p.name;
+  const name = p.name;
   const isMe = currentUserProfile?.playerId === playerId;
   const canEdit = isAdmin() || isMe;
   const editBtn = canEdit
@@ -349,10 +349,7 @@ function showTeamStatsModal(teamId) {
         .map(pid => State.getPlayer(pid))
         .filter(Boolean)
         .sort((a, b) => a.name.localeCompare(b.name))
-        .map(p => {
-          const num = p.jerseyNumber ? `<span class="jersey-badge" style="width:22px;height:22px;font-size:11px;margin-right:6px">${escapeHtml(p.jerseyNumber)}</span>` : '';
-          return `<span style="display:inline-flex;align-items:center;margin:3px 6px 3px 0;font-size:13px">${num}${escapeHtml(p.name)}</span>`;
-        })
+        .map(p => `<span style="display:inline-flex;align-items:center;margin:3px 6px 3px 0;font-size:13px">${escapeHtml(p.name)}</span>`)
         .join(''))
     : '<span style="color:#6b7280;font-size:13px">No players</span>';
 
@@ -533,10 +530,6 @@ function showCreateMyPlayerModal() {
           <label for="my-player-name">Name</label>
           <input id="my-player-name" required autofocus value="${escapeHtml(currentUserProfile?.name || currentUser?.email?.split('@')[0] || '')}" />
         </div>
-        <div class="form-group">
-          <label for="my-player-jersey">Jersey number <span class="muted small">(optional)</span></label>
-          <input id="my-player-jersey" maxlength="4" />
-        </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn" onclick="Modal.hide()">Cancel</button>
@@ -548,9 +541,8 @@ async function submitMyPlayer(e) {
   e.preventDefault();
   if (!currentUser) return;
   const name = $('#my-player-name').value.trim();
-  const jersey = $('#my-player-jersey').value.trim();
   if (!name) return;
-  const p = await State.addPlayer({ name, jerseyNumber: jersey });
+  const p = await State.addPlayer({ name });
   p.userId = currentUser.uid;
   p.invitePending = false;
   await Storage.savePlayer(p);
@@ -1628,7 +1620,7 @@ function buildHomeContentHtml(profile, { readOnly = false, signedIn = true } = {
       <div class="home-card">
         <div class="home-section-title">${readOnly ? 'Player' : 'My Player'}</div>
         <div class="home-player-name" style="display:flex;align-items:center;gap:8px">
-          <span>${escapeHtml(myPlayer.jerseyNumber ? '#' + myPlayer.jerseyNumber + ' ' + myPlayer.name : myPlayer.name)}</span>
+          <span>${escapeHtml(myPlayer.name)}</span>
           ${readOnly ? '' : `<button class="btn-icon" title="Edit name/number" onclick="showPlayerModal('${myPid}')" style="font-size:13px;padding:2px 5px">✎</button>`}
         </div>
         ${renderPlayerStatTable(s)}
@@ -1732,7 +1724,7 @@ function buildHomeContentHtml(profile, { readOnly = false, signedIn = true } = {
         </div>`;
       const statCard = `
         <div class="home-card">
-          <div class="home-player-name">${escapeHtml(activePlayer.jerseyNumber ? '#' + activePlayer.jerseyNumber + ' ' + activePlayer.name : activePlayer.name)}</div>
+          <div class="home-player-name">${escapeHtml(activePlayer.name)}</div>
           ${renderPlayerStatTable(State.computePlayerStats(activeId))}
         </div>`;
       followingHtml = header + statCard + sections.teamsCard + sections.gamesCard + sections.eventsCard;
@@ -1762,13 +1754,14 @@ function buildHomeContentHtml(profile, { readOnly = false, signedIn = true } = {
       <button class="${homeMainTab==='following' ? 'active' : ''}" onclick="setHomeMainTab('following')">⭐ Following</button>
     </div>` : '';
 
-  return `
-    <div style="padding-top:8px">
-      ${mainTabBar}
-      <div class="home-grid">
-        ${bodyHtml}
-      </div>
-    </div>`;
+  // Returned as {header, body} so callers with a fixed header + scrollable
+  // body (the real Home tab) can keep the My Player/Following subnav out of
+  // the scrolling area. Callers that just want one blob (the admin "view as"
+  // overlay) can concatenate the two pieces themselves.
+  return {
+    header: mainTabBar,
+    body: `<div class="home-grid">${bodyHtml}</div>`,
+  };
 }
 
 // Admin-only: view another user's Home tab as a read-only snapshot.
@@ -1780,7 +1773,8 @@ function showUserHomeView(uid) {
   const content = document.getElementById('admin-user-home-content');
   if (!overlay || !content) return;
   if (title) title.textContent = `Viewing ${u.name || u.email || 'user'}'s Home`;
-  content.innerHTML = buildHomeContentHtml(u, { readOnly: true, signedIn: true });
+  const { header, body } = buildHomeContentHtml(u, { readOnly: true, signedIn: true });
+  content.innerHTML = header + body;
   overlay.classList.add('open');
 }
 function closeAdminUserHomeOverlay() {
@@ -1838,7 +1832,10 @@ const Render = {
 
   home() {
     const c = $('#home-container'); if (!c) return;
-    c.innerHTML = buildHomeContentHtml(currentUserProfile, { readOnly: false, signedIn: !!currentUser });
+    const { header, body } = buildHomeContentHtml(currentUserProfile, { readOnly: false, signedIn: !!currentUser });
+    const h = $('#home-header');
+    if (h) h.innerHTML = header;
+    c.innerHTML = body;
   },
 
   users() {
@@ -1846,9 +1843,10 @@ const Render = {
     if (!isAdminUser()) { c.innerHTML = ''; return; }
     const tog = $('#admin-features-toggle');
     if (tog) tog.innerHTML = `
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
-        <span style="font-size:12px;color:#111827">Show admin controls site-wide</span>
-        <input type="checkbox" ${adminFeaturesEnabled ? 'checked' : ''} onchange="toggleAdminFeatures()" style="width:16px;height:16px;cursor:pointer" />
+      <label class="toggle-option">
+        <input type="checkbox" ${adminFeaturesEnabled ? 'checked' : ''} onchange="toggleAdminFeatures()">
+        <span class="toggle-switch"></span>
+        Show admin controls site-wide
       </label>`;
     if (!State.users.length) {
       c.innerHTML = '<div class="empty-state"><h3>No registered users yet</h3><p>Users appear here after they create an account.</p></div>';
@@ -2361,11 +2359,7 @@ function showPlayerModal(id = null) {
           <label for="player-name">Name</label>
           <input id="player-name" required autofocus value="${escapeHtml(editing?.name || '')}" />
         </div>
-        <div class="form-group">
-          <label for="player-jersey">Jersey number <span class="muted small">(optional)</span></label>
-          <input id="player-jersey" maxlength="4" value="${escapeHtml(editing?.jerseyNumber || '')}" />
-        </div>
-        ${isSelfEdit ? '<p class="muted small" style="margin:4px 0 0 0">Name and number changes don\'t affect existing game stats.</p>' : ''}
+        ${isSelfEdit ? '<p class="muted small" style="margin:4px 0 0 0">Name changes don\'t affect existing game stats.</p>' : ''}
       </div>
       <div class="modal-footer">
         <button type="button" class="btn" onclick="Modal.hide()">Cancel</button>
@@ -2376,7 +2370,7 @@ function showPlayerModal(id = null) {
 async function submitPlayer(e, id) {
   e.preventDefault();
   if (!isAdminUser() && currentUserProfile?.playerId !== id) { toast('Not authorized', 'error'); return; }
-  const data = { name: $('#player-name').value, jerseyNumber: $('#player-jersey').value };
+  const data = { name: $('#player-name').value };
   if (!data.name.trim()) return;
   if (id) await State.updatePlayer(id, data);
   else    await State.addPlayer(data);
@@ -2399,10 +2393,6 @@ function showCreateMyPlayerModal() {
           <label for="cmp-name">Your name</label>
           <input id="cmp-name" required autofocus value="${escapeHtml(currentUserProfile?.name || '')}" />
         </div>
-        <div class="form-group">
-          <label for="cmp-jersey">Jersey number <span class="muted small">(optional)</span></label>
-          <input id="cmp-jersey" maxlength="4" />
-        </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn" onclick="Modal.hide()">Cancel</button>
@@ -2416,11 +2406,10 @@ async function submitCreateMyPlayer(e) {
   if (!currentUser || !currentUserProfile) { toast('Not signed in', 'error'); return; }
   if (currentUserProfile.playerId) { toast('You already have a player profile', 'error'); return; }
   const name = $('#cmp-name').value.trim();
-  const jerseyNumber = $('#cmp-jersey').value.trim();
   if (!name) return;
   try {
     // Build the player with userId set upfront (single write, matches sign-up flow)
-    const p = { id: uid(), name, jerseyNumber: jerseyNumber || '', createdAt: Date.now(), userId: currentUser.uid };
+    const p = { id: uid(), name, createdAt: Date.now(), userId: currentUser.uid };
     State.players.push(p);
     await Storage.savePlayer(p);
     currentUserProfile.playerId = p.id;
@@ -2529,7 +2518,6 @@ function showTeamModal(id = null, forceAdmin = false) {
     .map(p => `
       <label class="player-picker-item">
         <input type="checkbox" value="${p.id}" ${selected.has(p.id) ? 'checked' : ''} ${!canEditRoster ? 'disabled' : ''}/>
-        <span class="jersey-badge" style="width:24px; height:24px; font-size:11px;">${escapeHtml(p.jerseyNumber || '#')}</span>
         <span>${escapeHtml(p.name)}</span>
       </label>`).join('');
   Modal.show(`
@@ -3501,10 +3489,7 @@ function renderLineup(g, side) {
     return `<li class="lineup-row" draggable="true" data-pid="${pid}">
       <span class="lineup-handle" title="Drag to reorder">⋮⋮</span>
       <span class="lineup-order">${idx + 1}</span>
-      <span class="lineup-name">
-        <span class="num">#${escapeHtml(p.jerseyNumber || '-')}</span>
-        ${escapeHtml(p.name)}
-      </span>
+      <span class="lineup-name">${escapeHtml(p.name)}</span>
       <select onchange="setPosition('${g.id}', '${side}', '${pid}', this.value)">${positionOptions(pos)}</select>
       <button class="btn-icon btn-sm" title="Move up" onclick="moveBatter('${g.id}', '${side}', ${idx}, -1)">↑</button>
       <button class="btn-icon btn-sm" title="Move down" onclick="moveBatter('${g.id}', '${side}', ${idx}, 1)">↓</button>

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>WiffleCast</title>
 <link rel="icon" type="image/png" href="wc_color.png" />
-<link rel="stylesheet" href="style.css?v=20" />
+<link rel="stylesheet" href="style.css?v=21" />
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 </head>
 <body>
@@ -48,12 +48,12 @@
 
 <main>
   <section id="view-home" class="view active">
+    <div class="view-header" id="home-header"></div>
     <div class="view-body"><div id="home-container"></div></div>
   </section>
 
   <section id="view-stats" class="view">
     <div class="view-header">
-      <div class="view-title">Stats</div>
       <div id="stats-filter-bar"></div>
     </div>
     <div class="view-body">
@@ -87,7 +87,6 @@
 
   <section id="view-tournaments" class="view">
     <div class="view-header">
-      <div class="view-title">Events</div>
       <div class="toolbar">
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
           <label id="lbl-hide-finished-events" class="toggle-option" style="display:none">
@@ -109,7 +108,6 @@
 
   <section id="view-admin" class="view">
     <div class="view-header">
-      <div class="view-title">Admin</div>
       <div class="toolbar">
         <div id="admin-features-toggle"></div>
       </div>
@@ -169,7 +167,6 @@
   </section>
 
   <section id="view-rules" class="view">
-    <div class="view-header"><div class="view-title">Rules</div></div>
     <div class="view-body">
     <div class="rules-grid">
       <div class="rules-card">
@@ -209,7 +206,6 @@
 
   <section id="view-games" class="view">
     <div class="view-header">
-      <div class="view-title">Games</div>
       <div class="toolbar">
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
           <label class="toggle-option">
@@ -309,7 +305,7 @@
 <!-- Cache-busting note: bump the ?v= on these three + style.css whenever their
      content changes, so GitHub Pages / browser caches don't serve stale JS. -->
 <script src="state.js?v=3"></script>
-<script src="live.js?v=17"></script>
-<script src="app.js?v=34"></script>
+<script src="live.js?v=18"></script>
+<script src="app.js?v=35"></script>
 </body>
 </html>
