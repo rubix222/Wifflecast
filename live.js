@@ -688,7 +688,6 @@ function liveGameHTML(g, home, away) {
       <div class="lg-tab-body">
         <div class="lg-pane" data-tab="score" ${scorePaneHidden ? 'hidden' : ''}>
           ${canScore && isScoringLockStale(g) ? `<div id="stale-scoring-banner" style="background:#fef9c3;border-bottom:1px solid #fde68a;padding:8px 14px;font-size:12px;color:#92400e">⚠️ Scoring session timed out. Press any pitch button — if no one else took over, you'll resume automatically.</div>` : ''}
-          <div class="lg-matchup-spacer"></div>
           <div class="field-wrap">
             <div class="field-and-bases">
               <div class="field-panel">
@@ -1881,7 +1880,7 @@ function drawField(overrideBases = null) {
   }
 
   const svg = `
-    <svg viewBox="0 0 400 400" class="field-svg" id="field-svg">
+    <svg viewBox="0 0 400 400" preserveAspectRatio="none" class="field-svg" id="field-svg">
       <!-- Field.svg stretched to fill — provides all field visuals (grass, dirt,
            foul lines, arcs, bases, home plate, batter's boxes, pitcher's rubber) -->
       <image href="/Field.svg" x="0" y="0" width="400" height="400" preserveAspectRatio="none"/>
@@ -2342,13 +2341,13 @@ function bipChooseKind(kind) {
       <button onclick="bipChooseDetail('LD')">Line drive<span class="sub">LD</span></button>
       <button onclick="bipChooseDetail('FB')">Fly ball<span class="sub">FB</span></button>`,
     hit: `
-      <button onclick="bipChooseDetail('1B')">Single<span class="sub">1B</span></button>
-      <button onclick="bipChooseDetail('2B')">Double<span class="sub">2B</span></button>
-      <button onclick="bipChooseKind('hr')">Home Run<span class="sub">HR</span></button>`,
+      <button onclick="bipChooseDetail('1B')" style="background:#dcfce7;border-color:#86efac;color:#15803d">Single<span class="sub">1B</span></button>
+      <button onclick="bipChooseDetail('2B')" style="background:#dbeafe;border-color:#93c5fd;color:#1d4ed8">Double<span class="sub">2B</span></button>
+      <button onclick="bipChooseKind('hr')" style="background:#fef3c7;border-color:#fbbf24;color:#92400e">Home Run<span class="sub">HR</span></button>`,
     error: `
-      <button onclick="bipChooseDetail('1B')">Single<span class="sub">1B</span></button>
-      <button onclick="bipChooseDetail('2B')">Double<span class="sub">2B</span></button>
-      <button onclick="bipChooseDetail('HR')">Home Run<span class="sub">HR</span></button>`,
+      <button onclick="bipChooseDetail('1B')" style="background:#dcfce7;border-color:#86efac;color:#15803d">Single<span class="sub">1B</span></button>
+      <button onclick="bipChooseDetail('2B')" style="background:#dbeafe;border-color:#93c5fd;color:#1d4ed8">Double<span class="sub">2B</span></button>
+      <button onclick="bipChooseDetail('HR')" style="background:#fef3c7;border-color:#fbbf24;color:#92400e">Home Run<span class="sub">HR</span></button>`,
   };
   Modal.show(`
     <div class="modal-header">
