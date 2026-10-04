@@ -8,6 +8,11 @@
     --text-muted: #6b7280;
     --text-faint: #9ca3af;
     --text-strong: #111827;
+    --accent-tint: #eff6ff;
+    --accent-tint-strong: #dbeafe;
+    --accent-border: #93c5fd;
+    --accent-text: #1d4ed8;
+    --accent-text-deep: #1e3a8a;
 
     /* Brand: blue is the primary/interactive color (main header, primary
        buttons, active nav/tabs, links); green is reserved for section-label
@@ -42,6 +47,11 @@
     --text-muted: #9ca3af;
     --text-faint: #6b7280;
     --text-strong: #f9fafb;
+    --accent-tint: rgba(59,130,246,0.16);
+    --accent-tint-strong: rgba(59,130,246,0.28);
+    --accent-border: rgba(96,165,250,0.45);
+    --accent-text: #93c5fd;
+    --accent-text-deep: #bfdbfe;
   }
   /* Inputs/selects/tables etc. don't automatically pick up dark surfaces since
      browsers give form controls their own default white background. */
@@ -661,7 +671,7 @@
     0%, 100% { opacity: 1; transform: scale(1); }
     50% { opacity: 0.4; transform: scale(0.75); }
   }
-  .status-completed { background: #dbeafe; color: #1d4ed8; }
+  .status-completed { background: var(--accent-tint-strong); color: var(--accent-text); }
 
   /* ---------- Toggle switch (used for on/off list filters) ---------- */
   .toggle-option {
@@ -1597,9 +1607,9 @@
     position: sticky; left: 0; z-index: 2;
     background: var(--surface-alt);
   }
-  .stats-table th:hover { background: #eff6ff; color: var(--brand-blue-dark); }
-  .stats-table th.sorted { color: var(--brand-blue-dark); background: #eff6ff; }
-  .stats-table th.sorted:first-child { background: #eff6ff; }
+  .stats-table th:hover { background: var(--accent-tint); color: var(--accent-text); }
+  .stats-table th.sorted { color: var(--accent-text); background: var(--accent-tint); }
+  .stats-table th.sorted:first-child { background: var(--accent-tint); }
   .stats-table th .sort-arr { margin-left: 3px; opacity: 0.7; font-size: 9px; }
   .stats-table td {
     padding: 8px 12px;
@@ -1616,8 +1626,8 @@
   .stats-table tr:last-child td { border-bottom: none; }
   .stats-table tr:hover td { background: var(--surface-alt); }
   .stats-table tr:hover td:first-child { background: var(--surface-alt); }
-  .stats-table tr.mine td { background: #eff6ff; color: var(--brand-blue-deep); font-weight: 600; }
-  .stats-table tr.mine td:first-child { background: #eff6ff; }
+  .stats-table tr.mine td { background: var(--accent-tint); color: var(--accent-text-deep); font-weight: 600; }
+  .stats-table tr.mine td:first-child { background: var(--accent-tint); }
   .stats-table tr.mine:hover td { background: #dcfce7; }
   .stats-table tr.mine:hover td:first-child { background: #dcfce7; }
   /* Single-row inline tables (home page stat rows) have no name column —
@@ -1811,7 +1821,7 @@
     pointer-events: none;
   }
   .play-entry.clickable { cursor: pointer; }
-  .play-entry.clickable:hover td { background: #eff6ff; }
+  .play-entry.clickable:hover td { background: var(--accent-tint); }
   .play-entry.selected td { background: #dcfce7 !important; }
   .play-entry.selected td:first-child { border-left: 3px solid var(--brand-blue-dark); }
   /* Suppress bottom border on main row when extras follow */
@@ -1990,7 +2000,7 @@
     top: 0;
     z-index: 10;
   }
-  .tourn-back-btn:hover { background: #eff6ff; }
+  .tourn-back-btn:hover { background: var(--accent-tint); }
   /* Hide list panel and go full-width when an event is open (all screen sizes) */
   #tournaments-split:not(.tourn-has-detail) .player-detail-panel { display: none; }
   #tournaments-split.tourn-has-detail .player-list-panel { display: none; }
@@ -2167,11 +2177,11 @@
   .stats-filter-btn:hover { background: var(--surface-alt); border-color: var(--text-faint); }
   .stats-filter-btn.filtered {
     color: var(--brand-blue-dark);
-    background: #eff6ff;
-    border-color: #93c5fd;
+    background: var(--accent-tint);
+    border-color: var(--accent-border);
     font-weight: 600;
   }
-  .stats-filter-btn.filtered:hover { background: #dbeafe; }
+  .stats-filter-btn.filtered:hover { background: var(--accent-tint-strong); }
   .stats-filter-clear-btn {
     font-size: 13px;
     color: var(--text-faint);
@@ -2329,8 +2339,8 @@
     flex-wrap: wrap;
   }
   .home-stat-hi {
-    background: #eff6ff;
-    border: 1px solid #bfdbfe;
+    background: var(--accent-tint);
+    border: 1px solid var(--accent-border);
     border-radius: 10px;
     padding: 10px 16px;
     text-align: center;
