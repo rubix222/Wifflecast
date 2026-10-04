@@ -1670,7 +1670,7 @@ function buildHomeContentHtml(profile, { readOnly = false, signedIn = true } = {
 
   // Not signed in — show welcome card only
   if (!signedIn) {
-    return `<div style="padding-top:8px"><div class="home-grid">${playerCard}</div></div>`;
+    return { header: '', body: `<div class="home-grid">${playerCard}</div>` };
   }
 
   // ── My Player's own teams/games/events ──
