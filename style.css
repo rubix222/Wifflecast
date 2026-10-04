@@ -16,15 +16,15 @@
     --surface-alt: #f8fafc;
     --border: #e2e8f0;
     --text: #1e293b;
-    --text-muted: #64748b;
-    --text-faint: #94a3b8;
+    --text-muted: #526074;
+    --text-faint: #64748b;
     --text-strong: #0f172a;
 
     --brand-blue: #2563eb;
     --brand-blue-dark: #1d4ed8;
     --brand-blue-deep: #1e3a8a;
-    --brand-green: #166534;
-    --brand-green-dark: #14532d;
+    --brand-green: #15803d;
+    --brand-green-dark: #166534;
 
     --accent-tint: #eff6ff;
     --accent-tint-strong: #dbeafe;
@@ -32,8 +32,8 @@
     --accent-text: #1d4ed8;
     --accent-text-deep: #1e3a8a;
 
-    --success: #16a34a;
-    --success-dark: #15803d;
+    --success: #15803d;
+    --success-dark: #166534;
     --success-tint: #dcfce7;
     --success-border: #86efac;
     --success-text: #166534;
@@ -60,7 +60,7 @@
     --border: #2a3752;
     --text: #e2e8f0;
     --text-muted: #94a3b8;
-    --text-faint: #64748b;
+    --text-faint: #7b8aa3;
     --text-strong: #f8fafc;
 
     --accent-tint: rgba(59,130,246,0.16);
@@ -687,7 +687,7 @@
     font-weight: 600;
   }
   .status-setup { background: var(--warn-tint); color: var(--warn-text); }
-  .status-in_progress { background: var(--success-tint); color: var(--success-dark); }
+  .status-in_progress { background: var(--success-tint); color: var(--success-text); }
   .status-in_progress::before {
     content: '';
     display: inline-block;
@@ -2166,7 +2166,7 @@
   .champ-finalist-winner {
     border-color: var(--success);
     background: var(--success-tint);
-    color: var(--success-dark);
+    color: var(--success-text);
   }
   .champ-vs { font-size: 13px; font-weight: 700; color: var(--text-faint); }
   .champ-score { font-size: 20px; font-weight: 800; color: var(--text); padding: 0 4px; }
