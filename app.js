@@ -261,7 +261,7 @@ function renderTeamStatTable(teamId) {
 
 // Shared helper: renders one section table (one row per team) for the home page.
 function renderHomeTeamsSection(teams, view) {
-  if (!teams.length) return '<p style="color:#6b7280;font-size:14px;margin:0">No teams yet.</p>';
+  if (!teams.length) return '<p style="color:var(--text-muted);font-size:14px;margin:0">No teams yet.</p>';
 
   const teamData = teams.map(t => {
     const ts  = State.computeTeamStats(t.id);
@@ -351,7 +351,7 @@ function showTeamStatsModal(teamId) {
         .sort((a, b) => a.name.localeCompare(b.name))
         .map(p => `<span style="display:inline-flex;align-items:center;margin:3px 6px 3px 0;font-size:13px">${escapeHtml(p.name)}</span>`)
         .join(''))
-    : '<span style="color:#6b7280;font-size:13px">No players</span>';
+    : '<span style="color:var(--text-muted);font-size:13px">No players</span>';
 
   const teamColor = _teamColor(t);
   const colorDot = `<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${teamColor};margin-right:6px;vertical-align:middle;border:1px solid rgba(0,0,0,0.15)"></span>`;
@@ -639,7 +639,7 @@ function showAuthModal(mode = 'signin', errorMsg = '') {
       <button class="btn-icon" onclick="Modal.hide()">✕</button>
     </div>
     <div class="modal-body">
-      ${errorMsg ? `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:8px 12px;color:#b91c1c;font-size:13px;margin-bottom:12px">${escapeHtml(errorMsg)}</div>` : ''}
+      ${errorMsg ? `<div style="background:var(--danger-tint);border:1px solid var(--danger-border);border-radius:6px;padding:8px 12px;color:var(--danger-dark);font-size:13px;margin-bottom:12px">${escapeHtml(errorMsg)}</div>` : ''}
       <div id="google-btn-container" style="min-height:44px;margin-bottom:4px"></div>
       <button type="button" style="display:none">
         <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#4285F4" d="M44.5 20H24v8.5h11.7C34.2 33.6 29.6 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 6 1.1 8.2 3l6-6C34.5 5.1 29.5 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21c10.8 0 20-7.8 20-21 0-1.4-.1-2.7-.5-4z"/><path fill="#34A853" d="M6.3 14.7l7 5.1C15 16.1 19.1 13 24 13c3.1 0 6 1.1 8.2 3l6-6C34.5 5.1 29.5 3 24 3c-7.6 0-14.2 4.6-17.7 11.7z"/><path fill="#FBBC05" d="M24 45c5.4 0 10.3-1.8 14.1-4.9l-6.5-5.4C29.6 36.4 26.9 37 24 37c-5.6 0-10.2-3.4-11.7-8.3l-7 5.4C8.9 41 15.9 45 24 45z"/><path fill="#EA4335" d="M44.5 20H24v8.5h11.7c-.8 2.3-2.3 4.2-4.2 5.6l6.5 5.4C42 36.2 45 30.6 45 24c0-1.4-.1-2.7-.5-4z"/></svg>
@@ -843,7 +843,7 @@ function showChangePasswordModal(errorMsg = '') {
     </div>
     <form onsubmit="submitChangePassword(event)">
       <div class="modal-body">
-        ${errorMsg ? `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:8px 12px;color:#b91c1c;font-size:13px;margin-bottom:12px">${escapeHtml(errorMsg)}</div>` : ''}
+        ${errorMsg ? `<div style="background:var(--danger-tint);border:1px solid var(--danger-border);border-radius:6px;padding:8px 12px;color:var(--danger-dark);font-size:13px;margin-bottom:12px">${escapeHtml(errorMsg)}</div>` : ''}
         <div class="form-group"><label>Current Password</label><input name="current" type="password" required autofocus autocomplete="current-password" /></div>
         <div class="form-group"><label>New Password</label><input name="newpw" type="password" required minlength="6" autocomplete="new-password" /></div>
         <div class="form-group"><label>Confirm New Password</label><input name="confirm" type="password" required minlength="6" autocomplete="new-password" /></div>
@@ -1572,7 +1572,7 @@ function buildPlayerHomeSections(pid, { interactive = false, labelPrefix = '' } 
     Hide Finished
   </label>` : '';
   const gamesHtml = games.map(g => buildGameListItem(g)).join('')
-    || '<p style="color:#6b7280;font-size:14px;margin:0">No active games.</p>';
+    || '<p style="color:var(--text-muted);font-size:14px;margin:0">No active games.</p>';
   const gamesCard = `
     <div class="home-card home-card-full">
       <div class="home-section-title">${labelPrefix}Games</div>
@@ -1597,7 +1597,7 @@ function buildPlayerHomeSections(pid, { interactive = false, labelPrefix = '' } 
       <div class="pli-name">${escapeHtml(t.name)}</div>
       <div class="pli-sub">${isTournamentComplete(t.id) ? 'Finished' : 'In progress'} · ${done}/${g2.length} games played</div>
     </div>`;
-  }).join('') || '<p style="color:#6b7280;font-size:14px;margin:0">No events yet.</p>';
+  }).join('') || '<p style="color:var(--text-muted);font-size:14px;margin:0">No events yet.</p>';
   const eventsCard = `
     <div class="home-card home-card-full">
       <div class="home-section-title">${labelPrefix}Events</div>
@@ -1629,7 +1629,7 @@ function buildHomeContentHtml(profile, { readOnly = false, signedIn = true } = {
     playerCard = signedIn ? `
       <div class="home-card">
         <div class="home-section-title">Player</div>
-        <p style="color:#6b7280;margin:0;font-size:14px">Not linked to a player.</p>
+        <p style="color:var(--text-muted);margin:0;font-size:14px">Not linked to a player.</p>
       </div>` : '';
   } else if (signedIn && followedIds.length) {
     // Already following someone — keep the door open to becoming a player
@@ -1637,7 +1637,7 @@ function buildHomeContentHtml(profile, { readOnly = false, signedIn = true } = {
     playerCard = `
       <div class="home-card">
         <div class="home-section-title">My Player</div>
-        <p style="color:#6b7280;margin:0 0 12px 0;font-size:14px">Don't have a player yet?</p>
+        <p style="color:var(--text-muted);margin:0 0 12px 0;font-size:14px">Don't have a player yet?</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-primary btn-sm" onclick="showCreateMyPlayerModal()">+ Create My Player</button>
           <button class="btn btn-sm" onclick="showClaimPlayerModal()">🔗 Claim Existing</button>
@@ -1648,14 +1648,14 @@ function buildHomeContentHtml(profile, { readOnly = false, signedIn = true } = {
       <div class="home-card">
         <div class="home-section-title">Get Started</div>
         <div style="margin-bottom:14px">
-          <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px">🏏 I'm a Player</div>
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:6px">🏏 I'm a Player</div>
           <div style="display:flex;flex-direction:column;gap:8px">
             <button class="btn btn-primary btn-sm" onclick="showCreateMyPlayerModal()">+ Create My Player</button>
             <button class="btn btn-sm" onclick="showClaimPlayerModal()">🔗 Claim an Existing Player</button>
           </div>
         </div>
         <div>
-          <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px">👀 I'm Just Watching</div>
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:6px">👀 I'm Just Watching</div>
           <button class="btn btn-sm" onclick="showFollowPlayerModal()">⭐ Follow a Player</button>
         </div>
       </div>`;
@@ -1663,7 +1663,7 @@ function buildHomeContentHtml(profile, { readOnly = false, signedIn = true } = {
     playerCard = `
       <div class="home-card">
         <div class="home-section-title">Welcome to WiffleCast</div>
-        <p style="color:#6b7280;margin:0 0 12px 0;font-size:14px">Sign in to manage your players and teams, or just follow along with players you like.</p>
+        <p style="color:var(--text-muted);margin:0 0 12px 0;font-size:14px">Sign in to manage your players and teams, or just follow along with players you like.</p>
         <button class="btn btn-primary btn-sm" onclick="showAuthModal('signin')">Sign In</button>
       </div>`;
   }
@@ -1812,7 +1812,7 @@ const Render = {
     }
 
     if (!sorted.length) {
-      listEl.innerHTML = `<div class="empty-state" style="padding:24px"><p>${allSorted.length ? 'No active events. <label style="cursor:pointer;color:#0369a1" onclick="hideFinishedEvents=false;Render.tournaments()">Show finished?</label>' : 'No events found.'}</p></div>`;
+      listEl.innerHTML = `<div class="empty-state" style="padding:24px"><p>${allSorted.length ? 'No active events. <label style="cursor:pointer;color:var(--accent-text)" onclick="hideFinishedEvents=false;Render.tournaments()">Show finished?</label>' : 'No events found.'}</p></div>`;
     } else {
       listEl.innerHTML = sorted.map(t => {
         const games = State.games.filter(g => g.tournamentId === t.id);
@@ -1859,7 +1859,7 @@ const Render = {
     const rows = State.users.map(u => {
       const player = u.playerId ? State.getPlayer(u.playerId) : null;
       return `<tr>
-        <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;color:#0369a1" title="${escapeHtml(u.name || '')} — click to view their Home" onclick="showUserHomeView('${u.uid}')">${escapeHtml(u.name || '—')}</td>
+        <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;color:var(--accent-text)" title="${escapeHtml(u.name || '')} — click to view their Home" onclick="showUserHomeView('${u.uid}')">${escapeHtml(u.name || '—')}</td>
         <td><span class="muted small">${escapeHtml(u.email || u.uid)}</span></td>
         <td>
           <span style="margin-right:6px">${player ? escapeHtml(player.name) : '<span class="muted">—</span>'}</span>
@@ -1867,7 +1867,7 @@ const Render = {
         </td>
         <td>
           ${u.email === ADMIN_EMAIL
-            ? '<span style="font-size:13px;color:#6b7280">Admin</span>'
+            ? '<span style="font-size:13px;color:var(--text-muted)">Admin</span>'
             : `<label style="display:flex;align-items:center;justify-content:flex-end;gap:6px;cursor:pointer">
                 <span style="font-size:13px">Can Score</span>
                 <input type="checkbox" ${u.canScore ? 'checked' : ''} onchange="toggleCanScore('${u.uid}')" />
@@ -2236,7 +2236,7 @@ const Render = {
     if (!State.games.length) {
       const hasTwoTeams = State.teams.length >= 2;
       const adminMsg = hasTwoTeams ? 'No games yet.' : 'Create at least 2 teams first.';
-      listEl.innerHTML = `<div style="padding:16px;color:#6b7280;font-size:13px">
+      listEl.innerHTML = `<div style="padding:16px;color:var(--text-muted);font-size:13px">
         ${isAdmin() ? adminMsg : 'No games found.'}
       </div>`;
       return;
@@ -2256,9 +2256,9 @@ const Render = {
 
     if (!sorted.length) {
       const emptyMsg = hideFinishedGames
-        ? `No active games. <label style="cursor:pointer;color:#0369a1" onclick="hideFinishedGames=false;Render.games()">Show finished?</label>`
+        ? `No active games. <label style="cursor:pointer;color:var(--accent-text)" onclick="hideFinishedGames=false;Render.games()">Show finished?</label>`
         : 'No games found.';
-      listEl.innerHTML = `<div style="padding:16px;color:#6b7280;font-size:13px">${emptyMsg}</div>`;
+      listEl.innerHTML = `<div style="padding:16px;color:var(--text-muted);font-size:13px">${emptyMsg}</div>`;
       return;
     }
     // Keep selectedGameId valid
@@ -2278,10 +2278,10 @@ const Render = {
       // Event badge + date on same line
       const eventName = g.tournamentId ? (State.getTournament(g.tournamentId)?.name || g.tournamentName || null) : null;
       const eventBadge = eventName
-        ? `<span style="font-size:11px;color:#0369a1">📋 ${escapeHtml(eventName)}</span>`
+        ? `<span style="font-size:11px;color:var(--accent-text)">📋 ${escapeHtml(eventName)}</span>`
         : '';
       const exhibitionBadge = g.isExhibition
-        ? `<span style="font-size:11px;color:#b45309">🎪 Exhibition</span>`
+        ? `<span style="font-size:11px;color:var(--warn-text)">🎪 Exhibition</span>`
         : '';
 
       // Top-right action buttons
@@ -2309,11 +2309,11 @@ const Render = {
           </div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px">
             <div style="font-weight:600;font-size:13px">${matchupHtml(away, home)}</div>
-            ${showScore ? `<div style="font-size:14px;font-weight:700;color:#374151;text-align:right;line-height:1.4">${g.score.away}<br>${g.score.home}</div>` : ''}
+            ${showScore ? `<div style="font-size:14px;font-weight:700;color:var(--text);text-align:right;line-height:1.4">${g.score.away}<br>${g.score.home}</div>` : ''}
           </div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px">
             <span style="display:flex;gap:6px">${eventBadge}${exhibitionBadge}</span>
-            <span style="font-size:11px;color:#9ca3af">${date}</span>
+            <span style="font-size:11px;color:var(--text-faint)">${date}</span>
           </div>
         </div>
       </div>`;
@@ -2392,7 +2392,7 @@ function showCreateMyPlayerModal() {
     </div>
     <form onsubmit="submitCreateMyPlayer(event)">
       <div class="modal-body">
-        <p style="font-size:13px;color:#6b7280;margin:0 0 14px">Create your player profile to have your stats tracked.</p>
+        <p style="font-size:13px;color:var(--text-muted);margin:0 0 14px">Create your player profile to have your stats tracked.</p>
         <div class="form-group">
           <label for="cmp-name">Your name</label>
           <input id="cmp-name" required autofocus value="${escapeHtml(currentUserProfile?.name || '')}" />
@@ -2497,7 +2497,7 @@ function _teamColor(team) {
 function matchupHtml(away, home) {
   return `<div style="display:grid;grid-template-columns:1em 1fr;align-items:center;column-gap:2px;line-height:1.5">
     <span></span><span>${teamSwatch(away)}${escapeHtml(away?.name||'?')}</span>
-    <span style="color:#9ca3af;font-size:0.8em;text-align:right">@</span><span>${teamSwatch(home)}${escapeHtml(home?.name||'?')}</span>
+    <span style="color:var(--text-faint);font-size:0.8em;text-align:right">@</span><span>${teamSwatch(home)}${escapeHtml(home?.name||'?')}</span>
   </div>`;
 }
 
@@ -2537,7 +2537,7 @@ function showTeamModal(id = null, forceAdmin = false) {
         </div>
         <div class="form-group">
           <label for="team-color">Team color</label>
-          <input type="color" id="team-color" value="${editing ? (editing.color || '#6b7280') : _randomTeamColor()}" style="width:48px;height:36px;padding:2px;cursor:pointer;border-radius:6px;border:1px solid #d1d5db" />
+          <input type="color" id="team-color" value="${editing ? (editing.color || '#6b7280') : _randomTeamColor()}" style="width:48px;height:36px;padding:2px;cursor:pointer;border-radius:6px;border:1px solid var(--border)" />
         </div>
         <div class="form-group">
           <label>Roster <span class="muted small">(select 2 or more players${!canEditRoster ? ' — only admins can change roster' : ''})</span></label>
@@ -2611,7 +2611,7 @@ function showNewGameModal() {
           <input id="game-innings" type="number" min="1" max="20" value="6" required style="width:60px" />
         </div>
         <div class="form-group">
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:400;color:#6b7280;font-size:12px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:400;color:var(--text-muted);font-size:12px">
             <input id="game-exhibition" type="checkbox" style="width:auto" />
             Exhibition only (no global stats)
           </label>
@@ -2687,10 +2687,10 @@ function openGame(id) {
       const eventName = g.tournamentId ? (State.getTournament(g.tournamentId)?.name || g.tournamentName || null) : null;
       detail.innerHTML = `
         <div class="inline-game-header">
-          <h3 style="line-height:1.4">${teamSwatch(away)}${escapeHtml(away?.name||'?')}<br><span style="font-size:0.75em;font-weight:400;color:#9ca3af">@</span> ${teamSwatch(home)}${escapeHtml(home?.name||'?')}</h3>
-          ${eventName ? `<div style="font-size:12px;color:#0369a1;margin-top:4px">📋 ${escapeHtml(eventName)}</div>` : ''}
+          <h3 style="line-height:1.4">${teamSwatch(away)}${escapeHtml(away?.name||'?')}<br><span style="font-size:0.75em;font-weight:400;color:var(--text-faint)">@</span> ${teamSwatch(home)}${escapeHtml(home?.name||'?')}</h3>
+          ${eventName ? `<div style="font-size:12px;color:var(--accent-text);margin-top:4px">📋 ${escapeHtml(eventName)}</div>` : ''}
         </div>
-        <div style="padding:24px;text-align:center;color:#6b7280">
+        <div style="padding:24px;text-align:center;color:var(--text-muted)">
           <div style="font-size:32px;margin-bottom:8px">⏳</div>
           <div style="font-size:15px;font-weight:600;margin-bottom:4px">Not Started</div>
           <div style="font-size:13px">This game hasn't been set up yet.</div>
@@ -2793,10 +2793,10 @@ function buildGameListItem(g, { showAdminControls = false } = {}) {
     : '';
   const eventName2 = g.tournamentId ? (State.getTournament(g.tournamentId)?.name || g.tournamentName || null) : null;
   const eventBadge2 = eventName2
-    ? `<span style="font-size:11px;color:#0369a1">📋 ${escapeHtml(eventName2)}</span>`
+    ? `<span style="font-size:11px;color:var(--accent-text)">📋 ${escapeHtml(eventName2)}</span>`
     : '';
   const exhibitionBadge2 = g.isExhibition
-    ? `<span style="font-size:11px;color:#b45309">🎪 Exhibition</span>`
+    ? `<span style="font-size:11px;color:var(--warn-text)">🎪 Exhibition</span>`
     : '';
   const clickAttr = (isSetup && !canUserScore()) ? 'style="cursor:default;opacity:0.6"' : `onclick="openGame('${g.id}')"`;
   return `<div class="player-list-item game-list-item" ${clickAttr}>
@@ -2807,11 +2807,11 @@ function buildGameListItem(g, { showAdminControls = false } = {}) {
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px">
         <div style="font-weight:600;font-size:13px">${matchupHtml(away, home)}</div>
-        ${showScore ? `<div style="font-size:14px;font-weight:700;color:#374151;text-align:right;line-height:1.4">${g.score.away}<br>${g.score.home}</div>` : ''}
+        ${showScore ? `<div style="font-size:14px;font-weight:700;color:var(--text);text-align:right;line-height:1.4">${g.score.away}<br>${g.score.home}</div>` : ''}
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px">
         <span style="display:flex;gap:6px">${eventBadge2}${exhibitionBadge2}</span>
-        <span style="font-size:11px;color:#9ca3af">${date}</span>
+        <span style="font-size:11px;color:var(--text-faint)">${date}</span>
       </div>
     </div>
   </div>`;
@@ -2839,7 +2839,7 @@ function renderTournamentDetail(id) {
 
     // Standings table
     const deRows = standings.map((row, i) => {
-      const badge = row.eliminated ? `<span style="font-size:11px;color:#dc2626;font-weight:600;margin-left:4px">OUT</span>` : '';
+      const badge = row.eliminated ? `<span style="font-size:11px;color:var(--danger);font-weight:600;margin-left:4px">OUT</span>` : '';
       return `<tr class="${i === 0 && !row.eliminated ? 'tourn-leader' : ''}${row.eliminated ? ' tourn-eliminated' : ''}">
         <td>${row.eliminated ? '✗' : i+1}</td>
         <td><span style="display:inline-flex;align-items:center;gap:5px"><strong>${teamSwatch(row.team)}${escapeHtml(row.team.name)}</strong>${badge}</span></td>
@@ -3407,7 +3407,7 @@ function renderGameSetup(g) {
   if (!detail) return;
   detail.innerHTML = `
     <div class="inline-game-header">
-      <h3 style="line-height:1.4">${teamSwatch(away)}${escapeHtml(away.name)}<br><span style="font-size:0.75em;font-weight:400;color:#9ca3af">@</span> ${teamSwatch(home)}${escapeHtml(home.name)}
+      <h3 style="line-height:1.4">${teamSwatch(away)}${escapeHtml(away.name)}<br><span style="font-size:0.75em;font-weight:400;color:var(--text-faint)">@</span> ${teamSwatch(home)}${escapeHtml(home.name)}
         <span class="game-card-status status-setup" style="margin-left:8px">setup</span>
       </h3>
     </div>
@@ -3427,7 +3427,7 @@ function renderGameSetup(g) {
         </div>
       </div>
     </div>
-    <div style="padding:12px 20px;border-top:1px solid #e5e7eb;display:flex;gap:8px;justify-content:flex-end">
+    <div style="padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
       <button class="btn btn-primary" onclick="startGame('${g.id}')">Start game →</button>
     </div>`;
   renderLineup(g, 'away');
@@ -3442,8 +3442,8 @@ function showSetupModal(gameId) {
   Modal.show(`
     <div class="modal-header">
       <div>
-        <h2 style="margin:0;line-height:1.4">${escapeHtml(away.name)}<br><span style="font-size:0.75em;font-weight:400;color:#9ca3af">@</span> ${escapeHtml(home.name)}</h2>
-        ${eventName ? `<div style="font-size:12px;color:#0369a1;margin-top:2px">📋 ${escapeHtml(eventName)}</div>` : ''}
+        <h2 style="margin:0;line-height:1.4">${escapeHtml(away.name)}<br><span style="font-size:0.75em;font-weight:400;color:var(--text-faint)">@</span> ${escapeHtml(home.name)}</h2>
+        ${eventName ? `<div style="font-size:12px;color:var(--accent-text);margin-top:2px">📋 ${escapeHtml(eventName)}</div>` : ''}
       </div>
       <button class="btn-icon" onclick="Modal.hide()">✕</button>
     </div>
@@ -3666,12 +3666,12 @@ function showEmailSetupModal() {
       <label class="form-label">Public Key</label>
       <input class="form-input" id="ejs-key" placeholder="your_public_key" value="${escapeHtml(cfg.publicKey || '')}" />
 
-      <div style="margin-top:16px;margin-bottom:6px;font-size:13px;font-weight:700;color:#374151;border-top:1px solid #e5e7eb;padding-top:14px">Invite Template</div>
+      <div style="margin-top:16px;margin-bottom:6px;font-size:13px;font-weight:700;color:var(--text);border-top:1px solid var(--border);padding-top:14px">Invite Template</div>
       <p class="help-text" style="margin-bottom:8px">Used when inviting a player by email. Variables: <code>{{to_email}}</code>, <code>{{to_name}}</code>, <code>{{message}}</code></p>
       <label class="form-label">Invite Template ID</label>
       <input class="form-input" id="ejs-template" placeholder="template_xxxxxxx" value="${escapeHtml(cfg.templateId || '')}" />
 
-      <div style="margin-top:16px;margin-bottom:6px;font-size:13px;font-weight:700;color:#374151;border-top:1px solid #e5e7eb;padding-top:14px">Recap Template</div>
+      <div style="margin-top:16px;margin-bottom:6px;font-size:13px;font-weight:700;color:var(--text);border-top:1px solid var(--border);padding-top:14px">Recap Template</div>
       <p class="help-text" style="margin-bottom:8px">Used for game recap emails. Create a <strong>separate</strong> template in EmailJS with these settings:</p>
       <ul class="help-text" style="margin:0 0 10px;padding-left:18px;line-height:1.8">
         <li>Subject: <code>{{subject}}</code></li>
@@ -3907,7 +3907,7 @@ function showRecapModal(gameId) {
       <button class="btn-icon" onclick="Modal.hide()">✕</button>
     </div>
     <div class="modal-body">
-      <pre id="recap-text" style="font-size:12px;line-height:1.6;white-space:pre-wrap;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:12px;margin:0;max-height:340px;overflow-y:auto">${escapeHtml(text)}</pre>
+      <pre id="recap-text" style="font-size:12px;line-height:1.6;white-space:pre-wrap;background:var(--surface-alt);border:1px solid var(--border);border-radius:6px;padding:12px;margin:0;max-height:340px;overflow-y:auto">${escapeHtml(text)}</pre>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="Modal.hide()">Close</button>
@@ -3915,7 +3915,7 @@ function showRecapModal(gameId) {
       ${canShare ? `<button class="btn btn-primary" onclick="_shareRecap('${gameId}')">Share…</button>` : ''}
       <button class="btn btn-primary" onclick="_copyRecap('${gameId}')">Copy</button>
     </div>
-    <div style="text-align:center;margin-top:8px;font-size:12px;color:#6b7280">
+    <div style="text-align:center;margin-top:8px;font-size:12px;color:var(--text-muted)">
       <a href="#" onclick="showEmailSetupModal();return false">Configure email settings</a>
     </div>`);
 }

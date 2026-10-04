@@ -641,9 +641,9 @@ function liveGameHTML(g, home, away) {
         <div class="lg-title">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:nowrap;min-width:0">
             <span class="game-card-status status-${g.status}" style="font-size:11px;flex-shrink:0">${isCompleted ? 'Final' : canScore ? 'Scoring' : 'Live'}</span>
-            ${(function(){ const n = !canScore && renderScorerName(g); return n ? `<span style="font-size:11px;color:#166534;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🟢 ${escapeHtml(n)}</span>` : ''; })()}
+            ${(function(){ const n = !canScore && renderScorerName(g); return n ? `<span style="font-size:11px;color:var(--success-text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🟢 ${escapeHtml(n)}</span>` : ''; })()}
           </div>
-          ${g.tournamentId ? `<div style="font-size:11px;color:#0369a1;font-weight:500;margin-top:2px">📋 ${escapeHtml(State.getTournament(g.tournamentId)?.name || g.tournamentName || '')}</div>` : ''}
+          ${g.tournamentId ? `<div style="font-size:11px;color:var(--accent-text);font-weight:500;margin-top:2px">📋 ${escapeHtml(State.getTournament(g.tournamentId)?.name || g.tournamentName || '')}</div>` : ''}
         </div>
         ${isCompleted && isAdmin() ? `
         <div style="display:flex;gap:6px;flex-shrink:0">
@@ -655,7 +655,7 @@ function liveGameHTML(g, home, away) {
           <button class="btn-icon lg-menu-btn" onclick="toggleLiveMenu()">⋮</button>
           <div class="lg-menu" id="lg-menu" hidden>
             <button onclick="endHalfInning('${g.id}');closeLiveMenu()">End half inning</button>
-            <button onclick="endGameEarly('${g.id}');closeLiveMenu()" style="color:#dc2626">End game</button>
+            <button onclick="endGameEarly('${g.id}');closeLiveMenu()" style="color:var(--danger)">End game</button>
             <div class="lg-menu-divider"></div>
             <button onclick="swapHomeAway('${g.id}');closeLiveMenu()"
               ${((g.events||[]).length > 0 || g.balls > 0 || g.strikes > 0 || (g.fouls||0) > 0) ? 'disabled' : ''}>⇄ Swap Home/Away</button>
@@ -687,7 +687,7 @@ function liveGameHTML(g, home, away) {
 
       <div class="lg-tab-body">
         <div class="lg-pane" data-tab="score" ${scorePaneHidden ? 'hidden' : ''}>
-          ${canScore && isScoringLockStale(g) ? `<div id="stale-scoring-banner" style="background:#fef9c3;border-bottom:1px solid #fde68a;padding:8px 14px;font-size:12px;color:#92400e">⚠️ Scoring session timed out. Press any pitch button — if no one else took over, you'll resume automatically.</div>` : ''}
+          ${canScore && isScoringLockStale(g) ? `<div id="stale-scoring-banner" style="background:var(--warn-tint);border-bottom:1px solid var(--warn-border);padding:8px 14px;font-size:12px;color:var(--warn-text)">⚠️ Scoring session timed out. Press any pitch button — if no one else took over, you'll resume automatically.</div>` : ''}
           <div class="lg-matchup-spacer"></div>
           <div class="field-wrap">
             <div class="field-and-bases">
@@ -737,7 +737,7 @@ function renderPitcherRow(g) {
   const pitcherId = currentPitcherId(g);
   const pitcher = pitcherId ? State.getPlayer(pitcherId) : null;
   return `
-    <div style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #f3f4f6">
+    <div style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--surface-alt)">
       <span>${escapeHtml(pitcher?.name || '?')}</span>
       <div class="game-stats">${pitcherId ? pitcherGameStats(g, pitcherId) : ''}</div>
     </div>
@@ -878,7 +878,7 @@ function renderBatterRow(g) {
   const batter = State.getPlayer(batterId);
   const canScore = !LiveGameWatchOnly && canUserScore();
   const nameEl = canScore
-    ? `<span class="player-name batter-skip-btn" onclick="showSkipBatterModal()" title="Click to skip this batter">${escapeHtml(batter?.name || '?')} <span style="font-size:10px;color:#9ca3af">⏭</span></span>`
+    ? `<span class="player-name batter-skip-btn" onclick="showSkipBatterModal()" title="Click to skip this batter">${escapeHtml(batter?.name || '?')} <span style="font-size:10px;color:var(--text-faint)">⏭</span></span>`
     : `<span class="player-name">${escapeHtml(batter?.name || '?')}</span>`;
   return `
     <div class="at-bat-row">
@@ -1808,10 +1808,10 @@ function drawField(overrideBases = null) {
       const canScoreNow = !LiveGameWatchOnly && canUserScore() && !isCompleted;
       if (!canScoreNow) return '';
       return `<g class="fielder" data-pid="" data-pos="${pos}" transform="translate(${cx},${cy})" style="cursor:pointer">
-        <circle cx="0" cy="0" r="16" style="fill:#f3f4f6;stroke:#9ca3af;stroke-width:1.5;stroke-dasharray:4,3"/>
-        <text class="pos" x="0" y="0" style="fill:#9ca3af">${pos}</text>
-        <text class="name bg" y="26" style="fill:#9ca3af">?</text>
-        <text class="name" y="26" style="fill:#9ca3af">?</text>
+        <circle cx="0" cy="0" r="16" style="fill:var(--surface-alt);stroke:var(--text-faint);stroke-width:1.5;stroke-dasharray:4,3"/>
+        <text class="pos" x="0" y="0" style="fill:var(--text-faint)">${pos}</text>
+        <text class="name bg" y="26" style="fill:var(--text-faint)">?</text>
+        <text class="name" y="26" style="fill:var(--text-faint)">?</text>
       </g>`;
     }
     const gloveMode = __fieldClickMode && __fieldClickMode.needFielder;
@@ -2128,7 +2128,7 @@ function showSwapFielderModal(currentPid, currentPos) {
     const msg = isPitcher
       ? `Pitcher has only faced <strong>${faced}</strong> of 4 required batters this inning.`
       : `The current pitcher has only faced <strong>${faced}</strong> of 4 required batters. Swapping them in would violate the pitching rule.`;
-    warningBanner = `<div style="background:#fef9c3;border:1px solid #fde68a;border-radius:6px;padding:8px 10px;font-size:12px;color:#92400e;margin-bottom:10px">
+    warningBanner = `<div style="background:var(--warn-tint);border:1px solid var(--warn-border);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--warn-text);margin-bottom:10px">
         ⚠️ ${msg}
        </div>`;
   }
@@ -2314,9 +2314,9 @@ function bipStart() {
     </div>
     <div class="modal-body">
       <div class="outcome-grid">
-        <button onclick="bipChooseKind('out')" style="background:#fee2e2;border-color:#fca5a5;color:#991b1b">Out</button>
-        <button onclick="bipChooseKind('hit')" style="background:#dcfce7;border-color:#86efac;color:#166534">Hit</button>
-        <button onclick="bipChooseKind('error')" style="background:#fef9c3;border-color:#fde047;color:#854d0e">Error</button>
+        <button onclick="bipChooseKind('out')" style="background:var(--danger-tint);border-color:var(--danger-border);color:var(--danger-text)">Out</button>
+        <button onclick="bipChooseKind('hit')" style="background:var(--success-tint);border-color:var(--success-border);color:var(--success-text)">Hit</button>
+        <button onclick="bipChooseKind('error')" style="background:var(--warn-tint);border-color:var(--warn-border);color:var(--warn-text)">Error</button>
       </div>
     </div>
     <div class="modal-footer">
@@ -2342,13 +2342,13 @@ function bipChooseKind(kind) {
       <button onclick="bipChooseDetail('LD')">Line drive<span class="sub">LD</span></button>
       <button onclick="bipChooseDetail('FB')">Fly ball<span class="sub">FB</span></button>`,
     hit: `
-      <button onclick="bipChooseDetail('1B')" style="background:#dcfce7;border-color:#86efac;color:#15803d">Single<span class="sub">1B</span></button>
-      <button onclick="bipChooseDetail('2B')" style="background:#dbeafe;border-color:#93c5fd;color:#1d4ed8">Double<span class="sub">2B</span></button>
-      <button onclick="bipChooseKind('hr')" style="background:#fef3c7;border-color:#fbbf24;color:#92400e">Home Run<span class="sub">HR</span></button>`,
+      <button onclick="bipChooseDetail('1B')" style="background:var(--success-tint);border-color:var(--success-border);color:var(--success-dark)">Single<span class="sub">1B</span></button>
+      <button onclick="bipChooseDetail('2B')" style="background:var(--accent-tint-strong);border-color:var(--accent-border);color:var(--brand-blue-dark)">Double<span class="sub">2B</span></button>
+      <button onclick="bipChooseKind('hr')" style="background:var(--warn-tint);border-color:var(--warn-border);color:var(--warn-text)">Home Run<span class="sub">HR</span></button>`,
     error: `
-      <button onclick="bipChooseDetail('1B')" style="background:#dcfce7;border-color:#86efac;color:#15803d">Single<span class="sub">1B</span></button>
-      <button onclick="bipChooseDetail('2B')" style="background:#dbeafe;border-color:#93c5fd;color:#1d4ed8">Double<span class="sub">2B</span></button>
-      <button onclick="bipChooseDetail('HR')" style="background:#fef3c7;border-color:#fbbf24;color:#92400e">Home Run<span class="sub">HR</span></button>`,
+      <button onclick="bipChooseDetail('1B')" style="background:var(--success-tint);border-color:var(--success-border);color:var(--success-dark)">Single<span class="sub">1B</span></button>
+      <button onclick="bipChooseDetail('2B')" style="background:var(--accent-tint-strong);border-color:var(--accent-border);color:var(--brand-blue-dark)">Double<span class="sub">2B</span></button>
+      <button onclick="bipChooseDetail('HR')" style="background:var(--warn-tint);border-color:var(--warn-border);color:var(--warn-text)">Home Run<span class="sub">HR</span></button>`,
   };
   Modal.show(`
     <div class="modal-header">
@@ -2496,7 +2496,7 @@ function showDoublePlayPrompt(g) {
     <div class="modal-header"><h3>Double Play?</h3></div>
     <div class="modal-body" style="padding:16px">
       <p style="margin:0 0 8px;font-size:15px">Was a double play attempted?</p>
-      <p style="margin:0;font-size:13px;color:#6b7280">Lead runner: <strong>${ri}</strong></p>
+      <p style="margin:0;font-size:13px;color:var(--text-muted)">Lead runner: <strong>${ri}</strong></p>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="applyDoublePlay(false,false)">No</button>
@@ -2532,7 +2532,7 @@ function showTagUpPrompt(g) {
     <div class="modal-header"><h3>Tag Up?</h3></div>
     <div class="modal-body" style="padding:16px">
       <p style="margin:0 0 8px;font-size:15px">Did the runner on 3rd tag up?</p>
-      <p style="margin:0;font-size:13px;color:#6b7280">Runner: <strong>${ri}</strong></p>
+      <p style="margin:0;font-size:13px;color:var(--text-muted)">Runner: <strong>${ri}</strong></p>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="applyTagUp(false,false)">No — stayed</button>
@@ -3031,7 +3031,7 @@ function _showEndGameDialog(g) {
       <p style="font-size:15px;margin:0 0 8px">
         <strong>${escapeHtml(winner?.name || '?')}</strong> leads ${score}.
       </p>
-      <p style="font-size:13px;color:#6b7280;margin:0">End the game here, or continue playing?</p>
+      <p style="font-size:13px;color:var(--text-muted);margin:0">End the game here, or continue playing?</p>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="Modal.hide(); continueExtraInnings('${g.id}')">Continue Playing</button>
@@ -3084,7 +3084,7 @@ function showSkipBatterModal() {
     <div class="modal-header"><h3>Skip Batter?</h3></div>
     <div class="modal-body" style="padding:16px">
       <p style="margin:0;font-size:15px">Skip <strong>${escapeHtml(batter?.name || '?')}</strong> and move to the next batter?</p>
-      <p style="margin:8px 0 0;font-size:13px;color:#6b7280">No stats will be recorded for this plate appearance.</p>
+      <p style="margin:8px 0 0;font-size:13px;color:var(--text-muted)">No stats will be recorded for this plate appearance.</p>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="Modal.hide()">Cancel</button>
@@ -3194,9 +3194,9 @@ function showEditScoreModal(gameId) {
       <table style="width:100%;border-collapse:collapse">
         <thead>
           <tr>
-            <th style="text-align:center;padding:4px 8px;font-size:12px;color:#6b7280">Inn</th>
-            <th style="padding:4px 8px;font-size:12px;color:#6b7280">${escapeHtml(away.name)} (Away)</th>
-            <th style="padding:4px 8px;font-size:12px;color:#6b7280">${escapeHtml(home.name)} (Home)</th>
+            <th style="text-align:center;padding:4px 8px;font-size:12px;color:var(--text-muted)">Inn</th>
+            <th style="padding:4px 8px;font-size:12px;color:var(--text-muted)">${escapeHtml(away.name)} (Away)</th>
+            <th style="padding:4px 8px;font-size:12px;color:var(--text-muted)">${escapeHtml(home.name)} (Home)</th>
           </tr>
         </thead>
         <tbody id="es-tbody">${renderRows()}</tbody>
