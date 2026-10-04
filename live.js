@@ -2338,9 +2338,9 @@ function bipChooseKind(kind) {
   const titles = { out: 'Type of out', hit: 'Hit', error: 'Error — batter reaches' };
   const grids = {
     out: `
-      <button onclick="bipChooseDetail('GB')">Ground ball<span class="sub">GB</span></button>
-      <button onclick="bipChooseDetail('LD')">Line drive<span class="sub">LD</span></button>
-      <button onclick="bipChooseDetail('FB')">Fly ball<span class="sub">FB</span></button>`,
+      <button onclick="bipChooseDetail('GB')" style="background:var(--danger-tint);border-color:var(--danger-border);color:var(--danger-text)">Ground ball<span class="sub">GB</span></button>
+      <button onclick="bipChooseDetail('LD')" style="background:var(--danger-tint);border-color:var(--danger-border);color:var(--danger-text)">Line drive<span class="sub">LD</span></button>
+      <button onclick="bipChooseDetail('FB')" style="background:var(--danger-tint);border-color:var(--danger-border);color:var(--danger-text)">Fly ball<span class="sub">FB</span></button>`,
     hit: `
       <button onclick="bipChooseDetail('1B')" style="background:var(--success-tint);border-color:var(--success-border);color:var(--success-text)">Single<span class="sub">1B</span></button>
       <button onclick="bipChooseDetail('2B')" style="background:var(--success-tint);border-color:var(--success-border);color:var(--success-text)">Double<span class="sub">2B</span></button>
