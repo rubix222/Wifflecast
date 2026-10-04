@@ -2342,12 +2342,12 @@ function bipChooseKind(kind) {
       <button onclick="bipChooseDetail('LD')">Line drive<span class="sub">LD</span></button>
       <button onclick="bipChooseDetail('FB')">Fly ball<span class="sub">FB</span></button>`,
     hit: `
-      <button onclick="bipChooseDetail('1B')" style="background:var(--success-tint);border-color:var(--success-border);color:var(--success-dark)">Single<span class="sub">1B</span></button>
-      <button onclick="bipChooseDetail('2B')" style="background:var(--accent-tint-strong);border-color:var(--accent-border);color:var(--brand-blue-dark)">Double<span class="sub">2B</span></button>
-      <button onclick="bipChooseKind('hr')" style="background:var(--warn-tint);border-color:var(--warn-border);color:var(--warn-text)">Home Run<span class="sub">HR</span></button>`,
+      <button onclick="bipChooseDetail('1B')" style="background:var(--success-tint);border-color:var(--success-border);color:var(--success-text)">Single<span class="sub">1B</span></button>
+      <button onclick="bipChooseDetail('2B')" style="background:var(--success-tint);border-color:var(--success-border);color:var(--success-text)">Double<span class="sub">2B</span></button>
+      <button onclick="bipChooseKind('hr')" style="background:var(--success-tint);border-color:var(--success-border);color:var(--success-text)">Home Run<span class="sub">HR</span></button>`,
     error: `
-      <button onclick="bipChooseDetail('1B')" style="background:var(--success-tint);border-color:var(--success-border);color:var(--success-dark)">Single<span class="sub">1B</span></button>
-      <button onclick="bipChooseDetail('2B')" style="background:var(--accent-tint-strong);border-color:var(--accent-border);color:var(--brand-blue-dark)">Double<span class="sub">2B</span></button>
+      <button onclick="bipChooseDetail('1B')" style="background:var(--warn-tint);border-color:var(--warn-border);color:var(--warn-text)">Single<span class="sub">1B</span></button>
+      <button onclick="bipChooseDetail('2B')" style="background:var(--warn-tint);border-color:var(--warn-border);color:var(--warn-text)">Double<span class="sub">2B</span></button>
       <button onclick="bipChooseDetail('HR')" style="background:var(--warn-tint);border-color:var(--warn-border);color:var(--warn-text)">Home Run<span class="sub">HR</span></button>`,
   };
   Modal.show(`
